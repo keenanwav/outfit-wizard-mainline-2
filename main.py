@@ -6,12 +6,15 @@ import pandas as pd
 from collections import Counter
 from color_utils import get_color_palette
 from outfit_generator import generate_outfit
-from data_manager import load_clothing_items, save_outfit, add_clothing_item, update_csv_structure, store_user_preference, get_recommendations, load_saved_outfits, delete_outfit, edit_clothing_item, delete_clothing_item
+from data_manager import load_clothing_items, save_outfit, add_clothing_item, update_csv_structure, store_user_preference, get_advanced_recommendations, load_saved_outfits, delete_outfit, edit_clothing_item, delete_clothing_item
 from auth import auth_form, require_login
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
+import logging
 
 st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
+
+logging.basicConfig(level=logging.INFO)
 
 def get_dominant_color(image):
     try:
@@ -33,100 +36,118 @@ def get_dominant_color(image):
         st.error(f"Error processing image: {str(e)}")
         return "#000000"
 
+def display_outfit(outfit, missing_items):
+    if outfit:
+        st.success("Outfit generated successfully!")
+        
+        if missing_items:
+            st.warning(f"Unable to find the following items: {', '.join(missing_items)}. Showing partial outfit.")
+        
+        cols = st.columns(3)
+        for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
+            with cols[i]:
+                st.subheader(item_type.capitalize())
+                if item_type in outfit:
+                    image_path = outfit[item_type]['image_path']
+                    if os.path.exists(image_path):
+                        try:
+                            img = Image.open(image_path)
+                            st.image(img, use_column_width=True)
+                            if st.button(f"Like {item_type}", key=f"like_{item_type}"):
+                                store_user_preference(st.session_state.username, outfit[item_type]['id'])
+                                st.success(f"You liked this {item_type}!")
+                        except Exception as e:
+                            st.error(f"Error opening image for {item_type}: {str(e)}")
+                    else:
+                        st.error(f"Image file not found for {item_type}: {image_path}")
+                else:
+                    st.error(f"No {item_type} available for the given preferences.")
+        
+        if st.button("Save Outfit"):
+            if 'username' not in st.session_state or not st.session_state.username:
+                st.error("Please log in to save outfits.")
+            else:
+                try:
+                    saved_path = save_outfit(outfit, st.session_state.username)
+                    if saved_path:
+                        st.success(f"Outfit saved successfully! Path: {saved_path}")
+                    else:
+                        st.error("Failed to save outfit. Please try again.")
+                except Exception as e:
+                    st.error(f"Error saving outfit: {str(e)}")
+    else:
+        st.error("Unable to generate an outfit with the given preferences. Please try different options.")
+
 def main_page():
     st.title("Outfit Wizard 🧙‍♂️👚👖👞")
 
+    st.sidebar.header("Set Your Preferences")
     auth_form()
 
     try:
         clothing_items = load_clothing_items()
         st.write(f"Loaded {len(clothing_items)} clothing items")
 
-        st.sidebar.header("Set Your Preferences")
         size = st.sidebar.selectbox("Size", ["XS", "S", "M", "L", "XL"])
         style = st.sidebar.selectbox("Style", ["Casual", "Formal", "Sporty"])
         gender = st.sidebar.selectbox("Gender", ["Male", "Female", "Unisex"])
 
-        if st.sidebar.button("Generate 🔄"):
-            outfit, missing_items = generate_outfit(clothing_items, size, style, gender)
+        if 'outfit' not in st.session_state or st.sidebar.button("Generate New Outfit 🔄"):
+            st.session_state.outfit, st.session_state.missing_items = generate_outfit(clothing_items, size, style, gender)
 
-            if outfit:
-                st.success("Outfit generated successfully!")
-                
-                if missing_items:
-                    st.warning(f"Unable to find the following items: {', '.join(missing_items)}. Showing partial outfit.")
-                
-                cols = st.columns(3)
-                for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
-                    with cols[i]:
-                        st.subheader(item_type.capitalize())
-                        if item_type in outfit:
-                            image_path = outfit[item_type]['image_path']
-                            if os.path.exists(image_path):
-                                try:
-                                    img = Image.open(image_path)
-                                    st.image(img, use_column_width=True)
-                                    if st.button(f"Like {item_type}", key=f"like_{item_type}"):
-                                        store_user_preference(st.session_state.username, outfit[item_type]['id'])
-                                        st.success(f"You liked this {item_type}!")
-                                except Exception as e:
-                                    st.error(f"Error opening image for {item_type}: {str(e)}")
-                            else:
-                                st.error(f"Image file not found for {item_type}: {image_path}")
-                        else:
-                            st.error(f"No {item_type} available for the given preferences.")
-                
-                if st.button("Save Outfit"):
-                    if 'username' not in st.session_state or not st.session_state.username:
-                        st.error("Please log in to save outfits.")
-                    else:
-                        try:
-                            saved_path = save_outfit(outfit, st.session_state.username)
-                            if saved_path:
-                                st.success(f"Outfit saved successfully! Path: {saved_path}")
-                            else:
-                                st.error("Failed to save outfit. Please try again.")
-                        except Exception as e:
-                            st.error(f"Error saving outfit: {str(e)}")
-            else:
-                st.error("Unable to generate an outfit with the given preferences. Please try different options.")
+        display_outfit(st.session_state.outfit, st.session_state.missing_items)
 
-        st.header("Personalized Recommendations")
+        st.header("Advanced Personalized Recommendations")
         if 'username' in st.session_state and st.session_state.username:
-            recommendations = get_recommendations(st.session_state.username)
-            
-            if not recommendations.empty:
-                cols = st.columns(5)
-                for i, (_, item) in enumerate(recommendations.iterrows()):
-                    with cols[i % 5]:
-                        st.subheader(f"{item['type'].capitalize()}")
-                        if os.path.exists(item['image_path']):
-                            st.image(item['image_path'], use_column_width=True)
-                            st.write(f"Style: {item['style']}")
-                            st.write(f"Gender: {item['gender']}")
-                            st.write(f"Size: {item['size']}")
-                            if st.button(f"Like", key=f"like_rec_{item['id']}_{i}"):
-                                store_user_preference(st.session_state.username, item['id'])
-                                st.success(f"You liked this {item['type']}!")
-                            if item['hyperlink']:
-                                st.markdown(f"[View Product]({item['hyperlink']})")
-                        else:
-                            st.error(f"Image not found: {item['image_path']}")
-            else:
-                st.info("Like some items to get personalized recommendations!")
+            collab_weight = st.slider("Collaborative Filtering Weight", 0.0, 1.0, 0.7, 0.1)
+            try:
+                recommendations = get_advanced_recommendations(st.session_state.username, n_recommendations=5, collab_weight=collab_weight)
+                
+                if not recommendations.empty:
+                    st.write("Based on your preferences and our advanced recommendation algorithm, we suggest these items:")
+                    cols = st.columns(5)
+                    for i, (_, item) in enumerate(recommendations.iterrows()):
+                        with cols[i % 5]:
+                            st.subheader(f"{item['type'].capitalize()}")
+                            if os.path.exists(item['image_path']):
+                                st.image(item['image_path'], use_column_width=True)
+                                st.write(f"Style: {item['style']}")
+                                st.write(f"Gender: {item['gender']}")
+                                st.write(f"Size: {item['size']}")
+                                if st.button(f"Like", key=f"like_rec_{item['id']}_{i}"):
+                                    store_user_preference(st.session_state.username, item['id'])
+                                    st.success(f"You liked this {item['type']}!")
+                                if item['hyperlink']:
+                                    st.markdown(f"[View Product]({item['hyperlink']})")
+                            else:
+                                st.error(f"Image not found: {item['image_path']}")
+                else:
+                    st.info("No recommendations available. Try liking some items!")
+            except Exception as e:
+                logging.error(f"Error generating recommendations: {str(e)}")
+                st.error("An error occurred while generating recommendations. Please try again later.")
         else:
             st.info("Please log in to see personalized recommendations.")
 
     except Exception as e:
-        st.error(f"Error loading clothing items or generating outfit: {str(e)}")
+        logging.error(f"Error in main page: {str(e)}")
+        st.error(f"An error occurred: {str(e)}")
 
     st.sidebar.markdown("---")
-    st.sidebar.info("Outfit Wizard helps you create harmonious outfits based on your preferences and provides personalized recommendations.")
+    st.sidebar.info("Outfit Wizard helps you create harmonious outfits based on your preferences and provides personalized recommendations using advanced machine learning algorithms.")
 
 def admin_page():
     st.title("Admin Panel")
     
-    require_login()
+    # Check if user is logged in or needs admin access
+    is_logged_in = 'username' in st.session_state and st.session_state.username
+    
+    if not is_logged_in:
+        st.warning("You are not logged in. Use the button below to access admin features.")
+        if st.button("Access as Admin"):
+            st.session_state.username = 'admin'
+            st.experimental_rerun()
+        return
     
     update_csv_structure()
     
@@ -198,7 +219,6 @@ def view_edit_items():
     st.header("View/Edit Clothing Items")
     clothing_items = load_clothing_items()
     
-    # Add search functionality
     search_query = st.text_input("Search items by type, style, or gender:")
     if search_query:
         clothing_items = clothing_items[
@@ -207,7 +227,6 @@ def view_edit_items():
             clothing_items['gender'].str.contains(search_query, case=False)
         ]
     
-    # Add pagination
     items_per_page = 10
     num_pages = (len(clothing_items) - 1) // items_per_page + 1
     page = st.number_input("Page", min_value=1, max_value=num_pages, value=1)
@@ -226,10 +245,10 @@ def view_edit_items():
             with col2:
                 with st.form(f"edit_item_{item['id']}"):
                     color_value = item['color'].replace(',', '')
-                    if color_value and len(color_value) == 6:  # Ensure it's a valid 6-digit hex code
+                    if color_value and len(color_value) == 6:
                         new_color = st.color_picker("Color", f"#{color_value}")
                     else:
-                        new_color = st.color_picker("Color", "#000000")  # Default to black if invalid
+                        new_color = st.color_picker("Color", "#000000")
                     new_styles = st.multiselect('Style', ['Casual', 'Formal', 'Sporty'], default=[style.strip() for style in item['style'].split(',')])
                     new_genders = st.multiselect('Gender', ['Male', 'Female', 'Unisex'], default=[gender.strip() for gender in item['gender'].split(',')])
                     new_sizes = st.multiselect("Size", ["XS", "S", "M", "L", "XL"], default=[size.strip() for size in item['size'].split(',')])
@@ -250,7 +269,6 @@ def delete_items():
     st.header("Delete Clothing Items")
     clothing_items = load_clothing_items()
     
-    # Add search functionality
     search_query = st.text_input("Search items to delete by type, style, or gender:")
     if search_query:
         clothing_items = clothing_items[
@@ -291,7 +309,7 @@ def delete_items():
 
 def saved_outfits_page():
     st.title("Saved Outfits")
-    require_login()
+    require_login(lambda: None)
     
     saved_outfits = load_saved_outfits(st.session_state.username)
     

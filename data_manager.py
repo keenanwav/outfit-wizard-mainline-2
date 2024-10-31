@@ -4,11 +4,11 @@ from PIL import Image
 import uuid
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import MultiLabelBinarizer
-from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
+from sklearn.preprocessing import MultiLabelBinarizer, StandardScaler
+from sklearn.decomposition import TruncatedSVD
 from scipy.sparse import csr_matrix
 from sklearn.neighbors import NearestNeighbors
+import logging
 
 def ensure_user_preferences_file():
     if not os.path.exists('data/user_preferences.csv'):
@@ -149,6 +149,84 @@ def get_recommendations(username, n_recommendations=5):
     recommendations = items_df[items_df['id'].isin(recommended_items.index)]
     
     return recommendations[['id', 'type', 'style', 'gender', 'size', 'image_path', 'hyperlink']]
+
+def get_advanced_recommendations(username, n_recommendations=5, collab_weight=0.7):
+    logging.info(f"Generating advanced recommendations for user: {username}")
+    ensure_user_preferences_file()
+    items_df = load_clothing_items()
+    preferences_df = pd.read_csv('data/user_preferences.csv')
+    
+    if username not in preferences_df['username'].unique():
+        logging.warning(f"No preferences found for user: {username}. Using fallback method.")
+        return get_fallback_recommendations(items_df, n_recommendations)
+    
+    # Collaborative Filtering
+    user_item_matrix = preferences_df.pivot(index='username', columns='item_id', values='item_id').notna().astype(int)
+    user_item_matrix_sparse = csr_matrix(user_item_matrix.values)
+    
+    # Matrix Factorization using Truncated SVD
+    n_components = min(30, user_item_matrix_sparse.shape[1] - 1)
+    svd = TruncatedSVD(n_components=n_components, random_state=42)
+    user_item_matrix_reduced = svd.fit_transform(user_item_matrix_sparse)
+    item_features = svd.components_.T
+    
+    # Find similar users
+    user_similarity = cosine_similarity(user_item_matrix_reduced)
+    user_similarity_df = pd.DataFrame(user_similarity, index=user_item_matrix.index, columns=user_item_matrix.index)
+    similar_users = user_similarity_df.loc[username].sort_values(ascending=False)[1:6].index.tolist()
+    
+    # Content-based Filtering
+    item_content_features = get_item_content_features(items_df)
+    
+    # Get user's liked items
+    user_liked_items = preferences_df[preferences_df['username'] == username]['item_id'].tolist()
+    user_liked_features = item_content_features[items_df['id'].isin(user_liked_items)]
+    
+    if len(user_liked_features) > 0:
+        user_profile = np.mean(user_liked_features, axis=0)
+    else:
+        user_profile = np.mean(item_content_features, axis=0)
+    
+    # Calculate similarity between user profile and all items
+    content_based_similarities = cosine_similarity([user_profile], item_content_features)[0]
+    
+    # Collaborative filtering scores
+    user_vector = user_item_matrix_reduced[user_item_matrix.index.get_loc(username)]
+    collaborative_scores = np.dot(user_vector, item_features.T)
+    
+    # Combine collaborative and content-based scores
+    combined_scores = collab_weight * collaborative_scores + (1 - collab_weight) * content_based_similarities
+    
+    # Get top N recommendations
+    top_indices = combined_scores.argsort()[::-1]
+    recommended_items = []
+    for idx in top_indices:
+        item_id = items_df.iloc[idx]['id']
+        if item_id not in user_liked_items and len(recommended_items) < n_recommendations:
+            recommended_items.append(item_id)
+    
+    recommendations = items_df[items_df['id'].isin(recommended_items)]
+    
+    logging.info(f"Generated {len(recommendations)} recommendations for user: {username}")
+    return recommendations[['id', 'type', 'style', 'gender', 'size', 'image_path', 'hyperlink']]
+
+def get_item_content_features(items_df):
+    mlb = MultiLabelBinarizer()
+    style_features = mlb.fit_transform(items_df['style'].str.split(','))
+    gender_features = mlb.fit_transform(items_df['gender'].str.split(','))
+    size_features = mlb.fit_transform(items_df['size'].str.split(','))
+    color_features = np.array([list(map(int, color.split(','))) for color in items_df['color']])
+    
+    item_content_features = np.hstack((style_features, gender_features, size_features, color_features))
+    
+    scaler = StandardScaler()
+    item_content_features_normalized = scaler.fit_transform(item_content_features)
+    
+    return item_content_features_normalized
+
+def get_fallback_recommendations(items_df, n_recommendations):
+    logging.info("Using fallback recommendation method")
+    return items_df.sample(n_recommendations)
 
 def load_saved_outfits(username):
     if os.path.exists('data/saved_outfits.csv'):

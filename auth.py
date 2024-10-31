@@ -75,23 +75,28 @@ def auth_form():
             st.session_state.username = None
             st.experimental_rerun()
     else:
-        choice = st.sidebar.selectbox("Login/Signup", ["Login", "Sign Up"])
-        username = st.sidebar.text_input("Username")
-        password = st.sidebar.text_input("Password", type="password")
+        st.header("Login / Register")
+        
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
 
-        if choice == "Sign Up":
-            if st.sidebar.button("Create Account"):
-                if register_user(username, password):
-                    st.sidebar.success("Account created successfully. You can now log in.")
-                else:
-                    st.sidebar.error("Username already exists. Please choose a different username.")
-        else:
-            if st.sidebar.button("Login"):
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("Login"):
                 if authenticate_user(username, password):
                     st.session_state.username = username
+                    st.success("Logged in successfully!")
                     st.experimental_rerun()
                 else:
-                    st.sidebar.error("Invalid username or password")
+                    st.error("Invalid username or password")
+
+        with col2:
+            if st.button("Register"):
+                if register_user(username, password):
+                    st.success("Account created successfully. You can now log in.")
+                else:
+                    st.error("Username already exists. Please choose a different username.")
 
 # Require login decorator
 def require_login(func):
