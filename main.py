@@ -10,7 +10,6 @@ from data_manager import (
     delete_outfit, edit_clothing_item, delete_clothing_item, create_user_items_table,
     add_user_clothing_item
 )
-from auth import auth_form, require_login
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
@@ -19,6 +18,10 @@ from outfit_generator import generate_outfit
 
 st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
 logging.basicConfig(level=logging.INFO)
+
+# Set default username for the application
+if 'username' not in st.session_state:
+    st.session_state.username = "default_user"
 
 def normalize_case(value):
     """Helper function to normalize case of strings"""
@@ -39,7 +42,6 @@ def get_dominant_color(image):
         st.error(f"Error processing image: {str(e)}")
         return "#000000"
 
-@require_login
 def personal_wardrobe_page():
     st.title("My Personal Wardrobe 👕")
     create_user_items_table()
@@ -197,7 +199,6 @@ def main_page():
     st.title("Outfit Wizard 🧙‍♂️👚👖👞")
     
     st.sidebar.header("Set Your Preferences")
-    auth_form()
     
     try:
         clothing_items = load_clothing_items()
@@ -227,14 +228,11 @@ def main_page():
             
             # Save outfit button
             if st.button("Save Outfit"):
-                if st.session_state.username:
-                    saved_path = save_outfit(st.session_state.outfit, st.session_state.username)
-                    if saved_path:
-                        st.success("Outfit saved successfully!")
-                    else:
-                        st.error("Failed to save outfit")
+                saved_path = save_outfit(st.session_state.outfit, st.session_state.username)
+                if saved_path:
+                    st.success("Outfit saved successfully!")
                 else:
-                    st.warning("Please log in to save outfits")
+                    st.error("Failed to save outfit")
                     
         if st.session_state.missing_items:
             st.warning(f"Couldn't find matching items for: {', '.join(st.session_state.missing_items)}")
@@ -244,7 +242,6 @@ def main_page():
 
 def saved_outfits_page():
     st.title("Saved Outfits")
-    require_login(lambda: None)
     
     saved_outfits = load_saved_outfits(st.session_state.username)
     
