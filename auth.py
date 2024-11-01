@@ -2,87 +2,57 @@ import streamlit as st
 import bcrypt
 import psycopg2
 import os
-import logging
 
-logging.basicConfig(level=logging.INFO)
-
+# Database connection
 def get_db_connection():
-    try:
-        return psycopg2.connect(
-            host=os.environ['PGHOST'],
-            database=os.environ['PGDATABASE'],
-            user=os.environ['PGUSER'],
-            password=os.environ['PGPASSWORD']
-        )
-    except Exception as e:
-        logging.error(f"Database connection error: {str(e)}")
-        return None
+    return psycopg2.connect(
+        host=os.environ['PGHOST'],
+        database=os.environ['PGDATABASE'],
+        user=os.environ['PGUSER'],
+        password=os.environ['PGPASSWORD']
+    )
 
+# Create users table if not exists
 def create_users_table():
     conn = get_db_connection()
-    if not conn:
-        return False
-    
     cur = conn.cursor()
-    try:
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(50) UNIQUE NOT NULL,
-                password VARCHAR(255) NOT NULL,
-                is_admin BOOLEAN DEFAULT FALSE
-            );
-        ''')
-        conn.commit()
-        return True
-    except Exception as e:
-        logging.error(f"Error creating users table: {str(e)}")
-        conn.rollback()
-        return False
-    finally:
-        cur.close()
-        conn.close()
+    cur.execute('''
+        DROP TABLE IF EXISTS users;
+        CREATE TABLE users (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(50) UNIQUE NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            is_admin BOOLEAN DEFAULT FALSE
+        );
+    ''')
+    conn.commit()
+    cur.close()
+    conn.close()
 
+# Hash password
 def hash_password(password):
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
+# Verify password
 def verify_password(password, hashed):
-    try:
-        if isinstance(hashed, str):
-            hashed = hashed.encode('utf-8')
-        return bcrypt.checkpw(password.encode('utf-8'), hashed)
-    except Exception as e:
-        logging.error(f"Password verification error: {str(e)}")
-        return False
+    return bcrypt.checkpw(password.encode('utf-8'), hashed)
 
+# Check if admin exists
 def admin_exists():
     conn = get_db_connection()
-    if not conn:
-        return False
-    
     cur = conn.cursor()
-    try:
-        cur.execute("SELECT COUNT(*) FROM users WHERE is_admin = TRUE")
-        count = cur.fetchone()[0]
-        return count > 0
-    except Exception as e:
-        logging.error(f"Error checking admin existence: {str(e)}")
-        return False
-    finally:
-        cur.close()
-        conn.close()
+    cur.execute("SELECT COUNT(*) FROM users WHERE is_admin = TRUE")
+    count = cur.fetchone()[0]
+    cur.close()
+    conn.close()
+    return count > 0
 
+# Register user
 def register_user(username, password, is_admin=False):
-    if not username or not password:
-        return False, "Username and password are required"
-    
     conn = get_db_connection()
-    if not conn:
-        return False, "Database connection error"
-    
     cur = conn.cursor()
+    hashed_password = hash_password(password)
     try:
-        hashed_password = hash_password(password)
         cur.execute(
             "INSERT INTO users (username, password, is_admin) VALUES (%s, %s, %s)",
             (username, hashed_password, is_admin)
@@ -92,38 +62,25 @@ def register_user(username, password, is_admin=False):
     except psycopg2.IntegrityError:
         conn.rollback()
         return False, "Username already exists"
-    except Exception as e:
-        conn.rollback()
-        logging.error(f"Registration error: {str(e)}")
-        return False, "Registration failed"
     finally:
         cur.close()
         conn.close()
 
+# Authenticate user
 def authenticate_user(username, password):
-    try:
-        conn = get_db_connection()
-        if not conn:
-            return False
-        
-        cur = conn.cursor()
-        cur.execute("SELECT password, is_admin FROM users WHERE username = %s", (username,))
-        result = cur.fetchone()
-        cur.close()
-        conn.close()
-        
-        if result and verify_password(password, result[0]):
-            return True
-        return False
-    except Exception as e:
-        logging.error(f"Authentication error: {str(e)}")
-        return False
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT password FROM users WHERE username = %s", (username,))
+    result = cur.fetchone()
+    cur.close()
+    conn.close()
+    if result:
+        return verify_password(password, result[0].encode('utf-8'))
+    return False
 
+# Streamlit login form
 def auth_form():
-    if not create_users_table():
-        st.error("Error connecting to database. Please try again later.")
-        return
-    
+    create_users_table()
     if 'username' not in st.session_state:
         st.session_state.username = None
 
@@ -131,7 +88,6 @@ def auth_form():
         st.sidebar.write(f"Logged in as {st.session_state.username}")
         if st.sidebar.button("Logout"):
             st.session_state.username = None
-            st.success("Logged out successfully!")
             st.experimental_rerun()
     else:
         st.header("Login / Register")
@@ -143,15 +99,12 @@ def auth_form():
 
         with col1:
             if st.button("Login"):
-                if not username or not password:
-                    st.error("Please enter both username and password")
+                if authenticate_user(username, password):
+                    st.session_state.username = username
+                    st.success("Logged in successfully!")
+                    st.experimental_rerun()
                 else:
-                    if authenticate_user(username, password):
-                        st.session_state.username = username
-                        st.success("Logged in successfully!")
-                        st.experimental_rerun()
-                    else:
-                        st.error("Invalid username or password")
+                    st.error("Invalid username or password")
 
         with col2:
             if st.button("Register"):
@@ -177,6 +130,7 @@ def auth_form():
                     else:
                         st.error(message)
 
+# Require login decorator
 def require_login(func):
     def wrapper(*args, **kwargs):
         if 'username' not in st.session_state or not st.session_state.username:
