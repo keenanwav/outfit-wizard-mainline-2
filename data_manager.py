@@ -9,10 +9,13 @@ from sklearn.decomposition import TruncatedSVD
 from scipy.sparse import csr_matrix
 from sklearn.neighbors import NearestNeighbors
 import logging
+from datetime import datetime
+from sklearn.model_selection import KFold
+import joblib
 
 def ensure_user_preferences_file():
     if not os.path.exists('data/user_preferences.csv'):
-        df = pd.DataFrame(columns=['username', 'item_id'])
+        df = pd.DataFrame(columns=['username', 'item_id', 'timestamp'])
         df.to_csv('data/user_preferences.csv', index=False)
 
 def load_clothing_items():
@@ -83,7 +86,6 @@ def add_clothing_item(item_type, color, styles, genders, sizes, image_file, hype
     })
     
     items_df = pd.concat([items_df, new_item], ignore_index=True)
-    
     items_df.to_csv('data/clothing_items.csv', index=False)
     
     return True, f"New {item_type} added successfully with ID: {new_id}"
@@ -98,57 +100,43 @@ def store_user_preference(username, item_id):
     ensure_user_preferences_file()
     preferences_df = pd.read_csv('data/user_preferences.csv')
     
-    new_preference = pd.DataFrame({'username': [username], 'item_id': [item_id]})
+    new_preference = pd.DataFrame({
+        'username': [username], 
+        'item_id': [item_id],
+        'timestamp': [datetime.now()]
+    })
     preferences_df = pd.concat([preferences_df, new_preference], ignore_index=True)
-    
     preferences_df.to_csv('data/user_preferences.csv', index=False)
 
 def get_item_features(items_df):
     mlb = MultiLabelBinarizer()
-    style_features = mlb.fit_transform(items_df['style'].str.split(','))
+    
+    style_words = set()
+    for styles in items_df['style'].str.split(','):
+        for style in styles:
+            style_words.update(style.lower().split())
+    
+    style_features = np.zeros((len(items_df), len(style_words)))
+    word_to_idx = {word: idx for idx, word in enumerate(style_words)}
+    
+    for i, styles in enumerate(items_df['style'].str.split(',')):
+        for style in styles:
+            for word in style.lower().split():
+                style_features[i, word_to_idx[word]] = 1
+    
     gender_features = mlb.fit_transform(items_df['gender'].str.split(','))
     size_features = mlb.fit_transform(items_df['size'].str.split(','))
     
     color_features = np.array([list(map(int, color.split(','))) for color in items_df['color']])
+    color_features_normalized = color_features / 255.0
     
-    return np.hstack((style_features, gender_features, size_features, color_features))
+    return np.hstack((style_features, gender_features, size_features, color_features_normalized))
 
-def get_recommendations(username, n_recommendations=5):
-    ensure_user_preferences_file()
-    items_df = load_clothing_items()
-    preferences_df = pd.read_csv('data/user_preferences.csv')
-    
-    user_item_matrix = preferences_df.pivot(index='username', columns='item_id', values='item_id').notna().astype(int)
-    
-    if username not in user_item_matrix.index or user_item_matrix.shape[0] <= 1:
-        return items_df.sample(n_recommendations)
-    
-    n_neighbors = min(20, user_item_matrix.shape[0] - 1)
-    
-    user_item_matrix_sparse = csr_matrix(user_item_matrix.values)
-    
-    model_knn = NearestNeighbors(metric='cosine', algorithm='brute', n_neighbors=n_neighbors, n_jobs=-1)
-    model_knn.fit(user_item_matrix_sparse)
-    
-    distances, indices = model_knn.kneighbors(user_item_matrix.loc[username].values.reshape(1, -1), n_neighbors=n_neighbors)
-    
-    similar_users = user_item_matrix.index[indices.flatten()[1:]]
-    
-    similar_users_preferences = preferences_df[preferences_df['username'].isin(similar_users)]
-    
-    item_score = similar_users_preferences.groupby('item_id').size().sort_values(ascending=False)
-    
-    user_items = preferences_df[preferences_df['username'] == username]['item_id'].unique()
-    
-    recommended_items = item_score[~item_score.index.isin(user_items)].head(n_recommendations)
-    
-    if len(recommended_items) < n_recommendations:
-        additional_items = items_df[~items_df['id'].isin(recommended_items.index) & ~items_df['id'].isin(user_items)].sample(n_recommendations - len(recommended_items))
-        recommended_items = pd.concat([recommended_items, pd.Series(additional_items['id'], index=additional_items['id'])])
-    
-    recommendations = items_df[items_df['id'].isin(recommended_items.index)]
-    
-    return recommendations[['id', 'type', 'style', 'gender', 'size', 'image_path', 'hyperlink']]
+def calculate_time_decay(timestamps, half_life_days=30):
+    current_time = datetime.now()
+    timestamps = pd.to_datetime(timestamps)
+    time_diff = (current_time - timestamps).dt.total_seconds() / (24 * 3600)
+    return np.exp(-np.log(2) * time_diff / half_life_days)
 
 def get_advanced_recommendations(username, n_recommendations=5, collab_weight=0.7):
     logging.info(f"Generating advanced recommendations for user: {username}")
@@ -160,69 +148,79 @@ def get_advanced_recommendations(username, n_recommendations=5, collab_weight=0.
         logging.warning(f"No preferences found for user: {username}. Using fallback method.")
         return get_fallback_recommendations(items_df, n_recommendations)
     
-    # Collaborative Filtering
-    user_item_matrix = preferences_df.pivot(index='username', columns='item_id', values='item_id').notna().astype(int)
-    user_item_matrix_sparse = csr_matrix(user_item_matrix.values)
+    if 'timestamp' not in preferences_df.columns:
+        preferences_df['timestamp'] = datetime.now()
     
-    # Matrix Factorization using Truncated SVD
-    n_components = min(30, user_item_matrix_sparse.shape[1] - 1)
-    svd = TruncatedSVD(n_components=n_components, random_state=42)
+    user_prefs = preferences_df[preferences_df['username'] == username]
+    time_weights = calculate_time_decay(user_prefs['timestamp'])
+    
+    user_item_matrix = preferences_df.pivot(index='username', columns='item_id', values='timestamp')
+    user_item_matrix = user_item_matrix.notna().astype(float)
+    
+    user_idx = user_item_matrix.index.get_loc(username)
+    user_item_matrix.iloc[user_idx] *= time_weights
+    
+    user_item_matrix_sparse = csr_matrix(user_item_matrix.values)
+    best_score = float('-inf')
+    best_n_components = 30
+    
+    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+    for n_comp in [20, 30, 40, 50]:
+        scores = []
+        for train_idx, val_idx in kf.split(user_item_matrix_sparse):
+            svd = TruncatedSVD(n_components=n_comp, random_state=42)
+            train = user_item_matrix_sparse[train_idx]
+            val = user_item_matrix_sparse[val_idx]
+            
+            user_item_matrix_reduced = svd.fit_transform(train)
+            pred = user_item_matrix_reduced @ svd.components_
+            score = np.mean((val.toarray() - pred[len(train_idx):]) ** 2)
+            scores.append(-score)
+        
+        avg_score = np.mean(scores)
+        if avg_score > best_score:
+            best_score = avg_score
+            best_n_components = n_comp
+    
+    svd = TruncatedSVD(n_components=best_n_components, random_state=42)
     user_item_matrix_reduced = svd.fit_transform(user_item_matrix_sparse)
     item_features = svd.components_.T
     
-    # Find similar users
-    user_similarity = cosine_similarity(user_item_matrix_reduced)
-    user_similarity_df = pd.DataFrame(user_similarity, index=user_item_matrix.index, columns=user_item_matrix.index)
-    similar_users = user_similarity_df.loc[username].sort_values(ascending=False)[1:6].index.tolist()
+    item_content_features = get_item_features(items_df)
     
-    # Content-based Filtering
-    item_content_features = get_item_content_features(items_df)
-    
-    # Get user's liked items
     user_liked_items = preferences_df[preferences_df['username'] == username]['item_id'].tolist()
     user_liked_features = item_content_features[items_df['id'].isin(user_liked_items)]
     
     if len(user_liked_features) > 0:
-        user_profile = np.mean(user_liked_features, axis=0)
+        user_profile = np.average(user_liked_features, weights=time_weights, axis=0)
     else:
         user_profile = np.mean(item_content_features, axis=0)
     
-    # Calculate similarity between user profile and all items
     content_based_similarities = cosine_similarity([user_profile], item_content_features)[0]
     
-    # Collaborative filtering scores
-    user_vector = user_item_matrix_reduced[user_item_matrix.index.get_loc(username)]
+    user_vector = user_item_matrix_reduced[user_idx]
     collaborative_scores = np.dot(user_vector, item_features.T)
     
-    # Combine collaborative and content-based scores
     combined_scores = collab_weight * collaborative_scores + (1 - collab_weight) * content_based_similarities
     
-    # Get top N recommendations
-    top_indices = combined_scores.argsort()[::-1]
-    recommended_items = []
-    for idx in top_indices:
+    top_indices = []
+    candidate_indices = combined_scores.argsort()[::-1]
+    
+    for idx in candidate_indices:
         item_id = items_df.iloc[idx]['id']
-        if item_id not in user_liked_items and len(recommended_items) < n_recommendations:
-            recommended_items.append(item_id)
+        if item_id not in user_liked_items:
+            if not top_indices or not any(
+                cosine_similarity([item_content_features[idx]], 
+                                item_content_features[top_indices]).flatten() > 0.8
+            ):
+                top_indices.append(idx)
+                if len(top_indices) == n_recommendations:
+                    break
     
-    recommendations = items_df[items_df['id'].isin(recommended_items)]
+    recommended_items = items_df.iloc[top_indices]
     
-    logging.info(f"Generated {len(recommendations)} recommendations for user: {username}")
-    return recommendations[['id', 'type', 'style', 'gender', 'size', 'image_path', 'hyperlink']]
-
-def get_item_content_features(items_df):
-    mlb = MultiLabelBinarizer()
-    style_features = mlb.fit_transform(items_df['style'].str.split(','))
-    gender_features = mlb.fit_transform(items_df['gender'].str.split(','))
-    size_features = mlb.fit_transform(items_df['size'].str.split(','))
-    color_features = np.array([list(map(int, color.split(','))) for color in items_df['color']])
-    
-    item_content_features = np.hstack((style_features, gender_features, size_features, color_features))
-    
-    scaler = StandardScaler()
-    item_content_features_normalized = scaler.fit_transform(item_content_features)
-    
-    return item_content_features_normalized
+    logging.info(f"Generated {len(recommended_items)} recommendations for user: {username}")
+    return recommended_items[['id', 'type', 'style', 'gender', 'size', 'image_path', 'hyperlink']]
 
 def get_fallback_recommendations(items_df, n_recommendations):
     logging.info("Using fallback recommendation method")
@@ -243,11 +241,9 @@ def delete_outfit(outfit_id):
         os.remove(outfit_to_delete['image_path'])
     
     saved_outfits_df = saved_outfits_df[saved_outfits_df['outfit_id'] != outfit_id]
-    
     saved_outfits_df.to_csv('data/saved_outfits.csv', index=False)
 
 def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink):
-    print(f"Debug: Starting edit_clothing_item function for item ID {item_id}")
     items_df = load_clothing_items()
     
     if item_id not in items_df['id'].values:
@@ -255,14 +251,12 @@ def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink):
     
     item_index = items_df.index[items_df['id'] == item_id].tolist()[0]
     
-    print(f"Debug: Before updating DataFrame for item ID {item_id}")
     items_df.at[item_index, 'color'] = f"{color[0]},{color[1]},{color[2]}"
     items_df.at[item_index, 'style'] = ','.join(styles)
     items_df.at[item_index, 'gender'] = ','.join(genders)
     items_df.at[item_index, 'size'] = ','.join(sizes)
     items_df.at[item_index, 'hyperlink'] = hyperlink
     
-    print(f"Debug: Before saving CSV file for item ID {item_id}")
     items_df.to_csv('data/clothing_items.csv', index=False)
     
     return True, f"Item with ID {item_id} updated successfully."
@@ -279,7 +273,6 @@ def delete_clothing_item(item_id):
         os.remove(item_to_delete['image_path'])
     
     items_df = items_df[items_df['id'] != item_id]
-    
     items_df.to_csv('data/clothing_items.csv', index=False)
     
     return True, f"Item with ID {item_id} deleted successfully."
