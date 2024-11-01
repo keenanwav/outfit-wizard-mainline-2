@@ -20,7 +20,8 @@ def create_users_table():
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             username VARCHAR(50) UNIQUE NOT NULL,
-            password VARCHAR(255) NOT NULL
+            password VARCHAR(255) NOT NULL,
+            is_admin BOOLEAN DEFAULT FALSE
         )
     ''')
     conn.commit()
@@ -35,18 +36,31 @@ def hash_password(password):
 def verify_password(password, hashed):
     return bcrypt.checkpw(password.encode('utf-8'), hashed)
 
+# Check if admin exists
+def admin_exists():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM users WHERE is_admin = TRUE")
+    count = cur.fetchone()[0]
+    cur.close()
+    conn.close()
+    return count > 0
+
 # Register user
-def register_user(username, password):
+def register_user(username, password, is_admin=False):
     conn = get_db_connection()
     cur = conn.cursor()
     hashed_password = hash_password(password)
     try:
-        cur.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, hashed_password))
+        cur.execute(
+            "INSERT INTO users (username, password, is_admin) VALUES (%s, %s, %s)",
+            (username, hashed_password, is_admin)
+        )
         conn.commit()
-        return True
+        return True, "Registration successful"
     except psycopg2.IntegrityError:
         conn.rollback()
-        return False
+        return False, "Username already exists"
     finally:
         cur.close()
         conn.close()
@@ -80,7 +94,7 @@ def auth_form():
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
 
         with col1:
             if st.button("Login"):
@@ -93,10 +107,27 @@ def auth_form():
 
         with col2:
             if st.button("Register"):
-                if register_user(username, password):
-                    st.success("Account created successfully. You can now log in.")
+                if not username or not password:
+                    st.error("Please enter both username and password")
                 else:
-                    st.error("Username already exists. Please choose a different username.")
+                    success, message = register_user(username, password)
+                    if success:
+                        st.success(message)
+                    else:
+                        st.error(message)
+
+        with col3:
+            if st.button("Create Admin Account"):
+                if not username or not password:
+                    st.error("Please enter both username and password")
+                elif admin_exists():
+                    st.error("An admin account already exists")
+                else:
+                    success, message = register_user(username, password, is_admin=True)
+                    if success:
+                        st.success("Admin account created successfully")
+                    else:
+                        st.error(message)
 
 # Require login decorator
 def require_login(func):
