@@ -29,20 +29,20 @@ def generate_outfit(clothing_items, size, style, gender):
     # If we have a complete outfit, create a merged image
     if len(selected_outfit) == 3:  # We have all three items
         # Create a new image with white background
-        total_width = 600
-        height = 200
-        merged_image = Image.new('RGB', (total_width, height), (255, 255, 255))
+        width = 200
+        total_height = 600
+        merged_image = Image.new('RGB', (width, total_height), (255, 255, 255))
         
         # Add each clothing item to the merged image
         for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
             try:
                 item_img = Image.open(selected_outfit[item_type]['image_path'])
                 # Resize while maintaining aspect ratio
-                item_img.thumbnail((200, 200))
-                # Calculate position to center vertically
-                y_position = (height - item_img.size[1]) // 2
-                # Paste the image
-                merged_image.paste(item_img, (i * 200, y_position))
+                item_img.thumbnail((width, 200))
+                # Calculate position to center horizontally
+                x_position = (width - item_img.size[0]) // 2
+                # Paste the image vertically
+                merged_image.paste(item_img, (x_position, i * 200))
             except Exception as e:
                 print(f"Error processing {item_type} image: {str(e)}")
         
