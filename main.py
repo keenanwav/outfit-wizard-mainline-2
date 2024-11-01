@@ -16,6 +16,10 @@ st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
 
 logging.basicConfig(level=logging.INFO)
 
+def normalize_case(value):
+    """Helper function to normalize case of strings"""
+    return value.strip().title() if isinstance(value, str) else value
+
 def get_dominant_color(image):
     try:
         img = Image.open(image)
@@ -233,6 +237,9 @@ def view_edit_items():
     start_idx = (page - 1) * items_per_page
     end_idx = start_idx + items_per_page
     
+    # Define style options with consistent case
+    style_options = ["Casual", "Formal", "Sporty"]
+    
     for index, item in clothing_items.iloc[start_idx:end_idx].iterrows():
         with st.expander(f"{item['type'].capitalize()} (ID: {item['id']})"):
             col1, col2 = st.columns([1, 2])
@@ -249,9 +256,15 @@ def view_edit_items():
                         new_color = st.color_picker("Color", f"#{color_value}")
                     else:
                         new_color = st.color_picker("Color", "#000000")
-                    new_styles = st.multiselect('Style', ['Casual', 'Formal', 'Sporty'], default=[style.strip() for style in item['style'].split(',')])
-                    new_genders = st.multiselect('Gender', ['Male', 'Female', 'Unisex'], default=[gender.strip() for gender in item['gender'].split(',')])
-                    new_sizes = st.multiselect("Size", ["XS", "S", "M", "L", "XL"], default=[size.strip() for size in item['size'].split(',')])
+                    
+                    # Normalize the case of default values
+                    current_styles = [normalize_case(style) for style in item['style'].split(',')]
+                    new_styles = st.multiselect('Style', style_options, default=current_styles)
+                    
+                    new_genders = st.multiselect('Gender', ['Male', 'Female', 'Unisex'], 
+                                               default=[gender.strip() for gender in item['gender'].split(',')])
+                    new_sizes = st.multiselect("Size", ["XS", "S", "M", "L", "XL"], 
+                                             default=[size.strip() for size in item['size'].split(',')])
                     new_hyperlink = st.text_input("Hyperlink", value=item['hyperlink'])
                     
                     if st.form_submit_button("Update"):
@@ -355,18 +368,16 @@ def saved_outfits_page():
         
         if len(saved_outfits) > 8:
             if st.button("See More Outfits"):
-                st.warning("This feature is not implemented yet.")
-    else:
-        st.info("You haven't saved any outfits yet.")
+                st.warning("Feature coming soon!")
 
 def main():
-    page = st.sidebar.radio("Navigation", ["Main Page", "Admin Panel", "Saved Outfits"])
+    page = st.sidebar.selectbox("Navigation", ["Home", "Admin", "Saved Outfits"])
     
-    if page == "Main Page":
+    if page == "Home":
         main_page()
-    elif page == "Admin Panel":
+    elif page == "Admin":
         admin_page()
-    elif page == "Saved Outfits":
+    else:
         saved_outfits_page()
 
 if __name__ == "__main__":
