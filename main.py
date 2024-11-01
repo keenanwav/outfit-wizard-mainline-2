@@ -16,139 +16,86 @@ from sklearn.metrics.pairwise import cosine_similarity
 import logging
 from color_utils import get_color_palette
 from outfit_generator import generate_outfit
-import base64
 
-st.set_page_config(
-    page_title="Outfit Wizard",
-    page_icon="👕",
-    layout="wide",
-    initial_sidebar_state="collapsed"  # Mobile-friendly default
-)
+st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
+logging.basicConfig(level=logging.INFO)
 
-# Load custom CSS
-with open('.streamlit/style.css') as f:
-    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+def normalize_case(value):
+    """Helper function to normalize case of strings"""
+    return value.strip().title() if isinstance(value, str) else value
 
-# Add mobile detection
-def is_mobile():
+def get_dominant_color(image):
     try:
-        user_agent = st.experimental_get_query_params().get('user_agent', [''])[0]
-        return any(device in user_agent.lower() for device in ['mobile', 'android', 'iphone', 'ipad', 'ipod'])
-    except:
-        return False
-
-def show_mobile_menu():
-    menu = st.sidebar.radio("Menu", ["Home", "My Wardrobe", "Saved Outfits"])
-    if menu == "Home":
-        main_page()
-    elif menu == "My Wardrobe":
-        personal_wardrobe_page()
-    else:
-        saved_outfits_page()
-
-def main_page():
-    st.title("Outfit Wizard 🧙‍♂️")
-    
-    # Mobile-optimized authentication
-    with st.container():
-        auth_form()
-    
-    try:
-        clothing_items = load_clothing_items()
-        
-        # Mobile-friendly preference selection
-        with st.expander("Set Your Preferences", expanded=True):
-            col1, col2 = st.columns(2)
-            with col1:
-                size = st.selectbox("Size", ["XS", "S", "M", "L", "XL"], key="mobile_size")
-                style = st.selectbox("Style", ["Casual", "Formal", "Sporty"], key="mobile_style")
-            with col2:
-                gender = st.selectbox("Gender", ["Male", "Female", "Unisex"], key="mobile_gender")
-        
-        # Generate outfit button
-        if st.button("Generate New Outfit 🔄", use_container_width=True):
-            st.session_state.outfit, st.session_state.missing_items = generate_outfit(
-                clothing_items, size, style, gender
-            )
-        
-        # Display outfit
-        if 'outfit' in st.session_state and st.session_state.outfit:
-            st.success("Outfit generated successfully!")
-            
-            if 'merged_image_path' in st.session_state.outfit:
-                # Mobile-optimized image display
-                st.image(
-                    st.session_state.outfit['merged_image_path'],
-                    use_column_width=True,
-                    caption="Your Generated Outfit"
-                )
-                
-                # Mobile-friendly interaction buttons
-                for item_type in ['shirt', 'pants', 'shoes']:
-                    if item_type in st.session_state.outfit:
-                        if st.button(f"Like {item_type} 👍", key=f"like_{item_type}", use_container_width=True):
-                            store_user_preference(st.session_state.username, st.session_state.outfit[item_type]['id'])
-                            st.success(f"You liked this {item_type}!")
-            
-            # Save outfit button
-            if st.button("Save Outfit 💾", use_container_width=True):
-                if st.session_state.username:
-                    saved_path = save_outfit(st.session_state.outfit, st.session_state.username)
-                    if saved_path:
-                        st.success("Outfit saved successfully!")
-                    else:
-                        st.error("Failed to save outfit")
-                else:
-                    st.warning("Please log in to save outfits")
-                    
-        if st.session_state.get('missing_items'):
-            st.warning(f"Couldn't find matching items for: {', '.join(st.session_state.missing_items)}")
-            
+        img = Image.open(image)
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+        img = img.resize((100, 100))
+        img_array = np.array(img)
+        colors = img_array.reshape(-1, 3)
+        color_counts = Counter(map(tuple, colors))
+        dominant_color = color_counts.most_common(1)[0][0]
+        return '#{:02x}{:02x}{:02x}'.format(*dominant_color)
     except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
+        st.error(f"Error processing image: {str(e)}")
+        return "#000000"
 
+@require_login
 def personal_wardrobe_page():
-    st.title("My Wardrobe 👕")
+    st.title("My Personal Wardrobe 👕")
     create_user_items_table()
     
-    if not st.session_state.get('username'):
-        st.warning("Please log in to access your wardrobe")
-        return
+    tabs = st.tabs(["Upload New Item", "View My Items"])
     
-    # Mobile-friendly tabs
-    tab1, tab2 = st.tabs(["Upload", "View Items"])
-    
-    with tab1:
-        with st.form("add_item_mobile", clear_on_submit=True):
-            st.subheader("Add New Item")
+    with tabs[0]:
+        st.header("Add Personal Clothing Item")
+        with st.form("add_personal_item", clear_on_submit=True):
+            item_type = st.selectbox("Item Type", ["shirt", "pants", "shoes"])
+            image_file = st.file_uploader("Upload Image (PNG)", type="png")
             
-            item_type = st.selectbox("Type", ["shirt", "pants", "shoes"], key="mobile_item_type")
-            image_file = st.file_uploader("Take Photo or Choose Image", type="png")
-            
-            if image_file:
+            if image_file is not None:
                 st.image(image_file, width=200)
-                color = st.color_picker("Adjust Color", "#000000")
-                
-                # Mobile-friendly multi-select using columns
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write("Style:")
-                    styles = [style for style in ["Casual", "Formal", "Sporty"]
-                             if st.checkbox(style, key=f"style_mobile_{style}")]
-                    
-                    st.write("Gender:")
-                    genders = [gender for gender in ["Male", "Female", "Unisex"]
-                              if st.checkbox(gender, key=f"gender_mobile_{gender}")]
-                
-                with col2:
-                    st.write("Size:")
-                    sizes = [size for size in ["XS", "S", "M", "L", "XL"]
-                            if st.checkbox(size, key=f"size_mobile_{size}")]
-                
-                if st.form_submit_button("Upload", use_container_width=True):
-                    if not (styles and genders and sizes):
-                        st.error("Please select all required options")
-                    else:
+                dominant_color = get_dominant_color(image_file)
+                st.write(f"Dominant color detected: {dominant_color}")
+                color = st.color_picker("Adjust Color", dominant_color)
+            else:
+                color = st.color_picker("Select Color", "#000000")
+            
+            st.write("Style (select all that apply):")
+            style_options = ["Casual", "Formal", "Sporty"]
+            styles = []
+            cols = st.columns(len(style_options))
+            for i, style in enumerate(style_options):
+                if cols[i].checkbox(style, key=f"style_{style}"):
+                    styles.append(style)
+            
+            st.write("Gender (select all that apply):")
+            gender_options = ["Male", "Female", "Unisex"]
+            genders = []
+            gender_cols = st.columns(len(gender_options))
+            for i, gender in enumerate(gender_options):
+                if gender_cols[i].checkbox(gender, key=f"gender_{gender}"):
+                    genders.append(gender)
+            
+            st.write("Size (select all that apply):")
+            size_options = ["XS", "S", "M", "L", "XL"]
+            sizes = []
+            size_cols = st.columns(len(size_options))
+            for i, size in enumerate(size_options):
+                if size_cols[i].checkbox(size, key=f"size_{size}"):
+                    sizes.append(size)
+            
+            submitted = st.form_submit_button("Upload Item")
+            if submitted:
+                if not image_file:
+                    st.error("Please upload an image file.")
+                elif not styles:
+                    st.error("Please select at least one style.")
+                elif not genders:
+                    st.error("Please select at least one gender.")
+                elif not sizes:
+                    st.error("Please select at least one size.")
+                else:
+                    try:
                         rgb_color = tuple(int(color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
                         success, message = add_user_clothing_item(
                             st.session_state.username,
@@ -163,68 +110,171 @@ def personal_wardrobe_page():
                             st.success(message)
                         else:
                             st.error(message)
+                    except Exception as e:
+                        st.error(f"Error adding clothing item: {str(e)}")
     
-    with tab2:
-        st.subheader("My Items")
-        items = load_clothing_items(st.session_state.username)
+    with tabs[1]:
+        st.header("My Uploaded Items")
+        personal_items = load_clothing_items(st.session_state.username)
         
-        if len(items) == 0:
-            st.info("No items in your wardrobe yet")
+        if len(personal_items) == 0:
+            st.info("You haven't uploaded any clothing items yet.")
             return
         
-        # Mobile-friendly item display
-        for _, item in items.iterrows():
-            with st.expander(f"{item['type'].title()}"):
-                if os.path.exists(item['image_path']):
-                    st.image(item['image_path'], use_column_width=True)
+        for _, item in personal_items.iterrows():
+            with st.expander(f"{item['type'].capitalize()} - ID: {item['id']}"):
+                col1, col2, col3 = st.columns([1, 2, 1])
+                
+                with col1:
+                    if os.path.exists(item['image_path']):
+                        st.image(item['image_path'], use_column_width=True)
+                    else:
+                        st.error(f"Image not found: {item['image_path']}")
+                
+                with col2:
+                    color = item['color'].split(',')
+                    new_color = st.color_picker(
+                        "Color", 
+                        f"#{int(color[0]):02x}{int(color[1]):02x}{int(color[2]):02x}",
+                        key=f"color_{item['id']}"
+                    )
                     
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button("Edit", key=f"edit_{item['id']}", use_container_width=True):
-                            st.session_state.editing_item = item['id']
-                    with col2:
-                        if st.button("Delete", key=f"delete_{item['id']}", use_container_width=True):
+                    style_list = item['style'].split(',')
+                    new_styles = []
+                    st.write("Styles:")
+                    style_cols = st.columns(len(["Casual", "Formal", "Sporty"]))
+                    for i, style in enumerate(["Casual", "Formal", "Sporty"]):
+                        if style_cols[i].checkbox(style, value=style in style_list, key=f"edit_style_{item['id']}_{style}"):
+                            new_styles.append(style)
+                    
+                    gender_list = item['gender'].split(',')
+                    new_genders = []
+                    st.write("Genders:")
+                    gender_cols = st.columns(len(["Male", "Female", "Unisex"]))
+                    for i, gender in enumerate(["Male", "Female", "Unisex"]):
+                        if gender_cols[i].checkbox(gender, value=gender in gender_list, key=f"edit_gender_{item['id']}_{gender}"):
+                            new_genders.append(gender)
+                    
+                    size_list = item['size'].split(',')
+                    new_sizes = []
+                    st.write("Sizes:")
+                    size_cols = st.columns(len(["XS", "S", "M", "L", "XL"]))
+                    for i, size in enumerate(["XS", "S", "M", "L", "XL"]):
+                        if size_cols[i].checkbox(size, value=size in size_list, key=f"edit_size_{item['id']}_{size}"):
+                            new_sizes.append(size)
+                
+                with col3:
+                    if st.button("Update", key=f"update_{item['id']}"):
+                        try:
+                            rgb_color = tuple(int(new_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                            success, message = edit_clothing_item(
+                                item['id'],
+                                rgb_color,
+                                new_styles,
+                                new_genders,
+                                new_sizes,
+                                item.get('hyperlink', '')
+                            )
+                            if success:
+                                st.success(message)
+                            else:
+                                st.error(message)
+                        except Exception as e:
+                            st.error(f"Error updating item: {str(e)}")
+                    
+                    if st.button("Delete", key=f"delete_{item['id']}"):
+                        try:
                             success, message = delete_clothing_item(item['id'])
                             if success:
                                 st.success(message)
                                 st.experimental_rerun()
                             else:
                                 st.error(message)
+                        except Exception as e:
+                            st.error(f"Error deleting item: {str(e)}")
+
+def main_page():
+    st.title("Outfit Wizard 🧙‍♂️👚👖👞")
+    
+    st.sidebar.header("Set Your Preferences")
+    auth_form()
+    
+    try:
+        clothing_items = load_clothing_items()
+        
+        size = st.sidebar.selectbox("Size", ["XS", "S", "M", "L", "XL"])
+        style = st.sidebar.selectbox("Style", ["Casual", "Formal", "Sporty"])
+        gender = st.sidebar.selectbox("Gender", ["Male", "Female", "Unisex"])
+        
+        if 'outfit' not in st.session_state or st.sidebar.button("Generate New Outfit 🔄"):
+            st.session_state.outfit, st.session_state.missing_items = generate_outfit(clothing_items, size, style, gender)
+        
+        if st.session_state.outfit:
+            st.success("Outfit generated successfully!")
+            
+            # Display merged outfit image
+            if 'merged_image_path' in st.session_state.outfit:
+                st.image(st.session_state.outfit['merged_image_path'], use_column_width=True)
+                
+                # Add like buttons for individual items
+                cols = st.columns(3)
+                for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
+                    with cols[i]:
+                        if item_type in st.session_state.outfit:
+                            if st.button(f"Like {item_type}"):
+                                store_user_preference(st.session_state.username, st.session_state.outfit[item_type]['id'])
+                                st.success(f"You liked this {item_type}!")
+            
+            # Save outfit button
+            if st.button("Save Outfit"):
+                if st.session_state.username:
+                    saved_path = save_outfit(st.session_state.outfit, st.session_state.username)
+                    if saved_path:
+                        st.success("Outfit saved successfully!")
+                    else:
+                        st.error("Failed to save outfit")
+                else:
+                    st.warning("Please log in to save outfits")
+                    
+        if st.session_state.missing_items:
+            st.warning(f"Couldn't find matching items for: {', '.join(st.session_state.missing_items)}")
+            
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
 
 def saved_outfits_page():
-    st.title("My Outfits 📱")
+    st.title("Saved Outfits")
+    require_login(lambda: None)
     
-    if not st.session_state.get('username'):
-        st.warning("Please log in to view saved outfits")
-        return
+    saved_outfits = load_saved_outfits(st.session_state.username)
     
-    outfits = load_saved_outfits(st.session_state.username)
-    
-    if outfits:
-        for outfit in outfits:
-            with st.container():
+    if saved_outfits:
+        cols = st.columns(2)
+        for i, outfit in enumerate(saved_outfits):
+            with cols[i % 2]:
+                st.subheader(f"Outfit {i+1}")
                 if os.path.exists(outfit['image_path']):
-                    st.image(outfit['image_path'], use_column_width=True)
-                    if st.button("Delete", key=f"delete_outfit_{outfit['outfit_id']}", use_container_width=True):
-                        if delete_outfit(outfit['outfit_id']):
-                            st.success("Outfit deleted!")
-                            st.experimental_rerun()
+                    st.image(outfit['image_path'])
+                    if st.button(f"Delete Outfit {i+1}"):
+                        delete_outfit(outfit['outfit_id'])
+                        st.success(f"Outfit {i+1} deleted successfully!")
+                        st.experimental_rerun()
                 else:
-                    st.error("Image not found")
+                    st.error(f"Image not found: {outfit['image_path']}")
     else:
-        st.info("No saved outfits yet")
+        st.info("You haven't saved any outfits yet.")
 
 def main():
-    if is_mobile():
-        show_mobile_menu()
-    else:
-        pages = {
-            "Home": main_page,
-            "My Wardrobe": personal_wardrobe_page,
-            "Saved Outfits": saved_outfits_page
-        }
-        page = st.sidebar.radio("Navigation", list(pages.keys()))
-        pages[page]()
+    pages = {
+        "Home": main_page,
+        "My Wardrobe": personal_wardrobe_page,
+        "Saved Outfits": saved_outfits_page
+    }
+    
+    st.sidebar.title("Navigation")
+    page = st.sidebar.radio("Go to", list(pages.keys()))
+    
+    pages[page]()
 
 if __name__ == "__main__":
     main()
