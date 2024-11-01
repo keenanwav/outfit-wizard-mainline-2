@@ -50,7 +50,12 @@ def ensure_user_preferences_file():
         df.to_csv('data/user_preferences.csv', index=False)
 
 def load_clothing_items(username=None):
-    items_df = pd.read_csv('data/clothing_items.csv')
+    if not os.path.exists('data/clothing_items.csv'):
+        # Create empty DataFrame with required columns
+        items_df = pd.DataFrame(columns=['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink'])
+        items_df.to_csv('data/clothing_items.csv', index=False)
+    else:
+        items_df = pd.read_csv('data/clothing_items.csv')
     
     if username:
         conn = get_db_connection()
@@ -70,6 +75,27 @@ def load_clothing_items(username=None):
             items_df = pd.concat([items_df, user_items_df], ignore_index=True)
     
     return items_df
+
+def add_clothing_item(item_type, color, styles, genders, sizes, image_path, hyperlink=""):
+    if not os.path.exists('data/clothing_items.csv'):
+        items_df = pd.DataFrame(columns=['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink'])
+    else:
+        items_df = pd.read_csv('data/clothing_items.csv')
+    
+    new_item = {
+        'id': len(items_df) + 1,
+        'type': item_type,
+        'color': f"{color[0]},{color[1]},{color[2]}",
+        'style': ','.join(styles),
+        'gender': ','.join(genders),
+        'size': ','.join(sizes),
+        'image_path': image_path,
+        'hyperlink': hyperlink
+    }
+    
+    items_df = pd.concat([items_df, pd.DataFrame([new_item])], ignore_index=True)
+    items_df.to_csv('data/clothing_items.csv', index=False)
+    return True, f"New {item_type} added successfully"
 
 def add_user_clothing_item(username, item_type, color, styles, genders, sizes, image_file, hyperlink=""):
     if not os.path.exists(f"user_images/{username}"):
@@ -109,6 +135,85 @@ def add_user_clothing_item(username, item_type, color, styles, genders, sizes, i
     finally:
         cur.close()
         conn.close()
+
+def update_csv_structure():
+    if not os.path.exists('data'):
+        os.makedirs('data')
+    
+    if not os.path.exists('data/clothing_items.csv'):
+        items_df = pd.DataFrame(columns=['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink'])
+        items_df.to_csv('data/clothing_items.csv', index=False)
+
+def store_user_preference(username, item_id):
+    ensure_user_preferences_file()
+    preferences_df = pd.read_csv('data/user_preferences.csv')
+    new_preference = {
+        'username': username,
+        'item_id': item_id,
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    preferences_df = pd.concat([preferences_df, pd.DataFrame([new_preference])], ignore_index=True)
+    preferences_df.to_csv('data/user_preferences.csv', index=False)
+
+def get_advanced_recommendations(username, n_recommendations=5, collab_weight=0.7):
+    logging.info(f"Generating advanced recommendations for user: {username}")
+    ensure_user_preferences_file()
+    
+    try:
+        preferences_df = pd.read_csv('data/user_preferences.csv')
+        items_df = load_clothing_items()
+        
+        if username not in preferences_df['username'].unique():
+            logging.warning(f"No preferences found for user: {username}")
+            return items_df.sample(n=n_recommendations)
+        
+        user_prefs = preferences_df[preferences_df['username'] == username]
+        timestamps = pd.to_datetime(user_prefs['timestamp'])
+        time_diff = (datetime.now() - timestamps).dt.total_seconds() / (24 * 3600)
+        time_weights = np.exp(-time_diff / 30)
+        
+        item_features = []
+        for _, item in items_df.iterrows():
+            color = list(map(int, item['color'].split(',')))
+            color_normalized = [c/255 for c in color]
+            
+            style_features = [1 if style in item['style'].split(',') else 0 
+                            for style in ['Casual', 'Formal', 'Sporty']]
+            gender_features = [1 if gender in item['gender'].split(',') else 0 
+                             for gender in ['Male', 'Female', 'Unisex']]
+            size_features = [1 if size in item['size'].split(',') else 0 
+                           for size in ['XS', 'S', 'M', 'L', 'XL']]
+            
+            features = color_normalized + style_features + gender_features + size_features
+            item_features.append(features)
+        
+        item_features = np.array(item_features)
+        
+        user_liked_items = user_prefs['item_id'].values
+        user_liked_indices = [items_df[items_df['id'] == item_id].index[0] 
+                            for item_id in user_liked_items if item_id in items_df['id'].values]
+        
+        if user_liked_indices:
+            user_profile = np.average(item_features[user_liked_indices], weights=time_weights, axis=0)
+        else:
+            user_profile = np.mean(item_features, axis=0)
+        
+        similarity_scores = cosine_similarity([user_profile], item_features)[0]
+        
+        recommended_indices = []
+        for idx in similarity_scores.argsort()[::-1]:
+            item_id = items_df.iloc[idx]['id']
+            if item_id not in user_liked_items:
+                recommended_indices.append(idx)
+                if len(recommended_indices) == n_recommendations:
+                    break
+        
+        recommended_items = items_df.iloc[recommended_indices]
+        return recommended_items
+        
+    except Exception as e:
+        logging.error(f"Error generating recommendations: {str(e)}")
+        return items_df.sample(n=n_recommendations)
 
 def save_outfit(outfit, username):
     try:
@@ -275,63 +380,3 @@ def delete_clothing_item(item_id):
     finally:
         cur.close()
         conn.close()
-
-def get_advanced_recommendations(username, n_recommendations=5, collab_weight=0.7):
-    logging.info(f"Generating advanced recommendations for user: {username}")
-    ensure_user_preferences_file()
-    
-    try:
-        preferences_df = pd.read_csv('data/user_preferences.csv')
-        items_df = load_clothing_items()
-        
-        if username not in preferences_df['username'].unique():
-            logging.warning(f"No preferences found for user: {username}")
-            return items_df.sample(n=n_recommendations)
-        
-        user_prefs = preferences_df[preferences_df['username'] == username]
-        timestamps = pd.to_datetime(user_prefs['timestamp'])
-        time_diff = (datetime.now() - timestamps).dt.total_seconds() / (24 * 3600)
-        time_weights = np.exp(-time_diff / 30)
-        
-        item_features = []
-        for _, item in items_df.iterrows():
-            color = list(map(int, item['color'].split(',')))
-            color_normalized = [c/255 for c in color]
-            
-            style_features = [1 if style in item['style'].split(',') else 0 
-                            for style in ['Casual', 'Formal', 'Sporty']]
-            gender_features = [1 if gender in item['gender'].split(',') else 0 
-                             for gender in ['Male', 'Female', 'Unisex']]
-            size_features = [1 if size in item['size'].split(',') else 0 
-                           for size in ['XS', 'S', 'M', 'L', 'XL']]
-            
-            features = color_normalized + style_features + gender_features + size_features
-            item_features.append(features)
-        
-        item_features = np.array(item_features)
-        
-        user_liked_items = user_prefs['item_id'].values
-        user_liked_indices = [items_df[items_df['id'] == item_id].index[0] 
-                            for item_id in user_liked_items if item_id in items_df['id'].values]
-        
-        if user_liked_indices:
-            user_profile = np.average(item_features[user_liked_indices], weights=time_weights, axis=0)
-        else:
-            user_profile = np.mean(item_features, axis=0)
-        
-        similarity_scores = cosine_similarity([user_profile], item_features)[0]
-        
-        recommended_indices = []
-        for idx in similarity_scores.argsort()[::-1]:
-            item_id = items_df.iloc[idx]['id']
-            if item_id not in user_liked_items:
-                recommended_indices.append(idx)
-                if len(recommended_indices) == n_recommendations:
-                    break
-        
-        recommended_items = items_df.iloc[recommended_indices]
-        return recommended_items
-        
-    except Exception as e:
-        logging.error(f"Error generating recommendations: {str(e)}")
-        return items_df.sample(n=n_recommendations)
