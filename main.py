@@ -17,7 +17,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 import logging
 
 st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
-
 logging.basicConfig(level=logging.INFO)
 
 def normalize_case(value):
@@ -132,7 +131,7 @@ def main_page():
                 st.error("An error occurred while generating recommendations. Please try again later.")
         else:
             st.info("Please log in to see personalized recommendations.")
-            
+    
     except Exception as e:
         logging.error(f"Error in main page: {str(e)}")
         st.error(f"An error occurred: {str(e)}")
@@ -227,15 +226,7 @@ def view_edit_items():
             clothing_items['gender'].str.contains(search_query, case=False)
         ]
     
-    items_per_page = 10
-    num_pages = (len(clothing_items) - 1) // items_per_page + 1
-    page = st.number_input("Page", min_value=1, max_value=num_pages, value=1)
-    start_idx = (page - 1) * items_per_page
-    end_idx = start_idx + items_per_page
-    
-    style_options = ["Casual", "Formal", "Sporty"]
-    
-    for index, item in clothing_items.iloc[start_idx:end_idx].iterrows():
+    for index, item in clothing_items.iterrows():
         with st.expander(f"{item['type'].capitalize()} (ID: {item['id']})"):
             col1, col2 = st.columns([1, 2])
             with col1:
@@ -252,6 +243,7 @@ def view_edit_items():
                     else:
                         new_color = st.color_picker("Color", "#000000")
                     
+                    style_options = ["Casual", "Formal", "Sporty"]
                     current_styles = [normalize_case(style) for style in item['style'].split(',')]
                     new_styles = st.multiselect('Style', style_options, default=current_styles)
                     
@@ -285,6 +277,9 @@ def delete_items():
         ]
     
     for index, item in clothing_items.iterrows():
+        timestamp = pd.Timestamp.now().timestamp()
+        unique_key = f"{item['id']}_{timestamp}"
+        
         col1, col2, col3 = st.columns([1, 2, 1])
         with col1:
             if os.path.exists(item['image_path']):
@@ -300,8 +295,11 @@ def delete_items():
             st.write(f"Size: {item['size']}")
         
         with col3:
-            if st.button(f"Delete Item {item['id']}", key=f"delete_button_{item['id']}"):
-                if st.button("Confirm Delete", key=f"confirm_delete_{item['id']}"):
+            delete_button_key = f"delete_button_{unique_key}"
+            confirm_button_key = f"confirm_delete_{unique_key}"
+            
+            if st.button(f"Delete Item {item['id']}", key=delete_button_key):
+                if st.button("Confirm Delete", key=confirm_button_key):
                     try:
                         success, message = delete_clothing_item(item['id'])
                         if success:
