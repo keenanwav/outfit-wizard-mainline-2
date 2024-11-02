@@ -45,21 +45,22 @@ def personal_wardrobe_page():
     
     with tabs[0]:
         st.header("Add Personal Clothing Item")
-
-        # File uploader outside any form
-        image_file = st.file_uploader("Upload Image (PNG)", type="png")
-        
-        # Display uploaded image and color picker
-        selected_color = None
-        color_hex = None
-        if image_file is not None:
-            st.image(image_file, width=200)
-            st.subheader("Color Selection")
-            selected_color, color_hex = create_color_picker(image_file, "upload")
-        
-        # Form for item details
         with st.form("add_personal_item", clear_on_submit=True):
             item_type = st.selectbox("Item Type", ["shirt", "pants", "shoes"])
+            image_file = st.file_uploader("Upload Image (PNG)", type="png")
+            
+            if image_file is not None:
+                st.image(image_file, width=200)
+                st.subheader("Color Selection")
+                st.write("Use the sliders below to pick a color from your image:")
+                selected_color, color_hex = create_color_picker(image_file, "upload")
+                if selected_color:
+                    color = color_hex
+                else:
+                    dominant_color = get_dominant_color(image_file)
+                    color = st.color_picker("Or select color manually:", dominant_color)
+            else:
+                color = st.color_picker("Select Color", "#000000")
             
             st.write("Style (select all that apply):")
             style_options = ["Casual", "Formal", "Sporty"]
@@ -100,7 +101,7 @@ def personal_wardrobe_page():
                         if selected_color:
                             rgb_color = selected_color
                         else:
-                            rgb_color = tuple(int(color_hex.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                            rgb_color = tuple(int(color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
                         
                         success, message = add_user_clothing_item(
                             "default_user",
@@ -128,69 +129,75 @@ def personal_wardrobe_page():
         
         for _, item in personal_items.iterrows():
             with st.expander(f"{item['type'].capitalize()} - ID: {item['id']}"):
-                col1, col2 = st.columns([1, 2])
+                col1, col2, col3 = st.columns([1, 2, 1])
                 
                 with col1:
                     if os.path.exists(item['image_path']):
                         st.image(item['image_path'], use_column_width=True)
-                        selected_color, color_hex = create_color_picker(item['image_path'], f"item_{item['id']}_{item['type']}")
+                        st.write("Pick a new color from the image:")
+                        selected_color, color_hex = create_color_picker(item['image_path'], f"item_{item['id']}")
                     else:
                         st.error(f"Image not found: {item['image_path']}")
                 
                 with col2:
-                    # Form for editing item details with unique key including item type
-                    with st.form(key=f"edit_item_{item['id']}_{item['type']}"):
-                        if selected_color:
-                            new_color = selected_color
-                        else:
-                            color_values = [int(c) for c in item['color'].split(',')]
-                            new_color = tuple(color_values)
-                        
-                        style_list = item['style'].split(',')
-                        new_styles = []
-                        st.write("Styles:")
-                        style_cols = st.columns(len(["Casual", "Formal", "Sporty"]))
-                        for i, style in enumerate(["Casual", "Formal", "Sporty"]):
-                            if style_cols[i].checkbox(style, value=style in style_list, 
-                                                   key=f"edit_style_{item['id']}_{item['type']}_{style}"):
-                                new_styles.append(style)
-                        
-                        gender_list = item['gender'].split(',')
-                        new_genders = []
-                        st.write("Genders:")
-                        gender_cols = st.columns(len(["Male", "Female", "Unisex"]))
-                        for i, gender in enumerate(["Male", "Female", "Unisex"]):
-                            if gender_cols[i].checkbox(gender, value=gender in gender_list, 
-                                                    key=f"edit_gender_{item['id']}_{item['type']}_{gender}"):
-                                new_genders.append(gender)
-                        
-                        size_list = item['size'].split(',')
-                        new_sizes = []
-                        st.write("Sizes:")
-                        size_cols = st.columns(len(["XS", "S", "M", "L", "XL"]))
-                        for i, size in enumerate(["XS", "S", "M", "L", "XL"]):
-                            if size_cols[i].checkbox(size, value=size in size_list, 
-                                                  key=f"edit_size_{item['id']}_{item['type']}_{size}"):
-                                new_sizes.append(size)
-                        
-                        if st.form_submit_button("Update"):
-                            try:
-                                success, message = edit_clothing_item(
-                                    item['id'],
-                                    new_color,
-                                    new_styles,
-                                    new_genders,
-                                    new_sizes,
-                                    item.get('hyperlink', '')
-                                )
-                                if success:
-                                    st.success(message)
-                                else:
-                                    st.error(message)
-                            except Exception as e:
-                                st.error(f"Error updating item: {str(e)}")
+                    if selected_color:
+                        new_color = color_hex
+                    else:
+                        color_values = [int(c) for c in item['color'].split(',')]
+                        new_color = st.color_picker(
+                            "Or select color manually:", 
+                            f"#{color_values[0]:02x}{color_values[1]:02x}{color_values[2]:02x}",
+                            key=f"color_{item['id']}"
+                        )
                     
-                    if st.button("Delete", key=f"delete_{item['id']}_{item['type']}"):
+                    style_list = item['style'].split(',')
+                    new_styles = []
+                    st.write("Styles:")
+                    style_cols = st.columns(len(["Casual", "Formal", "Sporty"]))
+                    for i, style in enumerate(["Casual", "Formal", "Sporty"]):
+                        if style_cols[i].checkbox(style, value=style in style_list, key=f"edit_style_{item['id']}_{style}"):
+                            new_styles.append(style)
+                    
+                    gender_list = item['gender'].split(',')
+                    new_genders = []
+                    st.write("Genders:")
+                    gender_cols = st.columns(len(["Male", "Female", "Unisex"]))
+                    for i, gender in enumerate(["Male", "Female", "Unisex"]):
+                        if gender_cols[i].checkbox(gender, value=gender in gender_list, key=f"edit_gender_{item['id']}_{gender}"):
+                            new_genders.append(gender)
+                    
+                    size_list = item['size'].split(',')
+                    new_sizes = []
+                    st.write("Sizes:")
+                    size_cols = st.columns(len(["XS", "S", "M", "L", "XL"]))
+                    for i, size in enumerate(["XS", "S", "M", "L", "XL"]):
+                        if size_cols[i].checkbox(size, value=size in size_list, key=f"edit_size_{item['id']}_{size}"):
+                            new_sizes.append(size)
+                
+                with col3:
+                    if st.button("Update", key=f"update_{item['id']}"):
+                        try:
+                            if selected_color:
+                                rgb_color = selected_color
+                            else:
+                                rgb_color = tuple(int(new_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                            
+                            success, message = edit_clothing_item(
+                                item['id'],
+                                rgb_color,
+                                new_styles,
+                                new_genders,
+                                new_sizes,
+                                item.get('hyperlink', '')
+                            )
+                            if success:
+                                st.success(message)
+                            else:
+                                st.error(message)
+                        except Exception as e:
+                            st.error(f"Error updating item: {str(e)}")
+                    
+                    if st.button("Delete", key=f"delete_{item['id']}"):
                         try:
                             success, message = delete_clothing_item(item['id'])
                             if success:
