@@ -4,6 +4,7 @@ from PIL import Image
 import numpy as np
 import pandas as pd
 from collections import Counter
+import uuid
 from data_manager import (
     load_clothing_items, save_outfit, add_clothing_item, update_csv_structure,
     store_user_preference, get_advanced_recommendations, load_saved_outfits,
@@ -18,6 +19,9 @@ from outfit_generator import generate_outfit
 
 st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
 logging.basicConfig(level=logging.INFO)
+
+def generate_unique_form_key(item_id, item_type):
+    return f"edit_item_{item_id}_{item_type}_{uuid.uuid4().hex[:8]}"
 
 def normalize_case(value):
     return value.strip().title() if isinstance(value, str) else value
@@ -55,7 +59,7 @@ def personal_wardrobe_page():
         if image_file is not None:
             st.image(image_file, width=200)
             st.subheader("Color Selection")
-            selected_color, color_hex = create_color_picker(image_file, "upload")
+            selected_color, color_hex = create_color_picker(image_file, f"upload_{uuid.uuid4().hex[:8]}")
         
         # Form for item details
         with st.form("add_personal_item", clear_on_submit=True):
@@ -133,13 +137,20 @@ def personal_wardrobe_page():
                 with col1:
                     if os.path.exists(item['image_path']):
                         st.image(item['image_path'], use_column_width=True)
-                        selected_color, color_hex = create_color_picker(item['image_path'], f"item_{item['id']}_{item['type']}")
+                        color_picker_key = f"item_{item['id']}_{item['type']}_{uuid.uuid4().hex[:8]}"
+                        selected_color, color_hex = create_color_picker(
+                            item['image_path'], 
+                            color_picker_key
+                        )
                     else:
                         st.error(f"Image not found: {item['image_path']}")
                 
                 with col2:
-                    # Form for editing item details with unique key including item type
-                    with st.form(key=f"edit_item_{item['id']}_{item['type']}"):
+                    # Generate unique form key
+                    form_key = generate_unique_form_key(item['id'], item['type'])
+                    
+                    # Form for editing item details with unique key
+                    with st.form(key=form_key):
                         if selected_color:
                             new_color = selected_color
                         else:
@@ -152,7 +163,7 @@ def personal_wardrobe_page():
                         style_cols = st.columns(len(["Casual", "Formal", "Sporty"]))
                         for i, style in enumerate(["Casual", "Formal", "Sporty"]):
                             if style_cols[i].checkbox(style, value=style in style_list, 
-                                                   key=f"edit_style_{item['id']}_{item['type']}_{style}"):
+                                                   key=f"{form_key}_style_{style}"):
                                 new_styles.append(style)
                         
                         gender_list = item['gender'].split(',')
@@ -161,7 +172,7 @@ def personal_wardrobe_page():
                         gender_cols = st.columns(len(["Male", "Female", "Unisex"]))
                         for i, gender in enumerate(["Male", "Female", "Unisex"]):
                             if gender_cols[i].checkbox(gender, value=gender in gender_list, 
-                                                    key=f"edit_gender_{item['id']}_{item['type']}_{gender}"):
+                                                    key=f"{form_key}_gender_{gender}"):
                                 new_genders.append(gender)
                         
                         size_list = item['size'].split(',')
@@ -170,7 +181,7 @@ def personal_wardrobe_page():
                         size_cols = st.columns(len(["XS", "S", "M", "L", "XL"]))
                         for i, size in enumerate(["XS", "S", "M", "L", "XL"]):
                             if size_cols[i].checkbox(size, value=size in size_list, 
-                                                  key=f"edit_size_{item['id']}_{item['type']}_{size}"):
+                                                  key=f"{form_key}_size_{size}"):
                                 new_sizes.append(size)
                         
                         if st.form_submit_button("Update"):
@@ -190,7 +201,9 @@ def personal_wardrobe_page():
                             except Exception as e:
                                 st.error(f"Error updating item: {str(e)}")
                     
-                    if st.button("Delete", key=f"delete_{item['id']}_{item['type']}"):
+                    # Delete button with unique key
+                    delete_key = f"delete_{item['id']}_{item['type']}_{uuid.uuid4().hex[:8]}"
+                    if st.button("Delete", key=delete_key):
                         try:
                             success, message = delete_clothing_item(item['id'])
                             if success:
@@ -259,7 +272,7 @@ def saved_outfits_page():
                 st.subheader(f"Outfit {i+1}")
                 if os.path.exists(outfit['image_path']):
                     st.image(outfit['image_path'])
-                    if st.button(f"Delete Outfit {i+1}"):
+                    if st.button(f"Delete Outfit {i+1}", key=f"delete_outfit_{outfit['outfit_id']}_{uuid.uuid4().hex[:8]}"):
                         delete_outfit(outfit['outfit_id'])
                         st.success(f"Outfit {i+1} deleted successfully!")
                         st.experimental_rerun()
