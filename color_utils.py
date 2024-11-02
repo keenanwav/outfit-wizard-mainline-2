@@ -13,7 +13,6 @@ def get_pixel_color(image, x, y):
     if img.mode != 'RGB':
         img = img.convert('RGB')
     
-    # Get the pixel color at the specified coordinates
     pixel_color = img.getpixel((x, y))
     return pixel_color
 
@@ -44,9 +43,6 @@ def create_color_picker(image, key_prefix):
     # Get image dimensions
     width, height = img.size
     
-    # Create main columns for layout
-    col1, col2 = st.columns([2, 1])
-    
     # Initialize session state for coordinates and color if not exists
     if f"{key_prefix}_x_{image_hash}" not in st.session_state:
         st.session_state[f"{key_prefix}_x_{image_hash}"] = width // 2
@@ -54,31 +50,33 @@ def create_color_picker(image, key_prefix):
         st.session_state[f"{key_prefix}_y_{image_hash}"] = height // 2
     if f"{key_prefix}_color_{image_hash}" not in st.session_state:
         st.session_state[f"{key_prefix}_color_{image_hash}"] = None
+
+    # Create main columns for layout
+    col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Display the image with a click handler
+        st.subheader("Eyedropper Tool")
         st.markdown("""
             <style>
                 .stImage:hover {cursor: crosshair !important;}
             </style>
             """, unsafe_allow_html=True)
         
-        clicked = st.image(image, use_column_width=True)
+        # Display the image
+        st.image(image, use_column_width=True)
         
-        # Handle click events using streamlit callback
-        if clicked:
-            x = st.session_state[f"{key_prefix}_x_{image_hash}"]
-            y = st.session_state[f"{key_prefix}_y_{image_hash}"]
-        else:
-            x = st.slider("X coordinate", 0, width-1, st.session_state[f"{key_prefix}_x_{image_hash}"], 
-                         key=f"{key_prefix}_x_slider_{image_hash}")
-            y = st.slider("Y coordinate", 0, height-1, st.session_state[f"{key_prefix}_y_{image_hash}"], 
-                         key=f"{key_prefix}_y_slider_{image_hash}")
-            st.session_state[f"{key_prefix}_x_{image_hash}"] = x
-            st.session_state[f"{key_prefix}_y_{image_hash}"] = y
+        # Coordinate sliders
+        st.markdown("### Adjust Coordinates")
+        x = st.slider("X coordinate", 0, width-1, st.session_state[f"{key_prefix}_x_{image_hash}"], 
+                     key=f"{key_prefix}_x_slider_{image_hash}")
+        y = st.slider("Y coordinate", 0, height-1, st.session_state[f"{key_prefix}_y_{image_hash}"], 
+                     key=f"{key_prefix}_y_slider_{image_hash}")
+        
+        st.session_state[f"{key_prefix}_x_{image_hash}"] = x
+        st.session_state[f"{key_prefix}_y_{image_hash}"] = y
     
     with col2:
-        st.write("Quick Color Selection:")
+        st.markdown("### Quick Color Selection")
         
         # Define color swatches
         primary_colors = {
@@ -90,7 +88,7 @@ def create_color_picker(image, key_prefix):
             "Black": "#000000", "White": "#FFFFFF"
         }
         
-        # Create CSS grid layout for color swatches
+        # Create CSS for color swatches
         st.markdown("""
             <style>
                 .color-grid {
@@ -111,13 +109,13 @@ def create_color_picker(image, key_prefix):
                 }
                 .swatch-section {
                     background: #f8f9fa;
-                    padding: 10px;
+                    padding: 12px;
                     border-radius: 8px;
                     margin-bottom: 16px;
                 }
                 .section-title {
                     font-weight: bold;
-                    margin-bottom: 8px;
+                    margin-bottom: 12px;
                 }
             </style>
         """, unsafe_allow_html=True)
@@ -125,32 +123,34 @@ def create_color_picker(image, key_prefix):
         # Primary colors section
         st.markdown('<div class="swatch-section">', unsafe_allow_html=True)
         st.markdown('<div class="section-title">Primary Colors</div>', unsafe_allow_html=True)
-        st.markdown('<div class="color-grid">', unsafe_allow_html=True)
-        for color_name, hex_code in primary_colors.items():
-            if st.button("", key=f"{key_prefix}_primary_{color_name}_{image_hash}", 
-                        help=f"{color_name}: {hex_code}"):
-                st.session_state[f"{key_prefix}_color_{image_hash}"] = hex_to_rgb(hex_code)
-            st.markdown(
-                f'<div class="color-swatch" style="background-color: {hex_code};" '
-                f'title="{color_name}: {hex_code}"></div>',
-                unsafe_allow_html=True
-            )
-        st.markdown('</div></div>', unsafe_allow_html=True)
+        cols = st.columns(3)
+        for idx, (color_name, hex_code) in enumerate(primary_colors.items()):
+            with cols[idx % 3]:
+                unique_key = f"{key_prefix}_primary_{color_name}_{image_hash}_{idx}"
+                if st.button("", key=unique_key, help=f"{color_name}: {hex_code}"):
+                    st.session_state[f"{key_prefix}_color_{image_hash}"] = hex_to_rgb(hex_code)
+                st.markdown(
+                    f'<div class="color-swatch" style="background-color: {hex_code};" '
+                    f'title="{color_name}: {hex_code}"></div>',
+                    unsafe_allow_html=True
+                )
+        st.markdown('</div>', unsafe_allow_html=True)
         
         # Secondary colors section
         st.markdown('<div class="swatch-section">', unsafe_allow_html=True)
         st.markdown('<div class="section-title">Secondary Colors</div>', unsafe_allow_html=True)
-        st.markdown('<div class="color-grid">', unsafe_allow_html=True)
-        for color_name, hex_code in secondary_colors.items():
-            if st.button("", key=f"{key_prefix}_secondary_{color_name}_{image_hash}", 
-                        help=f"{color_name}: {hex_code}"):
-                st.session_state[f"{key_prefix}_color_{image_hash}"] = hex_to_rgb(hex_code)
-            st.markdown(
-                f'<div class="color-swatch" style="background-color: {hex_code};" '
-                f'title="{color_name}: {hex_code}"></div>',
-                unsafe_allow_html=True
-            )
-        st.markdown('</div></div>', unsafe_allow_html=True)
+        cols = st.columns(3)
+        for idx, (color_name, hex_code) in enumerate(secondary_colors.items()):
+            with cols[idx % 3]:
+                unique_key = f"{key_prefix}_secondary_{color_name}_{image_hash}_{idx}"
+                if st.button("", key=unique_key, help=f"{color_name}: {hex_code}"):
+                    st.session_state[f"{key_prefix}_color_{image_hash}"] = hex_to_rgb(hex_code)
+                st.markdown(
+                    f'<div class="color-swatch" style="background-color: {hex_code};" '
+                    f'title="{color_name}: {hex_code}"></div>',
+                    unsafe_allow_html=True
+                )
+        st.markdown('</div>', unsafe_allow_html=True)
         
         # Get the color from either the image or selected swatch
         if st.session_state[f"{key_prefix}_color_{image_hash}"] is not None:
@@ -161,6 +161,7 @@ def create_color_picker(image, key_prefix):
         color_hex = "#{:02x}{:02x}{:02x}".format(*color)
         
         # Display color preview with improved styling
+        st.markdown("### Selected Color")
         st.markdown(f"""
             <div style="
                 background: #f8f9fa;
@@ -169,12 +170,8 @@ def create_color_picker(image, key_prefix):
                 margin-top: 16px;
             ">
                 <div style="
-                    font-weight: bold;
-                    margin-bottom: 8px;
-                ">Selected Color</div>
-                <div style="
                     width: 100%;
-                    height: 80px;
+                    height: 100px;
                     background-color: {color_hex};
                     border: 2px solid #ccc;
                     border-radius: 8px;
@@ -193,6 +190,7 @@ def create_color_picker(image, key_prefix):
         """, unsafe_allow_html=True)
         
         # Reset color selection button with unique key
+        st.markdown("<br>", unsafe_allow_html=True)
         if st.button("Reset Color Selection", key=f"{key_prefix}_reset_{image_hash}"):
             st.session_state[f"{key_prefix}_color_{image_hash}"] = None
     
