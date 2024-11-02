@@ -4,7 +4,6 @@ from PIL import Image
 import numpy as np
 import pandas as pd
 from collections import Counter
-import uuid
 from data_manager import (
     load_clothing_items, save_outfit, add_clothing_item, update_csv_structure,
     store_user_preference, get_advanced_recommendations, load_saved_outfits,
@@ -19,9 +18,6 @@ from outfit_generator import generate_outfit
 
 st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
 logging.basicConfig(level=logging.INFO)
-
-def generate_unique_form_key(item_id, item_type):
-    return f"edit_item_{item_id}_{item_type}_{uuid.uuid4().hex[:8]}"
 
 def normalize_case(value):
     return value.strip().title() if isinstance(value, str) else value
@@ -42,184 +38,168 @@ def get_dominant_color(image):
         return "#000000"
 
 def personal_wardrobe_page():
-    try:
-        st.title("My Personal Wardrobe 👕")
-        create_user_items_table()
+    st.title("My Personal Wardrobe 👕")
+    create_user_items_table()
+    
+    tabs = st.tabs(["Upload New Item", "View My Items"])
+    
+    with tabs[0]:
+        st.header("Add Personal Clothing Item")
+
+        # File uploader outside any form
+        image_file = st.file_uploader("Upload Image (PNG)", type="png")
         
-        tabs = st.tabs(["Upload New Item", "View My Items"])
+        # Display uploaded image and color picker
+        selected_color = None
+        color_hex = None
+        if image_file is not None:
+            st.image(image_file, width=200)
+            st.subheader("Color Selection")
+            selected_color, color_hex = create_color_picker(image_file, "upload")
         
-        with tabs[0]:
-            st.header("Add Personal Clothing Item")
+        # Form for item details
+        with st.form("add_personal_item", clear_on_submit=True):
+            item_type = st.selectbox("Item Type", ["shirt", "pants", "shoes"])
             
-            image_file = st.file_uploader("Upload Image (PNG)", type="png")
-            selected_color = None
-            color_hex = None
+            st.write("Style (select all that apply):")
+            style_options = ["Casual", "Formal", "Sporty"]
+            styles = []
+            cols = st.columns(len(style_options))
+            for i, style in enumerate(style_options):
+                if cols[i].checkbox(style, key=f"style_{style}"):
+                    styles.append(style)
             
-            if image_file:
-                upload_key = f"upload_{uuid.uuid4().hex[:8]}"
-                selected_color, color_hex = create_color_picker(image_file, upload_key)
+            st.write("Gender (select all that apply):")
+            gender_options = ["Male", "Female", "Unisex"]
+            genders = []
+            gender_cols = st.columns(len(gender_options))
+            for i, gender in enumerate(gender_options):
+                if gender_cols[i].checkbox(gender, key=f"gender_{gender}"):
+                    genders.append(gender)
             
-            with st.form("add_personal_item", clear_on_submit=True):
-                form_id = uuid.uuid4().hex[:8]
-                item_type = st.selectbox("Item Type", ["shirt", "pants", "shoes"], key=f"type_{form_id}")
+            st.write("Size (select all that apply):")
+            size_options = ["XS", "S", "M", "L", "XL"]
+            sizes = []
+            size_cols = st.columns(len(size_options))
+            for i, size in enumerate(size_options):
+                if size_cols[i].checkbox(size, key=f"size_{size}"):
+                    sizes.append(size)
+            
+            submitted = st.form_submit_button("Upload Item")
+            if submitted:
+                if not image_file:
+                    st.error("Please upload an image file.")
+                elif not styles:
+                    st.error("Please select at least one style.")
+                elif not genders:
+                    st.error("Please select at least one gender.")
+                elif not sizes:
+                    st.error("Please select at least one size.")
+                else:
+                    try:
+                        if selected_color:
+                            rgb_color = selected_color
+                        else:
+                            rgb_color = tuple(int(color_hex.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                        
+                        success, message = add_user_clothing_item(
+                            "default_user",
+                            item_type,
+                            rgb_color,
+                            styles,
+                            genders,
+                            sizes,
+                            image_file
+                        )
+                        if success:
+                            st.success(message)
+                        else:
+                            st.error(message)
+                    except Exception as e:
+                        st.error(f"Error adding clothing item: {str(e)}")
+    
+    with tabs[1]:
+        st.header("My Uploaded Items")
+        personal_items = load_clothing_items("default_user")
+        
+        if len(personal_items) == 0:
+            st.info("You haven't uploaded any clothing items yet.")
+            return
+        
+        for _, item in personal_items.iterrows():
+            with st.expander(f"{item['type'].capitalize()} - ID: {item['id']}"):
+                col1, col2 = st.columns([1, 2])
                 
-                st.write("Style (select all that apply):")
-                style_options = ["Casual", "Formal", "Sporty"]
-                styles = []
-                cols = st.columns(len(style_options))
-                for i, style in enumerate(style_options):
-                    if cols[i].checkbox(style, key=f"style_{form_id}_{style}"):
-                        styles.append(style)
-                
-                st.write("Gender (select all that apply):")
-                gender_options = ["Male", "Female", "Unisex"]
-                genders = []
-                gender_cols = st.columns(len(gender_options))
-                for i, gender in enumerate(gender_options):
-                    if gender_cols[i].checkbox(gender, key=f"gender_{form_id}_{gender}"):
-                        genders.append(gender)
-                
-                st.write("Size (select all that apply):")
-                size_options = ["XS", "S", "M", "L", "XL"]
-                sizes = []
-                size_cols = st.columns(len(size_options))
-                for i, size in enumerate(size_options):
-                    if size_cols[i].checkbox(size, key=f"size_{form_id}_{size}"):
-                        sizes.append(size)
-                
-                submitted = st.form_submit_button("Upload Item")
-                if submitted:
-                    if not image_file:
-                        st.error("Please upload an image file.")
-                    elif not styles:
-                        st.error("Please select at least one style.")
-                    elif not genders:
-                        st.error("Please select at least one gender.")
-                    elif not sizes:
-                        st.error("Please select at least one size.")
+                with col1:
+                    if os.path.exists(item['image_path']):
+                        st.image(item['image_path'], use_column_width=True)
+                        selected_color, color_hex = create_color_picker(item['image_path'], f"item_{item['id']}_{item['type']}")
                     else:
+                        st.error(f"Image not found: {item['image_path']}")
+                
+                with col2:
+                    # Form for editing item details with unique key including item type
+                    with st.form(key=f"edit_item_{item['id']}_{item['type']}"):
+                        if selected_color:
+                            new_color = selected_color
+                        else:
+                            color_values = [int(c) for c in item['color'].split(',')]
+                            new_color = tuple(color_values)
+                        
+                        style_list = item['style'].split(',')
+                        new_styles = []
+                        st.write("Styles:")
+                        style_cols = st.columns(len(["Casual", "Formal", "Sporty"]))
+                        for i, style in enumerate(["Casual", "Formal", "Sporty"]):
+                            if style_cols[i].checkbox(style, value=style in style_list, 
+                                                   key=f"edit_style_{item['id']}_{item['type']}_{style}"):
+                                new_styles.append(style)
+                        
+                        gender_list = item['gender'].split(',')
+                        new_genders = []
+                        st.write("Genders:")
+                        gender_cols = st.columns(len(["Male", "Female", "Unisex"]))
+                        for i, gender in enumerate(["Male", "Female", "Unisex"]):
+                            if gender_cols[i].checkbox(gender, value=gender in gender_list, 
+                                                    key=f"edit_gender_{item['id']}_{item['type']}_{gender}"):
+                                new_genders.append(gender)
+                        
+                        size_list = item['size'].split(',')
+                        new_sizes = []
+                        st.write("Sizes:")
+                        size_cols = st.columns(len(["XS", "S", "M", "L", "XL"]))
+                        for i, size in enumerate(["XS", "S", "M", "L", "XL"]):
+                            if size_cols[i].checkbox(size, value=size in size_list, 
+                                                  key=f"edit_size_{item['id']}_{item['type']}_{size}"):
+                                new_sizes.append(size)
+                        
+                        if st.form_submit_button("Update"):
+                            try:
+                                success, message = edit_clothing_item(
+                                    item['id'],
+                                    new_color,
+                                    new_styles,
+                                    new_genders,
+                                    new_sizes,
+                                    item.get('hyperlink', '')
+                                )
+                                if success:
+                                    st.success(message)
+                                else:
+                                    st.error(message)
+                            except Exception as e:
+                                st.error(f"Error updating item: {str(e)}")
+                    
+                    if st.button("Delete", key=f"delete_{item['id']}_{item['type']}"):
                         try:
-                            if selected_color:
-                                rgb_color = selected_color
-                            else:
-                                rgb_color = (0, 0, 0)
-                            
-                            success, message = add_user_clothing_item(
-                                "default_user",
-                                item_type,
-                                rgb_color,
-                                styles,
-                                genders,
-                                sizes,
-                                image_file
-                            )
+                            success, message = delete_clothing_item(item['id'])
                             if success:
                                 st.success(message)
                                 st.experimental_rerun()
                             else:
                                 st.error(message)
                         except Exception as e:
-                            st.error(f"Error adding clothing item: {str(e)}")
-                            logging.error(f"Error adding clothing item: {str(e)}")
-        
-        with tabs[1]:
-            st.header("My Uploaded Items")
-            personal_items = load_clothing_items("default_user")
-            
-            if len(personal_items) == 0:
-                st.info("You haven't uploaded any clothing items yet.")
-                return
-            
-            for _, item in personal_items.iterrows():
-                with st.expander(f"{item['type'].capitalize()} - ID: {item['id']}"):
-                    col1, col2 = st.columns([1, 2])
-                    
-                    with col1:
-                        if os.path.exists(item['image_path']):
-                            color_picker_key = f"item_{item['id']}_{item['type']}_{uuid.uuid4().hex[:8]}"
-                            selected_color, color_hex = create_color_picker(
-                                item['image_path'], 
-                                color_picker_key
-                            )
-                        else:
-                            st.error(f"Image not found: {item['image_path']}")
-                    
-                    with col2:
-                        try:
-                            form_key = generate_unique_form_key(item['id'], item['type'])
-                            
-                            with st.form(key=form_key):
-                                if selected_color:
-                                    new_color = selected_color
-                                else:
-                                    color_values = [int(c) for c in item['color'].split(',')]
-                                    new_color = tuple(color_values)
-                                
-                                style_list = item['style'].split(',')
-                                new_styles = []
-                                st.write("Styles:")
-                                style_cols = st.columns(len(["Casual", "Formal", "Sporty"]))
-                                for i, style in enumerate(["Casual", "Formal", "Sporty"]):
-                                    if style_cols[i].checkbox(style, value=style in style_list, 
-                                                           key=f"{form_key}_style_{style}"):
-                                        new_styles.append(style)
-                                
-                                gender_list = item['gender'].split(',')
-                                new_genders = []
-                                st.write("Genders:")
-                                gender_cols = st.columns(len(["Male", "Female", "Unisex"]))
-                                for i, gender in enumerate(["Male", "Female", "Unisex"]):
-                                    if gender_cols[i].checkbox(gender, value=gender in gender_list, 
-                                                            key=f"{form_key}_gender_{gender}"):
-                                        new_genders.append(gender)
-                                
-                                size_list = item['size'].split(',')
-                                new_sizes = []
-                                st.write("Sizes:")
-                                size_cols = st.columns(len(["XS", "S", "M", "L", "XL"]))
-                                for i, size in enumerate(["XS", "S", "M", "L", "XL"]):
-                                    if size_cols[i].checkbox(size, value=size in size_list, 
-                                                          key=f"{form_key}_size_{size}"):
-                                        new_sizes.append(size)
-                                
-                                if st.form_submit_button("Update"):
-                                    try:
-                                        success, message = edit_clothing_item(
-                                            item['id'],
-                                            new_color,
-                                            new_styles,
-                                            new_genders,
-                                            new_sizes,
-                                            item.get('hyperlink', '')
-                                        )
-                                        if success:
-                                            st.success(message)
-                                            st.experimental_rerun()
-                                        else:
-                                            st.error(message)
-                                    except Exception as e:
-                                        st.error(f"Error updating item: {str(e)}")
-                                        logging.error(f"Error updating item: {str(e)}")
-                            
-                            delete_key = f"delete_{item['id']}_{item['type']}_{uuid.uuid4().hex[:8]}"
-                            if st.button("Delete", key=delete_key):
-                                try:
-                                    success, message = delete_clothing_item(item['id'])
-                                    if success:
-                                        st.success(message)
-                                        st.experimental_rerun()
-                                    else:
-                                        st.error(message)
-                                except Exception as e:
-                                    st.error(f"Error deleting item: {str(e)}")
-                                    logging.error(f"Error deleting item: {str(e)}")
-                        except Exception as e:
-                            st.error(f"Form error: {str(e)}")
-                            logging.error(f"Form error in item {item['id']}: {str(e)}")
-    
-    except Exception as e:
-        st.error(f"Page error: {str(e)}")
-        logging.error(f"Page error in personal wardrobe: {str(e)}")
+                            st.error(f"Error deleting item: {str(e)}")
 
 def main_page():
     st.title("Outfit Wizard 🧙‍♂️👚👖👞")
@@ -279,7 +259,7 @@ def saved_outfits_page():
                 st.subheader(f"Outfit {i+1}")
                 if os.path.exists(outfit['image_path']):
                     st.image(outfit['image_path'])
-                    if st.button(f"Delete Outfit {i+1}", key=f"delete_outfit_{outfit['outfit_id']}_{uuid.uuid4().hex[:8]}"):
+                    if st.button(f"Delete Outfit {i+1}"):
                         delete_outfit(outfit['outfit_id'])
                         st.success(f"Outfit {i+1} deleted successfully!")
                         st.experimental_rerun()
