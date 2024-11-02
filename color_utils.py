@@ -50,7 +50,7 @@ def create_color_picker(image, key_prefix):
         st.session_state[f"{key_prefix}_y_{image_hash}"] = height // 2
     if f"{key_prefix}_color_{image_hash}" not in st.session_state:
         st.session_state[f"{key_prefix}_color_{image_hash}"] = None
-
+    
     # Create main columns for layout
     col1, col2 = st.columns([2, 1])
     
@@ -64,7 +64,9 @@ def create_color_picker(image, key_prefix):
         
         # Display the image
         st.image(image, use_column_width=True)
-        
+
+    # Create a form for the color picker controls
+    with st.form(key=f"color_picker_form_{image_hash}"):
         # Coordinate sliders
         st.markdown("### Adjust Coordinates")
         x = st.slider("X coordinate", 0, width-1, st.session_state[f"{key_prefix}_x_{image_hash}"], 
@@ -72,10 +74,6 @@ def create_color_picker(image, key_prefix):
         y = st.slider("Y coordinate", 0, height-1, st.session_state[f"{key_prefix}_y_{image_hash}"], 
                      key=f"{key_prefix}_y_slider_{image_hash}")
         
-        st.session_state[f"{key_prefix}_x_{image_hash}"] = x
-        st.session_state[f"{key_prefix}_y_{image_hash}"] = y
-    
-    with col2:
         st.markdown("### Quick Color Selection")
         
         # Define color swatches
@@ -91,21 +89,13 @@ def create_color_picker(image, key_prefix):
         # Create CSS for color swatches
         st.markdown("""
             <style>
-                .color-grid {
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 8px;
-                    margin-bottom: 16px;
-                }
                 .color-swatch {
-                    aspect-ratio: 1;
+                    width: 30px;
+                    height: 30px;
                     border-radius: 4px;
                     border: 1px solid #ccc;
-                    cursor: pointer;
-                    transition: transform 0.2s;
-                }
-                .color-swatch:hover {
-                    transform: scale(1.05);
+                    display: inline-block;
+                    margin: 4px;
                 }
                 .swatch-section {
                     background: #f8f9fa;
@@ -113,85 +103,89 @@ def create_color_picker(image, key_prefix):
                     border-radius: 8px;
                     margin-bottom: 16px;
                 }
-                .section-title {
-                    font-weight: bold;
-                    margin-bottom: 12px;
-                }
             </style>
         """, unsafe_allow_html=True)
         
         # Primary colors section
-        st.markdown('<div class="swatch-section">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Primary Colors</div>', unsafe_allow_html=True)
-        cols = st.columns(3)
-        for idx, (color_name, hex_code) in enumerate(primary_colors.items()):
-            with cols[idx % 3]:
-                unique_key = f"{key_prefix}_primary_{color_name}_{image_hash}_{idx}"
-                if st.button("", key=unique_key, help=f"{color_name}: {hex_code}"):
-                    st.session_state[f"{key_prefix}_color_{image_hash}"] = hex_to_rgb(hex_code)
-                st.markdown(
-                    f'<div class="color-swatch" style="background-color: {hex_code};" '
-                    f'title="{color_name}: {hex_code}"></div>',
-                    unsafe_allow_html=True
-                )
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("#### Primary Colors")
+        selected_primary = st.radio(
+            "Select a primary color:",
+            list(primary_colors.keys()),
+            key=f"{key_prefix}_primary_radio_{image_hash}",
+            horizontal=True,
+            label_visibility="collapsed"
+        )
         
         # Secondary colors section
-        st.markdown('<div class="swatch-section">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Secondary Colors</div>', unsafe_allow_html=True)
-        cols = st.columns(3)
-        for idx, (color_name, hex_code) in enumerate(secondary_colors.items()):
-            with cols[idx % 3]:
-                unique_key = f"{key_prefix}_secondary_{color_name}_{image_hash}_{idx}"
-                if st.button("", key=unique_key, help=f"{color_name}: {hex_code}"):
-                    st.session_state[f"{key_prefix}_color_{image_hash}"] = hex_to_rgb(hex_code)
-                st.markdown(
-                    f'<div class="color-swatch" style="background-color: {hex_code};" '
-                    f'title="{color_name}: {hex_code}"></div>',
-                    unsafe_allow_html=True
-                )
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("#### Secondary Colors")
+        selected_secondary = st.radio(
+            "Select a secondary color:",
+            list(secondary_colors.keys()),
+            key=f"{key_prefix}_secondary_radio_{image_hash}",
+            horizontal=True,
+            label_visibility="collapsed"
+        )
         
-        # Get the color from either the image or selected swatch
-        if st.session_state[f"{key_prefix}_color_{image_hash}"] is not None:
-            color = st.session_state[f"{key_prefix}_color_{image_hash}"]
-        else:
-            color = get_pixel_color(image, x, y)
+        # Submit button for the form
+        submitted = st.form_submit_button("Apply Color")
         
-        color_hex = "#{:02x}{:02x}{:02x}".format(*color)
-        
-        # Display color preview with improved styling
-        st.markdown("### Selected Color")
-        st.markdown(f"""
+        if submitted:
+            # Update coordinates in session state
+            st.session_state[f"{key_prefix}_x_{image_hash}"] = x
+            st.session_state[f"{key_prefix}_y_{image_hash}"] = y
+            
+            # Set color based on radio selection
+            if selected_primary != st.session_state.get(f"{key_prefix}_last_primary_{image_hash}"):
+                st.session_state[f"{key_prefix}_color_{image_hash}"] = hex_to_rgb(primary_colors[selected_primary])
+                st.session_state[f"{key_prefix}_last_primary_{image_hash}"] = selected_primary
+            elif selected_secondary != st.session_state.get(f"{key_prefix}_last_secondary_{image_hash}"):
+                st.session_state[f"{key_prefix}_color_{image_hash}"] = hex_to_rgb(secondary_colors[selected_secondary])
+                st.session_state[f"{key_prefix}_last_secondary_{image_hash}"] = selected_secondary
+            else:
+                # Use eyedropper color if no radio button changed
+                st.session_state[f"{key_prefix}_color_{image_hash}"] = get_pixel_color(image, x, y)
+    
+    # Display the currently selected color
+    if st.session_state[f"{key_prefix}_color_{image_hash}"] is not None:
+        color = st.session_state[f"{key_prefix}_color_{image_hash}"]
+    else:
+        color = get_pixel_color(image, x, y)
+    
+    color_hex = "#{:02x}{:02x}{:02x}".format(*color)
+    
+    # Display color preview
+    st.markdown("### Selected Color")
+    st.markdown(f"""
+        <div style="
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+        ">
             <div style="
-                background: #f8f9fa;
-                padding: 16px;
+                width: 100%;
+                height: 100px;
+                background-color: {color_hex};
+                border: 2px solid #ccc;
                 border-radius: 8px;
-                margin-top: 16px;
+                margin-bottom: 12px;
+            "></div>
+            <div style="
+                background: white;
+                padding: 8px;
+                border-radius: 4px;
+                font-family: monospace;
             ">
-                <div style="
-                    width: 100%;
-                    height: 100px;
-                    background-color: {color_hex};
-                    border: 2px solid #ccc;
-                    border-radius: 8px;
-                    margin-bottom: 12px;
-                "></div>
-                <div style="
-                    background: white;
-                    padding: 8px;
-                    border-radius: 4px;
-                    font-family: monospace;
-                ">
-                    RGB: {color}<br>
-                    Hex: {color_hex}
-                </div>
+                RGB: {color}<br>
+                Hex: {color_hex}
             </div>
-        """, unsafe_allow_html=True)
-        
-        # Reset color selection button with unique key
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Reset Color Selection", key=f"{key_prefix}_reset_{image_hash}"):
-            st.session_state[f"{key_prefix}_color_{image_hash}"] = None
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Reset button outside the form
+    if st.button("Reset Color Selection", key=f"{key_prefix}_reset_{image_hash}"):
+        st.session_state[f"{key_prefix}_color_{image_hash}"] = None
+        st.session_state[f"{key_prefix}_last_primary_{image_hash}"] = None
+        st.session_state[f"{key_prefix}_last_secondary_{image_hash}"] = None
     
     return color, color_hex
