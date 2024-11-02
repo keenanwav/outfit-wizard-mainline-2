@@ -130,10 +130,10 @@ def personal_wardrobe_page():
                         st.error(f"Image not found: {item['image_path']}")
                 
                 with col2:
-                    color = item['color'].split(',')
+                    color_values = [int(c) for c in item['color'].split(',')]
                     new_color = st.color_picker(
                         "Color", 
-                        f"#{int(color[0]):02x}{int(color[1]):02x}{int(color[2]):02x}",
+                        f"#{color_values[0]:02x}{color_values[1]:02x}{color_values[2]:02x}",
                         key=f"color_{item['id']}"
                     )
                     
@@ -203,7 +203,13 @@ def main_page():
         style = st.sidebar.selectbox("Style", ["Casual", "Formal", "Sporty"])
         gender = st.sidebar.selectbox("Gender", ["Male", "Female", "Unisex"])
         
-        if 'outfit' not in st.session_state or st.sidebar.button("Generate New Outfit 🔄"):
+        # Initialize outfit state if not present
+        if 'outfit' not in st.session_state:
+            st.session_state.outfit = None
+            st.session_state.missing_items = []
+        
+        # Simplified generate button condition
+        if st.sidebar.button("Generate New Outfit 🔄"):
             st.session_state.outfit, st.session_state.missing_items = generate_outfit(clothing_items, size, style, gender)
         
         if st.session_state.outfit:
