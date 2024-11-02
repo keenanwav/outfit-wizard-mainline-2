@@ -5,10 +5,9 @@ import numpy as np
 import pandas as pd
 from collections import Counter
 from data_manager import (
-    load_clothing_items, save_outfit, add_clothing_item, update_csv_structure,
-    store_user_preference, get_advanced_recommendations, load_saved_outfits,
-    delete_outfit, edit_clothing_item, delete_clothing_item, create_user_items_table,
-    add_user_clothing_item
+    load_clothing_items, save_outfit, load_saved_outfits,
+    edit_clothing_item, delete_clothing_item, create_user_items_table,
+    add_user_clothing_item, store_user_preference
 )
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
@@ -42,7 +41,7 @@ def personal_wardrobe_page():
     st.title("My Personal Wardrobe 👕")
     create_user_items_table()
     
-    tabs = st.tabs(["Upload New Item", "View My Items"])
+    tabs = st.tabs(["Upload New Item", "My Items"])
     
     with tabs[0]:
         st.header("Add Personal Clothing Item")
@@ -110,14 +109,93 @@ def personal_wardrobe_page():
                     except Exception as e:
                         st.error(f"Error adding clothing item: {str(e)}")
 
+    with tabs[1]:
+        st.header("My Items")
+        personal_items = load_clothing_items()
+        
+        if len(personal_items) == 0:
+            st.info("No clothing items found.")
+            return
+        
+        for _, item in personal_items.iterrows():
+            with st.expander(f"{item['type'].capitalize()} - ID: {item['id']}"):
+                col1, col2, col3 = st.columns([1, 2, 1])
+                
+                with col1:
+                    if os.path.exists(item['image_path']):
+                        st.image(item['image_path'], use_column_width=True)
+                    else:
+                        st.error(f"Image not found: {item['image_path']}")
+                
+                with col2:
+                    color_values = [int(c) for c in item['color'].split(',')]
+                    new_color = st.color_picker(
+                        "Color", 
+                        f"#{color_values[0]:02x}{color_values[1]:02x}{color_values[2]:02x}",
+                        key=f"color_{item['id']}"
+                    )
+                    
+                    style_list = item['style'].split(',')
+                    new_styles = []
+                    st.write("Styles:")
+                    style_cols = st.columns(len(["Casual", "Formal", "Sporty"]))
+                    for i, style in enumerate(["Casual", "Formal", "Sporty"]):
+                        if style_cols[i].checkbox(style, value=style in style_list, key=f"edit_style_{item['id']}_{style}"):
+                            new_styles.append(style)
+                    
+                    gender_list = item['gender'].split(',')
+                    new_genders = []
+                    st.write("Genders:")
+                    gender_cols = st.columns(len(["Male", "Female", "Unisex"]))
+                    for i, gender in enumerate(["Male", "Female", "Unisex"]):
+                        if gender_cols[i].checkbox(gender, value=gender in gender_list, key=f"edit_gender_{item['id']}_{gender}"):
+                            new_genders.append(gender)
+                    
+                    size_list = item['size'].split(',')
+                    new_sizes = []
+                    st.write("Sizes:")
+                    size_cols = st.columns(len(["XS", "S", "M", "L", "XL"]))
+                    for i, size in enumerate(["XS", "S", "M", "L", "XL"]):
+                        if size_cols[i].checkbox(size, value=size in size_list, key=f"edit_size_{item['id']}_{size}"):
+                            new_sizes.append(size)
+                
+                with col3:
+                    if st.button("Update", key=f"update_{item['id']}"):
+                        try:
+                            rgb_color = tuple(int(new_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                            success, message = edit_clothing_item(
+                                item['id'],
+                                rgb_color,
+                                new_styles,
+                                new_genders,
+                                new_sizes,
+                                item.get('hyperlink', '')
+                            )
+                            if success:
+                                st.success(message)
+                            else:
+                                st.error(message)
+                        except Exception as e:
+                            st.error(f"Error updating item: {str(e)}")
+                    
+                    if st.button("Delete", key=f"delete_{item['id']}"):
+                        try:
+                            success, message = delete_clothing_item(item['id'])
+                            if success:
+                                st.success(message)
+                                st.experimental_rerun()
+                            else:
+                                st.error(message)
+                        except Exception as e:
+                            st.error(f"Error deleting item: {str(e)}")
+
 def main_page():
     st.title("Outfit Wizard 🧙‍♂️👚👖👞")
-    
-    st.sidebar.header("Set Your Preferences")
     
     try:
         clothing_items = load_clothing_items()
         
+        st.sidebar.header("Set Your Preferences")
         size = st.sidebar.selectbox("Size", ["XS", "S", "M", "L", "XL"])
         style = st.sidebar.selectbox("Style", ["Casual", "Formal", "Sporty"])
         gender = st.sidebar.selectbox("Gender", ["Male", "Female", "Unisex"])
@@ -170,10 +248,6 @@ def saved_outfits_page():
                 st.subheader(f"Outfit {i+1}")
                 if os.path.exists(outfit['image_path']):
                     st.image(outfit['image_path'])
-                    if st.button(f"Delete Outfit {i+1}"):
-                        delete_outfit(outfit['outfit_id'])
-                        st.success(f"Outfit {i+1} deleted successfully!")
-                        st.experimental_rerun()
                 else:
                     st.error(f"Image not found: {outfit['image_path']}")
     else:
