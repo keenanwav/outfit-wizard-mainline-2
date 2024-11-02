@@ -56,8 +56,6 @@ def personal_wardrobe_page():
             color_hex = None
             
             if image_file:
-                st.image(image_file, width=200)
-                st.subheader("Color Selection")
                 upload_key = f"upload_{uuid.uuid4().hex[:8]}"
                 selected_color, color_hex = create_color_picker(image_file, upload_key)
             
@@ -104,7 +102,7 @@ def personal_wardrobe_page():
                             if selected_color:
                                 rgb_color = selected_color
                             else:
-                                rgb_color = tuple(int(color_hex.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                                rgb_color = (0, 0, 0)
                             
                             success, message = add_user_clothing_item(
                                 "default_user",
@@ -117,6 +115,7 @@ def personal_wardrobe_page():
                             )
                             if success:
                                 st.success(message)
+                                st.experimental_rerun()
                             else:
                                 st.error(message)
                         except Exception as e:
@@ -137,7 +136,6 @@ def personal_wardrobe_page():
                     
                     with col1:
                         if os.path.exists(item['image_path']):
-                            st.image(item['image_path'], use_column_width=True)
                             color_picker_key = f"item_{item['id']}_{item['type']}_{uuid.uuid4().hex[:8]}"
                             selected_color, color_hex = create_color_picker(
                                 item['image_path'], 
@@ -196,6 +194,7 @@ def personal_wardrobe_page():
                                         )
                                         if success:
                                             st.success(message)
+                                            st.experimental_rerun()
                                         else:
                                             st.error(message)
                                     except Exception as e:
