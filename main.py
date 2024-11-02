@@ -13,14 +13,13 @@ from data_manager import (
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
-from color_utils import get_color_palette, create_color_picker
+from color_utils import create_color_picker
 from outfit_generator import generate_outfit
 
 st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
 logging.basicConfig(level=logging.INFO)
 
 def normalize_case(value):
-    """Helper function to normalize case of strings"""
     return value.strip().title() if isinstance(value, str) else value
 
 def get_dominant_color(image):
@@ -52,7 +51,6 @@ def personal_wardrobe_page():
             
             if image_file is not None:
                 st.image(image_file, width=200)
-                # Add eyedropper tool for color selection
                 st.subheader("Color Selection")
                 st.write("Use the sliders below to pick a color from your image:")
                 selected_color, color_hex = create_color_picker(image_file, "upload")
@@ -100,7 +98,6 @@ def personal_wardrobe_page():
                     st.error("Please select at least one size.")
                 else:
                     try:
-                        # Use the selected color from eyedropper if available
                         if selected_color:
                             rgb_color = selected_color
                         else:
@@ -137,14 +134,12 @@ def personal_wardrobe_page():
                 with col1:
                     if os.path.exists(item['image_path']):
                         st.image(item['image_path'], use_column_width=True)
-                        # Add eyedropper for existing items
                         st.write("Pick a new color from the image:")
                         selected_color, color_hex = create_color_picker(item['image_path'], f"item_{item['id']}")
                     else:
                         st.error(f"Image not found: {item['image_path']}")
                 
                 with col2:
-                    # Use selected color from eyedropper if available
                     if selected_color:
                         new_color = color_hex
                     else:
@@ -225,23 +220,19 @@ def main_page():
         style = st.sidebar.selectbox("Style", ["Casual", "Formal", "Sporty"])
         gender = st.sidebar.selectbox("Gender", ["Male", "Female", "Unisex"])
         
-        # Initialize outfit state if not present
         if 'outfit' not in st.session_state:
             st.session_state.outfit = None
             st.session_state.missing_items = []
         
-        # Simplified generate button condition
         if st.sidebar.button("Generate New Outfit 🔄"):
             st.session_state.outfit, st.session_state.missing_items = generate_outfit(clothing_items, size, style, gender)
         
         if st.session_state.outfit:
             st.success("Outfit generated successfully!")
             
-            # Display merged outfit image
             if 'merged_image_path' in st.session_state.outfit:
                 st.image(st.session_state.outfit['merged_image_path'], use_column_width=True)
                 
-                # Add like buttons for individual items
                 cols = st.columns(3)
                 for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
                     with cols[i]:
@@ -250,7 +241,6 @@ def main_page():
                                 store_user_preference("default_user", st.session_state.outfit[item_type]['id'])
                                 st.success(f"You liked this {item_type}!")
             
-            # Save outfit button
             if st.button("Save Outfit"):
                 saved_path = save_outfit(st.session_state.outfit, "default_user")
                 if saved_path:
