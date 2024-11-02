@@ -1,72 +1,57 @@
+from PIL import Image
 import numpy as np
+import streamlit as st
 
-def rgb_to_hsv(rgb):
-    rgb = rgb.astype('float')
-    hsv = np.zeros_like(rgb)
-    hsv[..., 3:] = rgb[..., 3:]
-    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
-    maxc = np.max(rgb[..., :3], axis=-1)
-    minc = np.min(rgb[..., :3], axis=-1)
-    hsv[..., 2] = maxc
-    mask = maxc != minc
-    hsv[mask, 1] = (maxc - minc)[mask] / maxc[mask]
-    rc = np.zeros_like(r)
-    gc = np.zeros_like(g)
-    bc = np.zeros_like(b)
-    rc[mask] = (maxc - r)[mask] / (maxc - minc)[mask]
-    gc[mask] = (maxc - g)[mask] / (maxc - minc)[mask]
-    bc[mask] = (maxc - b)[mask] / (maxc - minc)[mask]
-    hsv[..., 0] = np.select(
-        [r == maxc, g == maxc], [bc - gc, 2.0 + rc - bc], default=4.0 + gc - rc)
-    hsv[..., 0] = (hsv[..., 0] / 6.0) % 1.0
-    return hsv
-
-def hsv_to_rgb(hsv):
-    rgb = np.empty_like(hsv)
-    rgb[..., 3:] = hsv[..., 3:]
-    h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
-    i = (h * 6.0).astype('uint8')
-    f = (h * 6.0) - i
-    p = v * (1.0 - s)
-    q = v * (1.0 - s * f)
-    t = v * (1.0 - s * (1.0 - f))
-    i = i % 6
-    conditions = [s == 0.0, i == 1, i == 2, i == 3, i == 4, i == 5]
-    rgb[..., 0] = np.select(conditions, [v, q, p, p, t, v], default=v)
-    rgb[..., 1] = np.select(conditions, [v, v, v, q, p, p], default=t)
-    rgb[..., 2] = np.select(conditions, [v, p, t, v, v, q], default=p)
-    return rgb.astype('uint8')
-
-def get_color_palette(base_color, palette_type):
-    base_hsv = rgb_to_hsv(np.array(base_color))[0]
-    h, s, v = base_hsv
-    
-    if palette_type == "Monochromatic":
-        colors = [
-            hsv_to_rgb(np.array([[h, s, v]]))[0],
-            hsv_to_rgb(np.array([[h, s * 0.7, v]]))[0],
-            hsv_to_rgb(np.array([[h, s, v * 0.7]]))[0]
-        ]
-    elif palette_type == "Analogous":
-        colors = [
-            hsv_to_rgb(np.array([[h, s, v]]))[0],
-            hsv_to_rgb(np.array([[(h + 1/12) % 1, s, v]]))[0],
-            hsv_to_rgb(np.array([[(h - 1/12) % 1, s, v]]))[0]
-        ]
-    elif palette_type == "Complementary":
-        colors = [
-            hsv_to_rgb(np.array([[h, s, v]]))[0],
-            hsv_to_rgb(np.array([[(h + 0.5) % 1, s, v]]))[0],
-            hsv_to_rgb(np.array([[h, s * 0.8, v * 0.8]]))[0]
-        ]
-    elif palette_type == "Triadic":
-        colors = [
-            hsv_to_rgb(np.array([[h, s, v]]))[0],
-            hsv_to_rgb(np.array([[(h + 1/3) % 1, s, v]]))[0],
-            hsv_to_rgb(np.array([[(h + 2/3) % 1, s, v]]))[0]
-        ]
+def get_pixel_color(image, x, y):
+    """Get the color of a specific pixel in an image."""
+    if isinstance(image, str):
+        img = Image.open(image)
     else:
-        raise ValueError("Invalid palette type")
+        img = Image.open(image)
     
-    return colors
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+    
+    # Get the pixel color at the specified coordinates
+    pixel_color = img.getpixel((x, y))
+    return pixel_color
 
+def create_color_picker(image, key_prefix):
+    """Create an interactive color picker with an image."""
+    if image is None:
+        return None, None
+    
+    # Open and display the image
+    img = Image.open(image)
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+    
+    # Get image dimensions
+    width, height = img.size
+    
+    # Create a container for the image
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # Display the image
+        st.image(image, use_column_width=True)
+        
+        # Create sliders for X and Y coordinates
+        x = st.slider("X coordinate", 0, width-1, width//2, key=f"{key_prefix}_x")
+        y = st.slider("Y coordinate", 0, height-1, height//2, key=f"{key_prefix}_y")
+    
+    # Get the color at the selected coordinates
+    color = get_pixel_color(image, x, y)
+    
+    with col2:
+        # Display the selected color
+        st.write("Selected Color:")
+        color_hex = "#{:02x}{:02x}{:02x}".format(*color)
+        st.markdown(
+            f'<div style="background-color: {color_hex}; width: 100px; height: 100px; border: 1px solid black;"></div>',
+            unsafe_allow_html=True
+        )
+        st.write(f"RGB: {color}")
+        st.write(f"Hex: {color_hex}")
+    
+    return color, color_hex

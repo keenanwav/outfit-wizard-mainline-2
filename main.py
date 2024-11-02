@@ -13,7 +13,7 @@ from data_manager import (
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
-from color_utils import get_color_palette
+from color_utils import get_color_palette, create_color_picker
 from outfit_generator import generate_outfit
 
 st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
@@ -52,9 +52,15 @@ def personal_wardrobe_page():
             
             if image_file is not None:
                 st.image(image_file, width=200)
-                dominant_color = get_dominant_color(image_file)
-                st.write(f"Dominant color detected: {dominant_color}")
-                color = st.color_picker("Adjust Color", dominant_color)
+                # Add eyedropper tool for color selection
+                st.subheader("Color Selection")
+                st.write("Use the sliders below to pick a color from your image:")
+                selected_color, color_hex = create_color_picker(image_file, "upload")
+                if selected_color:
+                    color = color_hex
+                else:
+                    dominant_color = get_dominant_color(image_file)
+                    color = st.color_picker("Or select color manually:", dominant_color)
             else:
                 color = st.color_picker("Select Color", "#000000")
             
@@ -94,7 +100,12 @@ def personal_wardrobe_page():
                     st.error("Please select at least one size.")
                 else:
                     try:
-                        rgb_color = tuple(int(color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                        # Use the selected color from eyedropper if available
+                        if selected_color:
+                            rgb_color = selected_color
+                        else:
+                            rgb_color = tuple(int(color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                        
                         success, message = add_user_clothing_item(
                             "default_user",
                             item_type,
@@ -126,16 +137,23 @@ def personal_wardrobe_page():
                 with col1:
                     if os.path.exists(item['image_path']):
                         st.image(item['image_path'], use_column_width=True)
+                        # Add eyedropper for existing items
+                        st.write("Pick a new color from the image:")
+                        selected_color, color_hex = create_color_picker(item['image_path'], f"item_{item['id']}")
                     else:
                         st.error(f"Image not found: {item['image_path']}")
                 
                 with col2:
-                    color_values = [int(c) for c in item['color'].split(',')]
-                    new_color = st.color_picker(
-                        "Color", 
-                        f"#{color_values[0]:02x}{color_values[1]:02x}{color_values[2]:02x}",
-                        key=f"color_{item['id']}"
-                    )
+                    # Use selected color from eyedropper if available
+                    if selected_color:
+                        new_color = color_hex
+                    else:
+                        color_values = [int(c) for c in item['color'].split(',')]
+                        new_color = st.color_picker(
+                            "Or select color manually:", 
+                            f"#{color_values[0]:02x}{color_values[1]:02x}{color_values[2]:02x}",
+                            key=f"color_{item['id']}"
+                        )
                     
                     style_list = item['style'].split(',')
                     new_styles = []
@@ -164,7 +182,11 @@ def personal_wardrobe_page():
                 with col3:
                     if st.button("Update", key=f"update_{item['id']}"):
                         try:
-                            rgb_color = tuple(int(new_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                            if selected_color:
+                                rgb_color = selected_color
+                            else:
+                                rgb_color = tuple(int(new_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                            
                             success, message = edit_clothing_item(
                                 item['id'],
                                 rgb_color,
