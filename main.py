@@ -133,13 +133,13 @@ def personal_wardrobe_page():
                 with col1:
                     if os.path.exists(item['image_path']):
                         st.image(item['image_path'], use_column_width=True)
-                        selected_color, color_hex = create_color_picker(item['image_path'], f"item_{item['id']}")
+                        selected_color, color_hex = create_color_picker(item['image_path'], f"item_{item['id']}_{item['type']}")
                     else:
                         st.error(f"Image not found: {item['image_path']}")
                 
                 with col2:
-                    # Form for editing item details
-                    with st.form(key=f"edit_item_{item['id']}"):
+                    # Form for editing item details with unique key including item type
+                    with st.form(key=f"edit_item_{item['id']}_{item['type']}"):
                         if selected_color:
                             new_color = selected_color
                         else:
@@ -151,7 +151,8 @@ def personal_wardrobe_page():
                         st.write("Styles:")
                         style_cols = st.columns(len(["Casual", "Formal", "Sporty"]))
                         for i, style in enumerate(["Casual", "Formal", "Sporty"]):
-                            if style_cols[i].checkbox(style, value=style in style_list, key=f"edit_style_{item['id']}_{style}"):
+                            if style_cols[i].checkbox(style, value=style in style_list, 
+                                                   key=f"edit_style_{item['id']}_{item['type']}_{style}"):
                                 new_styles.append(style)
                         
                         gender_list = item['gender'].split(',')
@@ -159,7 +160,8 @@ def personal_wardrobe_page():
                         st.write("Genders:")
                         gender_cols = st.columns(len(["Male", "Female", "Unisex"]))
                         for i, gender in enumerate(["Male", "Female", "Unisex"]):
-                            if gender_cols[i].checkbox(gender, value=gender in gender_list, key=f"edit_gender_{item['id']}_{gender}"):
+                            if gender_cols[i].checkbox(gender, value=gender in gender_list, 
+                                                    key=f"edit_gender_{item['id']}_{item['type']}_{gender}"):
                                 new_genders.append(gender)
                         
                         size_list = item['size'].split(',')
@@ -167,7 +169,8 @@ def personal_wardrobe_page():
                         st.write("Sizes:")
                         size_cols = st.columns(len(["XS", "S", "M", "L", "XL"]))
                         for i, size in enumerate(["XS", "S", "M", "L", "XL"]):
-                            if size_cols[i].checkbox(size, value=size in size_list, key=f"edit_size_{item['id']}_{size}"):
+                            if size_cols[i].checkbox(size, value=size in size_list, 
+                                                  key=f"edit_size_{item['id']}_{item['type']}_{size}"):
                                 new_sizes.append(size)
                         
                         if st.form_submit_button("Update"):
@@ -187,7 +190,7 @@ def personal_wardrobe_page():
                             except Exception as e:
                                 st.error(f"Error updating item: {str(e)}")
                     
-                    if st.button("Delete", key=f"delete_{item['id']}"):
+                    if st.button("Delete", key=f"delete_{item['id']}_{item['type']}"):
                         try:
                             success, message = delete_clothing_item(item['id'])
                             if success:
