@@ -51,28 +51,26 @@ def ensure_user_preferences_file():
 
 def load_clothing_items(username=None):
     if not os.path.exists('data/clothing_items.csv'):
-        # Create empty DataFrame with required columns
         items_df = pd.DataFrame(columns=['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink'])
         items_df.to_csv('data/clothing_items.csv', index=False)
     else:
         items_df = pd.read_csv('data/clothing_items.csv')
     
-    if username:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT id, type, color, style, gender, size, image_path, hyperlink 
-            FROM user_clothing_items 
-            WHERE user_id = %s
-        """, (username,))
-        user_items = cur.fetchall()
-        cur.close()
-        conn.close()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, type, color, style, gender, size, image_path, hyperlink 
+        FROM user_clothing_items 
+        WHERE user_id = 'default_user'
+    """)
+    user_items = cur.fetchall()
+    cur.close()
+    conn.close()
 
-        if user_items:
-            user_items_df = pd.DataFrame(user_items, 
-                columns=['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink'])
-            items_df = pd.concat([items_df, user_items_df], ignore_index=True)
+    if user_items:
+        user_items_df = pd.DataFrame(user_items, 
+            columns=['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink'])
+        items_df = pd.concat([items_df, user_items_df], ignore_index=True)
     
     return items_df
 
@@ -98,11 +96,11 @@ def add_clothing_item(item_type, color, styles, genders, sizes, image_path, hype
     return True, f"New {item_type} added successfully"
 
 def add_user_clothing_item(username, item_type, color, styles, genders, sizes, image_file, hyperlink=""):
-    if not os.path.exists(f"user_images/{username}"):
-        os.makedirs(f"user_images/{username}", exist_ok=True)
+    if not os.path.exists(f"user_images/default_user"):
+        os.makedirs(f"user_images/default_user", exist_ok=True)
     
     image_filename = f"{item_type}_{uuid.uuid4()}.png"
-    image_path = os.path.join(f"user_images/{username}", image_filename)
+    image_path = os.path.join(f"user_images/default_user", image_filename)
     
     with Image.open(image_file) as img:
         img.save(image_path)
@@ -117,7 +115,7 @@ def add_user_clothing_item(username, item_type, color, styles, genders, sizes, i
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
         """, (
-            username, 
+            'default_user', 
             item_type, 
             f"{color[0]},{color[1]},{color[2]}", 
             ','.join(styles),
@@ -148,7 +146,7 @@ def store_user_preference(username, item_id):
     ensure_user_preferences_file()
     preferences_df = pd.read_csv('data/user_preferences.csv')
     new_preference = {
-        'username': username,
+        'username': 'default_user',
         'item_id': item_id,
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
@@ -156,18 +154,18 @@ def store_user_preference(username, item_id):
     preferences_df.to_csv('data/user_preferences.csv', index=False)
 
 def get_advanced_recommendations(username, n_recommendations=5, collab_weight=0.7):
-    logging.info(f"Generating advanced recommendations for user: {username}")
+    logging.info(f"Generating advanced recommendations")
     ensure_user_preferences_file()
     
     try:
         preferences_df = pd.read_csv('data/user_preferences.csv')
         items_df = load_clothing_items()
         
-        if username not in preferences_df['username'].unique():
-            logging.warning(f"No preferences found for user: {username}")
+        user_prefs = preferences_df[preferences_df['username'] == 'default_user']
+        if len(user_prefs) == 0:
+            logging.warning(f"No preferences found for default user")
             return items_df.sample(n=n_recommendations)
         
-        user_prefs = preferences_df[preferences_df['username'] == username]
         timestamps = pd.to_datetime(user_prefs['timestamp'])
         time_diff = (datetime.now() - timestamps).dt.total_seconds() / (24 * 3600)
         time_weights = np.exp(-time_diff / 30)
@@ -253,7 +251,7 @@ def save_outfit(outfit, username):
             cur.execute("""
                 INSERT INTO saved_outfits (outfit_id, username, image_path)
                 VALUES (%s, %s, %s)
-            """, (outfit_id, username, outfit_path))
+            """, (outfit_id, 'default_user', outfit_path))
             
             conn.commit()
             return outfit_path
@@ -277,9 +275,9 @@ def load_saved_outfits(username):
         cur.execute("""
             SELECT outfit_id, image_path, created_at 
             FROM saved_outfits 
-            WHERE username = %s 
+            WHERE username = 'default_user' 
             ORDER BY created_at DESC
-        """, (username,))
+        """)
         
         outfits = cur.fetchall()
         if outfits:

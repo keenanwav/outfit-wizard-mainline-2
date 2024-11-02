@@ -19,10 +19,6 @@ from outfit_generator import generate_outfit
 st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
 logging.basicConfig(level=logging.INFO)
 
-# Set default username for the application
-if 'username' not in st.session_state:
-    st.session_state.username = "default_user"
-
 def normalize_case(value):
     """Helper function to normalize case of strings"""
     return value.strip().title() if isinstance(value, str) else value
@@ -100,7 +96,7 @@ def personal_wardrobe_page():
                     try:
                         rgb_color = tuple(int(color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
                         success, message = add_user_clothing_item(
-                            st.session_state.username,
+                            "default_user",
                             item_type,
                             rgb_color,
                             styles,
@@ -117,7 +113,7 @@ def personal_wardrobe_page():
     
     with tabs[1]:
         st.header("My Uploaded Items")
-        personal_items = load_clothing_items(st.session_state.username)
+        personal_items = load_clothing_items("default_user")
         
         if len(personal_items) == 0:
             st.info("You haven't uploaded any clothing items yet.")
@@ -223,12 +219,12 @@ def main_page():
                     with cols[i]:
                         if item_type in st.session_state.outfit:
                             if st.button(f"Like {item_type}"):
-                                store_user_preference(st.session_state.username, st.session_state.outfit[item_type]['id'])
+                                store_user_preference("default_user", st.session_state.outfit[item_type]['id'])
                                 st.success(f"You liked this {item_type}!")
             
             # Save outfit button
             if st.button("Save Outfit"):
-                saved_path = save_outfit(st.session_state.outfit, st.session_state.username)
+                saved_path = save_outfit(st.session_state.outfit, "default_user")
                 if saved_path:
                     st.success("Outfit saved successfully!")
                 else:
@@ -243,7 +239,7 @@ def main_page():
 def saved_outfits_page():
     st.title("Saved Outfits")
     
-    saved_outfits = load_saved_outfits(st.session_state.username)
+    saved_outfits = load_saved_outfits("default_user")
     
     if saved_outfits:
         cols = st.columns(2)
