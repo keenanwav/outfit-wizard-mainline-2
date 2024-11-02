@@ -23,10 +23,6 @@ logging.basicConfig(level=logging.INFO)
 if 'username' not in st.session_state:
     st.session_state.username = "default_user"
 
-# Ensure required directories exist
-for directory in ['user_images', 'wardrobe', 'merged_outfits']:
-    os.makedirs(directory, exist_ok=True)
-
 def normalize_case(value):
     """Helper function to normalize case of strings"""
     return value.strip().title() if isinstance(value, str) else value
