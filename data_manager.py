@@ -10,7 +10,6 @@ from scipy.sparse import csr_matrix
 from sklearn.neighbors import NearestNeighbors
 import logging
 from datetime import datetime
-from sklearn.model_selection import KFold
 import joblib
 import psycopg2
 from psycopg2.extras import execute_values
@@ -49,7 +48,7 @@ def ensure_user_preferences_file():
         df = pd.DataFrame(columns=['username', 'item_id', 'timestamp'])
         df.to_csv('data/user_preferences.csv', index=False)
 
-def load_clothing_items(username=None):
+def load_clothing_items():
     if not os.path.exists('data/clothing_items.csv'):
         items_df = pd.DataFrame(columns=['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink'])
         items_df.to_csv('data/clothing_items.csv', index=False)
@@ -74,28 +73,7 @@ def load_clothing_items(username=None):
     
     return items_df
 
-def add_clothing_item(item_type, color, styles, genders, sizes, image_path, hyperlink=""):
-    if not os.path.exists('data/clothing_items.csv'):
-        items_df = pd.DataFrame(columns=['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink'])
-    else:
-        items_df = pd.read_csv('data/clothing_items.csv')
-    
-    new_item = {
-        'id': len(items_df) + 1,
-        'type': item_type,
-        'color': f"{color[0]},{color[1]},{color[2]}",
-        'style': ','.join(styles),
-        'gender': ','.join(genders),
-        'size': ','.join(sizes),
-        'image_path': image_path,
-        'hyperlink': hyperlink
-    }
-    
-    items_df = pd.concat([items_df, pd.DataFrame([new_item])], ignore_index=True)
-    items_df.to_csv('data/clothing_items.csv', index=False)
-    return True, f"New {item_type} added successfully"
-
-def add_user_clothing_item(username, item_type, color, styles, genders, sizes, image_file, hyperlink=""):
+def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file, hyperlink=""):
     if not os.path.exists(f"user_images/default_user"):
         os.makedirs(f"user_images/default_user", exist_ok=True)
     
@@ -134,15 +112,7 @@ def add_user_clothing_item(username, item_type, color, styles, genders, sizes, i
         cur.close()
         conn.close()
 
-def update_csv_structure():
-    if not os.path.exists('data'):
-        os.makedirs('data')
-    
-    if not os.path.exists('data/clothing_items.csv'):
-        items_df = pd.DataFrame(columns=['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink'])
-        items_df.to_csv('data/clothing_items.csv', index=False)
-
-def store_user_preference(username, item_id):
+def store_user_preference(item_id):
     ensure_user_preferences_file()
     preferences_df = pd.read_csv('data/user_preferences.csv')
     new_preference = {
@@ -153,7 +123,7 @@ def store_user_preference(username, item_id):
     preferences_df = pd.concat([preferences_df, pd.DataFrame([new_preference])], ignore_index=True)
     preferences_df.to_csv('data/user_preferences.csv', index=False)
 
-def get_advanced_recommendations(username, n_recommendations=5, collab_weight=0.7):
+def get_advanced_recommendations(n_recommendations=5, collab_weight=0.7):
     logging.info(f"Generating advanced recommendations")
     ensure_user_preferences_file()
     
@@ -213,7 +183,7 @@ def get_advanced_recommendations(username, n_recommendations=5, collab_weight=0.
         logging.error(f"Error generating recommendations: {str(e)}")
         return items_df.sample(n=n_recommendations)
 
-def save_outfit(outfit, username):
+def save_outfit(outfit):
     try:
         if not os.path.exists('wardrobe'):
             os.makedirs('wardrobe')
@@ -267,7 +237,7 @@ def save_outfit(outfit, username):
         logging.error(f"Error saving outfit: {str(e)}")
         return None
 
-def load_saved_outfits(username):
+def load_saved_outfits():
     conn = get_db_connection()
     cur = conn.cursor()
     
@@ -294,31 +264,6 @@ def load_saved_outfits(username):
     except Exception as e:
         logging.error(f"Error loading saved outfits: {str(e)}")
         return []
-    finally:
-        cur.close()
-        conn.close()
-
-def delete_outfit(outfit_id):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        cur.execute("SELECT image_path FROM saved_outfits WHERE outfit_id = %s", (outfit_id,))
-        outfit = cur.fetchone()
-        
-        if outfit and outfit[0]:
-            if os.path.exists(outfit[0]):
-                os.remove(outfit[0])
-            
-            cur.execute("DELETE FROM saved_outfits WHERE outfit_id = %s", (outfit_id,))
-            conn.commit()
-            return True, "Outfit deleted successfully"
-        
-        return False, "Outfit not found"
-        
-    except Exception as e:
-        conn.rollback()
-        return False, str(e)
     finally:
         cur.close()
         conn.close()
