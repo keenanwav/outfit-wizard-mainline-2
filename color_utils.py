@@ -1,197 +1,72 @@
-from PIL import Image
 import numpy as np
-import streamlit as st
-import hashlib
 
-def get_pixel_color(image, x, y):
-    """Get the color of a specific pixel in an image."""
-    if isinstance(image, str):
-        img = Image.open(image)
+def rgb_to_hsv(rgb):
+    rgb = rgb.astype('float')
+    hsv = np.zeros_like(rgb)
+    hsv[..., 3:] = rgb[..., 3:]
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    maxc = np.max(rgb[..., :3], axis=-1)
+    minc = np.min(rgb[..., :3], axis=-1)
+    hsv[..., 2] = maxc
+    mask = maxc != minc
+    hsv[mask, 1] = (maxc - minc)[mask] / maxc[mask]
+    rc = np.zeros_like(r)
+    gc = np.zeros_like(g)
+    bc = np.zeros_like(b)
+    rc[mask] = (maxc - r)[mask] / (maxc - minc)[mask]
+    gc[mask] = (maxc - g)[mask] / (maxc - minc)[mask]
+    bc[mask] = (maxc - b)[mask] / (maxc - minc)[mask]
+    hsv[..., 0] = np.select(
+        [r == maxc, g == maxc], [bc - gc, 2.0 + rc - bc], default=4.0 + gc - rc)
+    hsv[..., 0] = (hsv[..., 0] / 6.0) % 1.0
+    return hsv
+
+def hsv_to_rgb(hsv):
+    rgb = np.empty_like(hsv)
+    rgb[..., 3:] = hsv[..., 3:]
+    h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    i = (h * 6.0).astype('uint8')
+    f = (h * 6.0) - i
+    p = v * (1.0 - s)
+    q = v * (1.0 - s * f)
+    t = v * (1.0 - s * (1.0 - f))
+    i = i % 6
+    conditions = [s == 0.0, i == 1, i == 2, i == 3, i == 4, i == 5]
+    rgb[..., 0] = np.select(conditions, [v, q, p, p, t, v], default=v)
+    rgb[..., 1] = np.select(conditions, [v, v, v, q, p, p], default=t)
+    rgb[..., 2] = np.select(conditions, [v, p, t, v, v, q], default=p)
+    return rgb.astype('uint8')
+
+def get_color_palette(base_color, palette_type):
+    base_hsv = rgb_to_hsv(np.array(base_color))[0]
+    h, s, v = base_hsv
+    
+    if palette_type == "Monochromatic":
+        colors = [
+            hsv_to_rgb(np.array([[h, s, v]]))[0],
+            hsv_to_rgb(np.array([[h, s * 0.7, v]]))[0],
+            hsv_to_rgb(np.array([[h, s, v * 0.7]]))[0]
+        ]
+    elif palette_type == "Analogous":
+        colors = [
+            hsv_to_rgb(np.array([[h, s, v]]))[0],
+            hsv_to_rgb(np.array([[(h + 1/12) % 1, s, v]]))[0],
+            hsv_to_rgb(np.array([[(h - 1/12) % 1, s, v]]))[0]
+        ]
+    elif palette_type == "Complementary":
+        colors = [
+            hsv_to_rgb(np.array([[h, s, v]]))[0],
+            hsv_to_rgb(np.array([[(h + 0.5) % 1, s, v]]))[0],
+            hsv_to_rgb(np.array([[h, s * 0.8, v * 0.8]]))[0]
+        ]
+    elif palette_type == "Triadic":
+        colors = [
+            hsv_to_rgb(np.array([[h, s, v]]))[0],
+            hsv_to_rgb(np.array([[(h + 1/3) % 1, s, v]]))[0],
+            hsv_to_rgb(np.array([[(h + 2/3) % 1, s, v]]))[0]
+        ]
     else:
-        img = Image.open(image)
+        raise ValueError("Invalid palette type")
     
-    if img.mode != 'RGB':
-        img = img.convert('RGB')
-    
-    pixel_color = img.getpixel((x, y))
-    return pixel_color
+    return colors
 
-def hex_to_rgb(hex_color):
-    """Convert hex color to RGB tuple."""
-    hex_color = hex_color.lstrip('#')
-    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-
-def get_image_hash(image):
-    """Generate a unique hash for an image."""
-    if isinstance(image, str):
-        return str(hash(image))
-    return str(hash(image.name))
-
-def create_color_picker(image, key_prefix):
-    """Create an interactive color picker with an image."""
-    if image is None:
-        return None, None
-    
-    # Generate a unique identifier for this image
-    image_hash = get_image_hash(image)
-    
-    # Open and display the image
-    img = Image.open(image)
-    if img.mode != 'RGB':
-        img = img.convert('RGB')
-    
-    # Get image dimensions
-    width, height = img.size
-    
-    # Initialize session state for coordinates and color if not exists
-    if f"{key_prefix}_x_{image_hash}" not in st.session_state:
-        st.session_state[f"{key_prefix}_x_{image_hash}"] = width // 2
-    if f"{key_prefix}_y_{image_hash}" not in st.session_state:
-        st.session_state[f"{key_prefix}_y_{image_hash}"] = height // 2
-    if f"{key_prefix}_color_{image_hash}" not in st.session_state:
-        st.session_state[f"{key_prefix}_color_{image_hash}"] = None
-
-    # Create main columns for layout
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.subheader("Eyedropper Tool")
-        st.markdown("""
-            <style>
-                .stImage:hover {cursor: crosshair !important;}
-            </style>
-            """, unsafe_allow_html=True)
-        
-        # Display the image
-        st.image(image, use_column_width=True)
-        
-        # Coordinate sliders
-        st.markdown("### Adjust Coordinates")
-        x = st.slider("X coordinate", 0, width-1, st.session_state[f"{key_prefix}_x_{image_hash}"], 
-                     key=f"{key_prefix}_x_slider_{image_hash}")
-        y = st.slider("Y coordinate", 0, height-1, st.session_state[f"{key_prefix}_y_{image_hash}"], 
-                     key=f"{key_prefix}_y_slider_{image_hash}")
-        
-        st.session_state[f"{key_prefix}_x_{image_hash}"] = x
-        st.session_state[f"{key_prefix}_y_{image_hash}"] = y
-    
-    with col2:
-        st.markdown("### Quick Color Selection")
-        
-        # Define color swatches
-        primary_colors = {
-            "Red": "#FF0000", "Blue": "#0000FF", "Yellow": "#FFFF00",
-            "Green": "#00FF00", "Purple": "#800080", "Orange": "#FFA500"
-        }
-        secondary_colors = {
-            "Pink": "#FFC0CB", "Brown": "#A52A2A", "Gray": "#808080",
-            "Black": "#000000", "White": "#FFFFFF"
-        }
-        
-        # Create CSS for color swatches
-        st.markdown("""
-            <style>
-                .color-grid {
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 8px;
-                    margin-bottom: 16px;
-                }
-                .color-swatch {
-                    aspect-ratio: 1;
-                    border-radius: 4px;
-                    border: 1px solid #ccc;
-                    cursor: pointer;
-                    transition: transform 0.2s;
-                }
-                .color-swatch:hover {
-                    transform: scale(1.05);
-                }
-                .swatch-section {
-                    background: #f8f9fa;
-                    padding: 12px;
-                    border-radius: 8px;
-                    margin-bottom: 16px;
-                }
-                .section-title {
-                    font-weight: bold;
-                    margin-bottom: 12px;
-                }
-            </style>
-        """, unsafe_allow_html=True)
-        
-        # Primary colors section
-        st.markdown('<div class="swatch-section">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Primary Colors</div>', unsafe_allow_html=True)
-        cols = st.columns(3)
-        for idx, (color_name, hex_code) in enumerate(primary_colors.items()):
-            with cols[idx % 3]:
-                unique_key = f"{key_prefix}_primary_{color_name}_{image_hash}_{idx}"
-                if st.button("", key=unique_key, help=f"{color_name}: {hex_code}"):
-                    st.session_state[f"{key_prefix}_color_{image_hash}"] = hex_to_rgb(hex_code)
-                st.markdown(
-                    f'<div class="color-swatch" style="background-color: {hex_code};" '
-                    f'title="{color_name}: {hex_code}"></div>',
-                    unsafe_allow_html=True
-                )
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Secondary colors section
-        st.markdown('<div class="swatch-section">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Secondary Colors</div>', unsafe_allow_html=True)
-        cols = st.columns(3)
-        for idx, (color_name, hex_code) in enumerate(secondary_colors.items()):
-            with cols[idx % 3]:
-                unique_key = f"{key_prefix}_secondary_{color_name}_{image_hash}_{idx}"
-                if st.button("", key=unique_key, help=f"{color_name}: {hex_code}"):
-                    st.session_state[f"{key_prefix}_color_{image_hash}"] = hex_to_rgb(hex_code)
-                st.markdown(
-                    f'<div class="color-swatch" style="background-color: {hex_code};" '
-                    f'title="{color_name}: {hex_code}"></div>',
-                    unsafe_allow_html=True
-                )
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Get the color from either the image or selected swatch
-        if st.session_state[f"{key_prefix}_color_{image_hash}"] is not None:
-            color = st.session_state[f"{key_prefix}_color_{image_hash}"]
-        else:
-            color = get_pixel_color(image, x, y)
-        
-        color_hex = "#{:02x}{:02x}{:02x}".format(*color)
-        
-        # Display color preview with improved styling
-        st.markdown("### Selected Color")
-        st.markdown(f"""
-            <div style="
-                background: #f8f9fa;
-                padding: 16px;
-                border-radius: 8px;
-                margin-top: 16px;
-            ">
-                <div style="
-                    width: 100%;
-                    height: 100px;
-                    background-color: {color_hex};
-                    border: 2px solid #ccc;
-                    border-radius: 8px;
-                    margin-bottom: 12px;
-                "></div>
-                <div style="
-                    background: white;
-                    padding: 8px;
-                    border-radius: 4px;
-                    font-family: monospace;
-                ">
-                    RGB: {color}<br>
-                    Hex: {color_hex}
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        # Reset color selection button with unique key
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Reset Color Selection", key=f"{key_prefix}_reset_{image_hash}"):
-            st.session_state[f"{key_prefix}_color_{image_hash}"] = None
-    
-    return color, color_hex
