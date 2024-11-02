@@ -113,10 +113,10 @@ def personal_wardrobe_page():
     
     with tabs[1]:
         st.header("My Uploaded Items")
-        personal_items = load_clothing_items("default_user")
+        personal_items = load_clothing_items()
         
         if len(personal_items) == 0:
-            st.info("You haven't uploaded any clothing items yet.")
+            st.info("No clothing items found.")
             return
         
         for _, item in personal_items.iterrows():
@@ -203,41 +203,41 @@ def main_page():
         style = st.sidebar.selectbox("Style", ["Casual", "Formal", "Sporty"])
         gender = st.sidebar.selectbox("Gender", ["Male", "Female", "Unisex"])
         
-        # Initialize outfit state if not present
-        if 'outfit' not in st.session_state:
-            st.session_state.outfit = None
-            st.session_state.missing_items = []
+        current_outfit = None
+        missing_items = []
         
-        # Simplified generate button condition
         if st.sidebar.button("Generate New Outfit 🔄"):
-            st.session_state.outfit, st.session_state.missing_items = generate_outfit(clothing_items, size, style, gender)
+            current_outfit, missing_items = generate_outfit(clothing_items, size, style, gender)
+            st.session_state.current_outfit = current_outfit
+            st.session_state.missing_items = missing_items
         
-        if st.session_state.outfit:
+        # Display current outfit if available
+        current_outfit = st.session_state.get('current_outfit')
+        missing_items = st.session_state.get('missing_items', [])
+        
+        if current_outfit:
             st.success("Outfit generated successfully!")
             
-            # Display merged outfit image
-            if 'merged_image_path' in st.session_state.outfit:
-                st.image(st.session_state.outfit['merged_image_path'], use_column_width=True)
+            if 'merged_image_path' in current_outfit:
+                st.image(current_outfit['merged_image_path'], use_column_width=True)
                 
-                # Add like buttons for individual items
                 cols = st.columns(3)
                 for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
                     with cols[i]:
-                        if item_type in st.session_state.outfit:
+                        if item_type in current_outfit:
                             if st.button(f"Like {item_type}"):
-                                store_user_preference("default_user", st.session_state.outfit[item_type]['id'])
+                                store_user_preference("default_user", current_outfit[item_type]['id'])
                                 st.success(f"You liked this {item_type}!")
             
-            # Save outfit button
             if st.button("Save Outfit"):
-                saved_path = save_outfit(st.session_state.outfit, "default_user")
+                saved_path = save_outfit(current_outfit, "default_user")
                 if saved_path:
                     st.success("Outfit saved successfully!")
                 else:
                     st.error("Failed to save outfit")
                     
-        if st.session_state.missing_items:
-            st.warning(f"Couldn't find matching items for: {', '.join(st.session_state.missing_items)}")
+        if missing_items:
+            st.warning(f"Couldn't find matching items for: {', '.join(missing_items)}")
             
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
@@ -261,7 +261,7 @@ def saved_outfits_page():
                 else:
                     st.error(f"Image not found: {outfit['image_path']}")
     else:
-        st.info("You haven't saved any outfits yet.")
+        st.info("No saved outfits yet.")
 
 def main():
     pages = {
@@ -272,6 +272,12 @@ def main():
     
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Go to", list(pages.keys()))
+    
+    # Initialize session state for outfit management
+    if 'current_outfit' not in st.session_state:
+        st.session_state.current_outfit = None
+    if 'missing_items' not in st.session_state:
+        st.session_state.missing_items = []
     
     pages[page]()
 
