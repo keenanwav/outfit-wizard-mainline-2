@@ -77,6 +77,8 @@ def personal_wardrobe_page():
             item_type = st.selectbox("Item Type", ["shirt", "pants", "shoes"])
             image_file = st.file_uploader("Upload Image (PNG)", type="png")
             
+            # Only show color picker after image upload
+            color = None
             if image_file is not None:
                 st.image(image_file, width=200)
                 try:
@@ -86,8 +88,6 @@ def personal_wardrobe_page():
                 except Exception as e:
                     logging.error(f"Error detecting dominant color: {str(e)}")
                     color = st.color_picker("Select Color", "#000000")
-            else:
-                color = st.color_picker("Select Color", "#000000")
             
             st.write("Style (select all that apply):")
             style_options = ["Casual", "Formal", "Sporty"]
@@ -123,6 +123,8 @@ def personal_wardrobe_page():
                     st.error("Please select at least one gender.")
                 elif not sizes:
                     st.error("Please select at least one size.")
+                elif color is None:
+                    st.error("Please upload an image to select a color.")
                 else:
                     try:
                         rgb_color = tuple(int(color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
