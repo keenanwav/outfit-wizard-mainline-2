@@ -281,7 +281,7 @@ def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink):
             ','.join(genders),
             ','.join(sizes),
             hyperlink,
-            item_id
+            int(item_id) if isinstance(item_id, (np.int64, np.integer)) else item_id
         ))
         
         if cur.fetchone():
@@ -301,6 +301,9 @@ def delete_clothing_item(item_id):
     cur = conn.cursor()
     
     try:
+        # Convert numpy.int64 to regular Python int if necessary
+        item_id = int(item_id) if isinstance(item_id, (np.int64, np.integer)) else item_id
+        
         cur.execute("SELECT image_path FROM user_clothing_items WHERE id = %s", (item_id,))
         item = cur.fetchone()
         
