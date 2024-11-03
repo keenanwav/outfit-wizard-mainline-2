@@ -15,8 +15,30 @@ import logging
 from color_utils import get_color_palette
 from outfit_generator import generate_outfit
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
 st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
-logging.basicConfig(level=logging.INFO)
+
+def parse_color_string(color_string, default_color=(0, 0, 0)):
+    """Helper function to safely parse color string"""
+    try:
+        if not color_string or ',' not in color_string:
+            logging.warning(f"Invalid color string format: {color_string}")
+            return default_color
+        
+        color_values = [int(c.strip()) for c in color_string.split(',')]
+        if len(color_values) != 3:
+            logging.warning(f"Invalid number of color values: {color_values}")
+            return default_color
+            
+        return tuple(color_values)
+    except (ValueError, IndexError) as e:
+        logging.error(f"Error parsing color string: {str(e)}")
+        return default_color
 
 def normalize_case(value):
     """Helper function to normalize case of strings"""
@@ -34,12 +56,18 @@ def get_dominant_color(image):
         dominant_color = color_counts.most_common(1)[0][0]
         return '#{:02x}{:02x}{:02x}'.format(*dominant_color)
     except Exception as e:
-        st.error(f"Error processing image: {str(e)}")
+        logging.error(f"Error processing image: {str(e)}")
         return "#000000"
 
 def personal_wardrobe_page():
     st.title("My Personal Wardrobe 👕")
-    create_user_items_table()
+    try:
+        create_user_items_table()
+        logging.info("Successfully created/verified user items table")
+    except Exception as e:
+        logging.error(f"Error creating user items table: {str(e)}")
+        st.error("Error initializing wardrobe. Please try again later.")
+        return
     
     tabs = st.tabs(["Upload New Item", "My Items"])
     
@@ -51,9 +79,13 @@ def personal_wardrobe_page():
             
             if image_file is not None:
                 st.image(image_file, width=200)
-                dominant_color = get_dominant_color(image_file)
-                st.write(f"Dominant color detected: {dominant_color}")
-                color = st.color_picker("Adjust Color", dominant_color)
+                try:
+                    dominant_color = get_dominant_color(image_file)
+                    st.write(f"Dominant color detected: {dominant_color}")
+                    color = st.color_picker("Adjust Color", dominant_color)
+                except Exception as e:
+                    logging.error(f"Error detecting dominant color: {str(e)}")
+                    color = st.color_picker("Select Color", "#000000")
             else:
                 color = st.color_picker("Select Color", "#000000")
             
@@ -104,14 +136,23 @@ def personal_wardrobe_page():
                         )
                         if success:
                             st.success(message)
+                            logging.info(f"Successfully added new {item_type}")
                         else:
                             st.error(message)
+                            logging.error(f"Failed to add {item_type}: {message}")
                     except Exception as e:
                         st.error(f"Error adding clothing item: {str(e)}")
+                        logging.error(f"Error adding clothing item: {str(e)}")
 
     with tabs[1]:
         st.header("My Items")
-        personal_items = load_clothing_items()
+        try:
+            personal_items = load_clothing_items()
+            logging.info(f"Loaded {len(personal_items)} clothing items")
+        except Exception as e:
+            st.error("Error loading clothing items")
+            logging.error(f"Error loading clothing items: {str(e)}")
+            return
         
         if len(personal_items) == 0:
             st.info("No clothing items found.")
@@ -126,16 +167,21 @@ def personal_wardrobe_page():
                         st.image(item['image_path'], use_column_width=True)
                     else:
                         st.error(f"Image not found: {item['image_path']}")
+                        logging.error(f"Missing image file: {item['image_path']}")
                 
                 with col2:
-                    color_values = [int(c) for c in item['color'].split(',')]
-                    new_color = st.color_picker(
-                        "Color", 
-                        f"#{color_values[0]:02x}{color_values[1]:02x}{color_values[2]:02x}",
-                        key=f"color_{item['id']}"
-                    )
+                    try:
+                        color_values = parse_color_string(item['color'], (0, 0, 0))
+                        new_color = st.color_picker(
+                            "Color", 
+                            f"#{color_values[0]:02x}{color_values[1]:02x}{color_values[2]:02x}",
+                            key=f"color_{item['id']}"
+                        )
+                    except Exception as e:
+                        logging.error(f"Error handling color for item {item['id']}: {str(e)}")
+                        new_color = st.color_picker("Color", "#000000", key=f"color_{item['id']}")
                     
-                    style_list = item['style'].split(',')
+                    style_list = item['style'].split(',') if item['style'] else []
                     new_styles = []
                     st.write("Styles:")
                     style_cols = st.columns(len(["Casual", "Formal", "Sporty"]))
@@ -143,7 +189,7 @@ def personal_wardrobe_page():
                         if style_cols[i].checkbox(style, value=style in style_list, key=f"edit_style_{item['id']}_{style}"):
                             new_styles.append(style)
                     
-                    gender_list = item['gender'].split(',')
+                    gender_list = item['gender'].split(',') if item['gender'] else []
                     new_genders = []
                     st.write("Genders:")
                     gender_cols = st.columns(len(["Male", "Female", "Unisex"]))
@@ -151,7 +197,7 @@ def personal_wardrobe_page():
                         if gender_cols[i].checkbox(gender, value=gender in gender_list, key=f"edit_gender_{item['id']}_{gender}"):
                             new_genders.append(gender)
                     
-                    size_list = item['size'].split(',')
+                    size_list = item['size'].split(',') if item['size'] else []
                     new_sizes = []
                     st.write("Sizes:")
                     size_cols = st.columns(len(["XS", "S", "M", "L", "XL"]))
@@ -173,27 +219,34 @@ def personal_wardrobe_page():
                             )
                             if success:
                                 st.success(message)
+                                logging.info(f"Successfully updated item {item['id']}")
                             else:
                                 st.error(message)
+                                logging.error(f"Failed to update item {item['id']}: {message}")
                         except Exception as e:
                             st.error(f"Error updating item: {str(e)}")
+                            logging.error(f"Error updating item {item['id']}: {str(e)}")
                     
                     if st.button("Delete", key=f"delete_{item['id']}"):
                         try:
                             success, message = delete_clothing_item(item['id'])
                             if success:
                                 st.success(message)
+                                logging.info(f"Successfully deleted item {item['id']}")
                                 st.experimental_rerun()
                             else:
                                 st.error(message)
+                                logging.error(f"Failed to delete item {item['id']}: {message}")
                         except Exception as e:
                             st.error(f"Error deleting item: {str(e)}")
+                            logging.error(f"Error deleting item {item['id']}: {str(e)}")
 
 def main_page():
     st.title("Outfit Wizard 🧙‍♂️👚👖👞")
     
     try:
         clothing_items = load_clothing_items()
+        logging.info("Successfully loaded clothing items for main page")
         
         st.sidebar.header("Set Your Preferences")
         size = st.sidebar.selectbox("Size", ["XS", "S", "M", "L", "XL"])
@@ -204,6 +257,7 @@ def main_page():
             outfit, missing_items = generate_outfit(clothing_items, size, style, gender)
             st.session_state.current_outfit = outfit
             st.session_state.missing_items = missing_items
+            logging.info("Generated new outfit")
         
         # Display current outfit if available
         current_outfit = st.session_state.get('current_outfit')
@@ -222,38 +276,55 @@ def main_page():
                             if st.button(f"Like {item_type}"):
                                 store_user_preference(current_outfit[item_type]['id'])
                                 st.success(f"You liked this {item_type}!")
+                                logging.info(f"User liked {item_type} (ID: {current_outfit[item_type]['id']})")
             
             if st.button("Save Outfit"):
                 saved_path = save_outfit(current_outfit)
                 if saved_path:
                     st.success("Outfit saved successfully!")
+                    logging.info("Successfully saved outfit")
                 else:
                     st.error("Failed to save outfit")
+                    logging.error("Failed to save outfit")
                     
         if missing_items:
             st.warning(f"Couldn't find matching items for: {', '.join(missing_items)}")
+            logging.warning(f"Missing items in outfit generation: {missing_items}")
             
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
+        logging.error(f"Error in main page: {str(e)}")
 
 def saved_outfits_page():
     st.title("Saved Outfits")
     
-    saved_outfits = load_saved_outfits()
-    
-    if saved_outfits:
-        cols = st.columns(2)
-        for i, outfit in enumerate(saved_outfits):
-            with cols[i % 2]:
-                st.subheader(f"Outfit {i+1}")
-                if os.path.exists(outfit['image_path']):
-                    st.image(outfit['image_path'])
-                else:
-                    st.error(f"Image not found: {outfit['image_path']}")
-    else:
-        st.info("No saved outfits yet.")
+    try:
+        saved_outfits = load_saved_outfits()
+        logging.info(f"Loaded {len(saved_outfits)} saved outfits")
+        
+        if saved_outfits:
+            cols = st.columns(2)
+            for i, outfit in enumerate(saved_outfits):
+                with cols[i % 2]:
+                    st.subheader(f"Outfit {i+1}")
+                    if os.path.exists(outfit['image_path']):
+                        st.image(outfit['image_path'])
+                    else:
+                        st.error(f"Image not found: {outfit['image_path']}")
+                        logging.error(f"Missing saved outfit image: {outfit['image_path']}")
+        else:
+            st.info("No saved outfits yet.")
+    except Exception as e:
+        st.error("Error loading saved outfits")
+        logging.error(f"Error loading saved outfits: {str(e)}")
 
 def main():
+    # Initialize only outfit-related session state
+    if 'current_outfit' not in st.session_state:
+        st.session_state.current_outfit = None
+    if 'missing_items' not in st.session_state:
+        st.session_state.missing_items = []
+    
     pages = {
         "Home": main_page,
         "My Wardrobe": personal_wardrobe_page,
@@ -263,13 +334,11 @@ def main():
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Go to", list(pages.keys()))
     
-    # Initialize session state for outfit management only
-    if 'current_outfit' not in st.session_state:
-        st.session_state.current_outfit = None
-    if 'missing_items' not in st.session_state:
-        st.session_state.missing_items = []
-    
-    pages[page]()
+    try:
+        pages[page]()
+    except Exception as e:
+        st.error("An error occurred while loading the page")
+        logging.error(f"Error loading page {page}: {str(e)}")
 
 if __name__ == "__main__":
     main()
