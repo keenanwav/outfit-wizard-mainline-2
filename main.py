@@ -12,10 +12,9 @@ from data_manager import (
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
-from color_utils import get_color_palette
+from color_utils import get_color_palette, display_color_palette
 from outfit_generator import generate_outfit
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -24,7 +23,6 @@ logging.basicConfig(
 st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
 
 def parse_color_string(color_string, default_color=(0, 0, 0)):
-    """Helper function to safely parse color string"""
     try:
         if not color_string or ',' not in color_string:
             logging.warning(f"Invalid color string format: {color_string}")
@@ -41,7 +39,6 @@ def parse_color_string(color_string, default_color=(0, 0, 0)):
         return default_color
 
 def normalize_case(value):
-    """Helper function to normalize case of strings"""
     return value.strip().title() if isinstance(value, str) else value
 
 def get_dominant_color(image):
@@ -76,11 +73,8 @@ def personal_wardrobe_page():
         with st.form("add_personal_item", clear_on_submit=True):
             item_type = st.selectbox("Item Type", ["shirt", "pants", "shoes"])
             image_file = st.file_uploader("Upload Image (PNG)", type="png")
-            
-            # Add hyperlink field
             hyperlink = st.text_input("Item Link (Optional)", help="Enter the URL where this item can be purchased")
             
-            # Only show color picker after image upload
             color = None
             if image_file is not None:
                 st.image(image_file, width=200)
@@ -154,123 +148,110 @@ def personal_wardrobe_page():
         st.header("My Items")
         try:
             personal_items = load_clothing_items()
-            logging.info(f"Loaded {len(personal_items)} clothing items")
-        except Exception as e:
-            st.error("Error loading clothing items")
-            logging.error(f"Error loading clothing items: {str(e)}")
-            return
-        
-        if len(personal_items) == 0:
-            st.info("No clothing items found.")
-            return
+            if len(personal_items) == 0:
+                st.info("No clothing items found.")
+                return
 
-        # Group items by type
-        item_types = ["shirt", "pants", "shoes"]
-        for item_type in item_types:
-            type_items = personal_items[personal_items['type'] == item_type]
-            if len(type_items) > 0:
-                st.subheader(f"{item_type.title()}s")
-                
-                # Calculate number of columns (3 items per row)
-                n_items = len(type_items)
-                n_rows = (n_items + 2) // 3  # Round up division
-                
-                for row in range(n_rows):
-                    cols = st.columns(3)
-                    for col in range(3):
-                        idx = row * 3 + col
-                        if idx < n_items:
-                            item = type_items.iloc[idx]
-                            with cols[col]:
-                                # Create a container for the item
-                                with st.container():
-                                    # Display image
-                                    if os.path.exists(item['image_path']):
-                                        st.image(item['image_path'], use_column_width=True)
-                                    else:
-                                        st.error(f"Image not found")
-                                    
-                                    # Display hyperlink if available
-                                    if item.get('hyperlink'):
-                                        st.markdown(f"[Shop Item]({item['hyperlink']})")
-                                    
-                                    # Create two columns for edit and delete buttons
-                                    button_cols = st.columns(2)
-                                    
-                                    # Show item details in an expander
-                                    with st.expander("Edit Details"):
-                                        try:
-                                            color_values = parse_color_string(item['color'], (0, 0, 0))
-                                            new_color = st.color_picker(
-                                                "Color", 
-                                                f"#{color_values[0]:02x}{color_values[1]:02x}{color_values[2]:02x}",
-                                                key=f"color_{item_type}_{item['id']}"
-                                            )
-                                            
-                                            # Add hyperlink field in edit mode
-                                            new_hyperlink = st.text_input(
-                                                "Item Link",
-                                                value=item.get('hyperlink', ''),
-                                                key=f"hyperlink_{item_type}_{item['id']}"
-                                            )
-                                        except Exception as e:
-                                            logging.error(f"Error handling color for item {item['id']}: {str(e)}")
-                                            new_color = st.color_picker("Color", "#000000", key=f"color_{item_type}_{item['id']}")
-                                            new_hyperlink = st.text_input("Item Link", "", key=f"hyperlink_{item_type}_{item['id']}")
+            item_types = ["shirt", "pants", "shoes"]
+            for item_type in item_types:
+                type_items = personal_items[personal_items['type'] == item_type]
+                if len(type_items) > 0:
+                    st.subheader(f"{item_type.title()}s")
+                    n_items = len(type_items)
+                    n_rows = (n_items + 2) // 3
+                    
+                    for row in range(n_rows):
+                        cols = st.columns(3)
+                        for col in range(3):
+                            idx = row * 3 + col
+                            if idx < n_items:
+                                item = type_items.iloc[idx]
+                                with cols[col]:
+                                    with st.container():
+                                        if os.path.exists(item['image_path']):
+                                            st.image(item['image_path'], use_column_width=True)
+                                        else:
+                                            st.error(f"Image not found")
                                         
-                                        style_list = item['style'].split(',') if item['style'] else []
-                                        new_styles = []
-                                        st.write("Styles:")
-                                        style_cols = st.columns(len(["Casual", "Formal", "Sporty"]))
-                                        for i, style in enumerate(["Casual", "Formal", "Sporty"]):
-                                            if style_cols[i].checkbox(style, value=style in style_list, key=f"edit_style_{item_type}_{item['id']}_{style}"):
-                                                new_styles.append(style)
+                                        if item.get('hyperlink'):
+                                            st.markdown(f"[Shop Item]({item['hyperlink']})")
                                         
-                                        gender_list = item['gender'].split(',') if item['gender'] else []
-                                        new_genders = []
-                                        st.write("Genders:")
-                                        gender_cols = st.columns(len(["Male", "Female", "Unisex"]))
-                                        for i, gender in enumerate(["Male", "Female", "Unisex"]):
-                                            if gender_cols[i].checkbox(gender, value=gender in gender_list, key=f"edit_gender_{item_type}_{item['id']}_{gender}"):
-                                                new_genders.append(gender)
-                                        
-                                        size_list = item['size'].split(',') if item['size'] else []
-                                        new_sizes = []
-                                        st.write("Sizes:")
-                                        size_cols = st.columns(len(["XS", "S", "M", "L", "XL"]))
-                                        for i, size in enumerate(["XS", "S", "M", "L", "XL"]):
-                                            if size_cols[i].checkbox(size, value=size in size_list, key=f"edit_size_{item_type}_{item['id']}_{size}"):
-                                                new_sizes.append(size)
-                                        
-                                        if st.button("Update", key=f"update_{item_type}_{item['id']}"):
+                                        with st.expander("Edit Details"):
                                             try:
-                                                rgb_color = tuple(int(new_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
-                                                success, message = edit_clothing_item(
-                                                    item['id'],
-                                                    rgb_color,
-                                                    new_styles,
-                                                    new_genders,
-                                                    new_sizes,
-                                                    new_hyperlink
+                                                color_values = parse_color_string(item['color'], (0, 0, 0))
+                                                new_color = st.color_picker(
+                                                    "Color", 
+                                                    f"#{color_values[0]:02x}{color_values[1]:02x}{color_values[2]:02x}",
+                                                    key=f"color_{item_type}_{item['id']}"
                                                 )
+                                                
+                                                new_hyperlink = st.text_input(
+                                                    "Item Link",
+                                                    value=item.get('hyperlink', ''),
+                                                    key=f"hyperlink_{item_type}_{item['id']}"
+                                                )
+                                            except Exception as e:
+                                                logging.error(f"Error handling color for item {item['id']}: {str(e)}")
+                                                new_color = st.color_picker("Color", "#000000", key=f"color_{item_type}_{item['id']}")
+                                                new_hyperlink = st.text_input("Item Link", "", key=f"hyperlink_{item_type}_{item['id']}")
+                                            
+                                            style_list = item['style'].split(',') if item['style'] else []
+                                            new_styles = []
+                                            st.write("Styles:")
+                                            style_cols = st.columns(len(["Casual", "Formal", "Sporty"]))
+                                            for i, style in enumerate(["Casual", "Formal", "Sporty"]):
+                                                if style_cols[i].checkbox(style, value=style in style_list, key=f"edit_style_{item_type}_{item['id']}_{style}"):
+                                                    new_styles.append(style)
+                                            
+                                            gender_list = item['gender'].split(',') if item['gender'] else []
+                                            new_genders = []
+                                            st.write("Genders:")
+                                            gender_cols = st.columns(len(["Male", "Female", "Unisex"]))
+                                            for i, gender in enumerate(["Male", "Female", "Unisex"]):
+                                                if gender_cols[i].checkbox(gender, value=gender in gender_list, key=f"edit_gender_{item_type}_{item['id']}_{gender}"):
+                                                    new_genders.append(gender)
+                                            
+                                            size_list = item['size'].split(',') if item['size'] else []
+                                            new_sizes = []
+                                            st.write("Sizes:")
+                                            size_cols = st.columns(len(["XS", "S", "M", "L", "XL"]))
+                                            for i, size in enumerate(["XS", "S", "M", "L", "XL"]):
+                                                if size_cols[i].checkbox(size, value=size in size_list, key=f"edit_size_{item_type}_{item['id']}_{size}"):
+                                                    new_sizes.append(size)
+                                            
+                                            if st.button("Update", key=f"update_{item_type}_{item['id']}"):
+                                                try:
+                                                    rgb_color = tuple(int(new_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                                                    success, message = edit_clothing_item(
+                                                        item['id'],
+                                                        rgb_color,
+                                                        new_styles,
+                                                        new_genders,
+                                                        new_sizes,
+                                                        new_hyperlink
+                                                    )
+                                                    if success:
+                                                        st.success(message)
+                                                        st.experimental_rerun()
+                                                    else:
+                                                        st.error(message)
+                                                except Exception as e:
+                                                    st.error(f"Error updating item: {str(e)}")
+                                        
+                                        if st.button("Delete", key=f"delete_{item_type}_{item['id']}"):
+                                            try:
+                                                success, message = delete_clothing_item(item['id'])
                                                 if success:
                                                     st.success(message)
                                                     st.experimental_rerun()
                                                 else:
                                                     st.error(message)
                                             except Exception as e:
-                                                st.error(f"Error updating item: {str(e)}")
-                                    
-                                    if st.button("Delete", key=f"delete_{item_type}_{item['id']}"):
-                                        try:
-                                            success, message = delete_clothing_item(item['id'])
-                                            if success:
-                                                st.success(message)
-                                                st.experimental_rerun()
-                                            else:
-                                                st.error(message)
-                                        except Exception as e:
-                                            st.error(f"Error deleting item: {str(e)}")
+                                                st.error(f"Error deleting item: {str(e)}")
+        except Exception as e:
+            st.error("Error loading clothing items")
+            logging.error(f"Error loading clothing items: {str(e)}")
+            return
 
 def main_page():
     st.title("Outfit Wizard 🧙‍♂️👚👖👞")
@@ -290,7 +271,6 @@ def main_page():
             st.session_state.missing_items = missing_items
             logging.info("Generated new outfit")
         
-        # Display current outfit if available
         current_outfit = st.session_state.get('current_outfit')
         missing_items = st.session_state.get('missing_items', [])
         
@@ -300,6 +280,11 @@ def main_page():
             if 'merged_image_path' in current_outfit:
                 st.image(current_outfit['merged_image_path'], use_column_width=True)
                 
+                st.subheader("Outfit Color Palette")
+                outfit_colors = get_color_palette(current_outfit['merged_image_path'])
+                if outfit_colors is not None:
+                    display_color_palette(outfit_colors)
+                
                 cols = st.columns(3)
                 for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
                     with cols[i]:
@@ -308,6 +293,11 @@ def main_page():
                                 store_user_preference(current_outfit[item_type]['id'])
                                 st.success(f"You liked this {item_type}!")
                                 logging.info(f"User liked {item_type} (ID: {current_outfit[item_type]['id']})")
+                            
+                            st.write(f"{item_type.title()} Colors:")
+                            item_colors = get_color_palette(current_outfit[item_type]['image_path'], n_colors=3)
+                            if item_colors is not None:
+                                display_color_palette(item_colors)
             
             if st.button("Save Outfit"):
                 saved_path = save_outfit(current_outfit)
@@ -317,12 +307,13 @@ def main_page():
                 else:
                     st.error("Failed to save outfit")
                     logging.error("Failed to save outfit")
+        
         elif missing_items:
-            st.warning("Could not generate a complete outfit. Missing items: " + ", ".join(missing_items))
-        else:
-            st.info("Click 'Generate New Outfit' to create an outfit based on your preferences.")
+            st.warning(f"Could not generate complete outfit. Missing items: {', '.join(missing_items)}")
+            logging.warning(f"Missing items in outfit generation: {missing_items}")
+        
     except Exception as e:
-        st.error("Error generating outfit")
+        st.error(f"An error occurred: {str(e)}")
         logging.error(f"Error in main page: {str(e)}")
 
 def saved_outfits_page():
@@ -344,19 +335,18 @@ def saved_outfits_page():
         logging.error(f"Error loading saved outfits: {str(e)}")
 
 def main():
-    # Initialize only outfit-related session state
     if 'current_outfit' not in st.session_state:
         st.session_state.current_outfit = None
     if 'missing_items' not in st.session_state:
         st.session_state.missing_items = []
     
+    st.sidebar.title("Navigation")
     pages = {
         "Home": main_page,
         "My Wardrobe": personal_wardrobe_page,
         "Saved Outfits": saved_outfits_page
     }
     
-    st.sidebar.title("Navigation")
     page = st.sidebar.radio("Go to", list(pages.keys()))
     
     try:
