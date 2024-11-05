@@ -269,23 +269,17 @@ def main_page():
         gender = st.sidebar.selectbox("Gender", ["Male", "Female", "Unisex"])
         
         if st.sidebar.button("Generate New Outfit 🔄"):
-            with st.spinner("🪄 Casting outfit magic..."):
-                # Create a centered container for the magic wand animation
-                col1, col2, col3 = st.columns([1, 2, 1])
-                with col2:
-                    st.image("magic_wand.png", width=100)
-                
-                outfit, missing_items = generate_outfit(clothing_items, size, style, gender)
-                st.session_state.current_outfit = outfit
-                st.session_state.missing_items = missing_items
-                logging.info("Generated new outfit")
+            outfit, missing_items = generate_outfit(clothing_items, size, style, gender)
+            st.session_state.current_outfit = outfit
+            st.session_state.missing_items = missing_items
+            logging.info("Generated new outfit")
         
         # Display current outfit if available
         current_outfit = st.session_state.get('current_outfit')
         missing_items = st.session_state.get('missing_items', [])
         
         if current_outfit:
-            st.success("✨ Your magical outfit is ready!")
+            st.success("Outfit generated successfully!")
             
             if 'merged_image_path' in current_outfit:
                 st.image(current_outfit['merged_image_path'], use_column_width=True)
@@ -321,25 +315,26 @@ def saved_outfits_page():
     
     try:
         saved_outfits = load_saved_outfits()
+        logging.info(f"Loaded {len(saved_outfits)} saved outfits")
         
-        if not saved_outfits:
+        if saved_outfits:
+            cols = st.columns(2)
+            for i, outfit in enumerate(saved_outfits):
+                with cols[i % 2]:
+                    st.subheader(f"Outfit {i+1}")
+                    if os.path.exists(outfit['image_path']):
+                        st.image(outfit['image_path'])
+                    else:
+                        st.error(f"Image not found: {outfit['image_path']}")
+                        logging.error(f"Missing saved outfit image: {outfit['image_path']}")
+        else:
             st.info("No saved outfits yet.")
-            return
-            
-        for outfit in saved_outfits:
-            st.write(f"Created on: {outfit['date']}")
-            if os.path.exists(outfit['image_path']):
-                st.image(outfit['image_path'])
-            else:
-                st.error(f"Image not found: {outfit['image_path']}")
-                logging.error(f"Missing saved outfit image: {outfit['image_path']}")
-                
     except Exception as e:
         st.error("Error loading saved outfits")
         logging.error(f"Error loading saved outfits: {str(e)}")
 
-if __name__ == "__main__":
-    # Initialize session state for outfit-related data
+def main():
+    # Initialize only outfit-related session state
     if 'current_outfit' not in st.session_state:
         st.session_state.current_outfit = None
     if 'missing_items' not in st.session_state:
@@ -353,4 +348,12 @@ if __name__ == "__main__":
     
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Go to", list(pages.keys()))
-    pages[page]()
+    
+    try:
+        pages[page]()
+    except Exception as e:
+        st.error("An error occurred while loading the page")
+        logging.error(f"Error loading page {page}: {str(e)}")
+
+if __name__ == "__main__":
+    main()
