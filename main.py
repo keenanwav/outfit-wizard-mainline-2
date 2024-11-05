@@ -77,6 +77,9 @@ def personal_wardrobe_page():
             item_type = st.selectbox("Item Type", ["shirt", "pants", "shoes"])
             image_file = st.file_uploader("Upload Image (PNG)", type="png")
             
+            # Add hyperlink field
+            hyperlink = st.text_input("Item Link (Optional)", help="Enter the URL where this item can be purchased")
+            
             # Only show color picker after image upload
             color = None
             if image_file is not None:
@@ -134,7 +137,8 @@ def personal_wardrobe_page():
                             styles,
                             genders,
                             sizes,
-                            image_file
+                            image_file,
+                            hyperlink
                         )
                         if success:
                             st.success(message)
@@ -186,6 +190,10 @@ def personal_wardrobe_page():
                                     else:
                                         st.error(f"Image not found")
                                     
+                                    # Display hyperlink if available
+                                    if item.get('hyperlink'):
+                                        st.markdown(f"[Shop Item]({item['hyperlink']})")
+                                    
                                     # Create two columns for edit and delete buttons
                                     button_cols = st.columns(2)
                                     
@@ -198,9 +206,17 @@ def personal_wardrobe_page():
                                                 f"#{color_values[0]:02x}{color_values[1]:02x}{color_values[2]:02x}",
                                                 key=f"color_{item_type}_{item['id']}"
                                             )
+                                            
+                                            # Add hyperlink field in edit mode
+                                            new_hyperlink = st.text_input(
+                                                "Item Link",
+                                                value=item.get('hyperlink', ''),
+                                                key=f"hyperlink_{item_type}_{item['id']}"
+                                            )
                                         except Exception as e:
                                             logging.error(f"Error handling color for item {item['id']}: {str(e)}")
                                             new_color = st.color_picker("Color", "#000000", key=f"color_{item_type}_{item['id']}")
+                                            new_hyperlink = st.text_input("Item Link", "", key=f"hyperlink_{item_type}_{item['id']}")
                                         
                                         style_list = item['style'].split(',') if item['style'] else []
                                         new_styles = []
@@ -235,7 +251,7 @@ def personal_wardrobe_page():
                                                     new_styles,
                                                     new_genders,
                                                     new_sizes,
-                                                    item.get('hyperlink', '')
+                                                    new_hyperlink
                                                 )
                                                 if success:
                                                     st.success(message)
@@ -301,32 +317,26 @@ def main_page():
                 else:
                     st.error("Failed to save outfit")
                     logging.error("Failed to save outfit")
-                    
-        if missing_items:
-            st.warning(f"Couldn't find matching items for: {', '.join(missing_items)}")
-            logging.warning(f"Missing items in outfit generation: {missing_items}")
-            
+        elif missing_items:
+            st.warning("Could not generate a complete outfit. Missing items: " + ", ".join(missing_items))
+        else:
+            st.info("Click 'Generate New Outfit' to create an outfit based on your preferences.")
     except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
+        st.error("Error generating outfit")
         logging.error(f"Error in main page: {str(e)}")
 
 def saved_outfits_page():
-    st.title("Saved Outfits")
-    
+    st.title("Saved Outfits 💾")
     try:
-        saved_outfits = load_saved_outfits()
-        logging.info(f"Loaded {len(saved_outfits)} saved outfits")
-        
-        if saved_outfits:
-            cols = st.columns(2)
-            for i, outfit in enumerate(saved_outfits):
-                with cols[i % 2]:
-                    st.subheader(f"Outfit {i+1}")
-                    if os.path.exists(outfit['image_path']):
-                        st.image(outfit['image_path'])
-                    else:
-                        st.error(f"Image not found: {outfit['image_path']}")
-                        logging.error(f"Missing saved outfit image: {outfit['image_path']}")
+        outfits = load_saved_outfits()
+        if outfits:
+            for outfit in outfits:
+                if os.path.exists(outfit['image_path']):
+                    st.write(f"Saved on: {outfit['date']}")
+                    st.image(outfit['image_path'])
+                else:
+                    st.error(f"Image not found: {outfit['image_path']}")
+                    logging.error(f"Missing saved outfit image: {outfit['image_path']}")
         else:
             st.info("No saved outfits yet.")
     except Exception as e:
