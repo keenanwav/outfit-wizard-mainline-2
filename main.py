@@ -23,16 +23,15 @@ logging.basicConfig(
 
 st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
 
-# Initialize session state for cleanup tracking
 if 'last_cleanup_time' not in st.session_state:
     st.session_state.last_cleanup_time = datetime.now()
-    cleanup_merged_outfits()  # Initial cleanup on app startup
+    cleanup_merged_outfits()
 
 def check_cleanup_needed():
     current_time = datetime.now()
     hours_since_cleanup = (current_time - st.session_state.last_cleanup_time).total_seconds() / 3600
     
-    if hours_since_cleanup >= 1:  # Check every hour
+    if hours_since_cleanup >= 1:
         cleanup_count = cleanup_merged_outfits()
         st.session_state.last_cleanup_time = current_time
         if cleanup_count > 0:
@@ -259,7 +258,6 @@ def main_page():
     st.title("Outfit Wizard 🧙‍♂️👚👖👞")
     
     try:
-        # Check if cleanup is needed
         check_cleanup_needed()
         
         clothing_items = load_clothing_items()
@@ -289,10 +287,10 @@ def main_page():
                 for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
                     with cols[i]:
                         if item_type in current_outfit:
-                            if st.button(f"Like {item_type}"):
-                                store_user_preference(current_outfit[item_type]['id'])
-                                st.success(f"You liked this {item_type}!")
-                                logging.info(f"User liked {item_type} (ID: {current_outfit[item_type]['id']})")
+                            if 'hyperlink' in current_outfit[item_type] and current_outfit[item_type]['hyperlink']:
+                                st.markdown(f"<a href='{current_outfit[item_type]['hyperlink']}' target='_blank'><button style='width:100%'>Shop {item_type.title()}</button></a>", unsafe_allow_html=True)
+                            else:
+                                st.write("No shopping link available")
                             
                             st.write(f"{item_type.title()} Color:")
                             item_color = get_color_palette(current_outfit[item_type]['image_path'], n_colors=1)
