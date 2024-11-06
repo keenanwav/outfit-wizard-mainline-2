@@ -79,11 +79,11 @@ def display_color_palette(colors):
                 <div style="
                     background-color: {hex_color};
                     width: 100%;
-                    height: 50px;
+                    aspect-ratio: 1;
                     border-radius: 5px;
                     margin-bottom: 5px;
                 "></div>
-                <p style="text-align: center; font-size: 12px;">{hex_color}</p>
+                <p style="text-align: center; font-size: 12px; margin: 0 auto;">{hex_color}</p>
                 """,
                 unsafe_allow_html=True
             )
