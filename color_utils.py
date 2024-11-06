@@ -78,10 +78,10 @@ def display_color_palette(colors):
                 f"""
                 <div style="
                     background-color: {hex_color};
-                    width: 100%;
+                    width: 2rem;
                     aspect-ratio: 1;
-                    border-radius: 5px;
-                    margin-bottom: 5px;
+                    border-radius: 8px;
+                    margin: 0 auto 8px auto;
                 "></div>
                 <p style="text-align: center; font-size: 12px; margin: 0 auto;">{hex_color}</p>
                 """,
