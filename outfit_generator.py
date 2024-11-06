@@ -5,6 +5,30 @@ import os
 import uuid
 import logging
 from datetime import datetime, timedelta
+import numpy as np
+
+def remove_background(image):
+    """Remove background by making white/light pixels transparent"""
+    # Convert image to RGBA if it isn't already
+    if image.mode != 'RGBA':
+        image = image.convert('RGBA')
+    
+    # Get the image data as a numpy array
+    data = np.array(image)
+    
+    # Create an alpha channel based on pixel brightness
+    # Convert RGB to grayscale using standard weights
+    r, g, b, a = data.T
+    grayscale = 0.2989 * r + 0.5870 * g + 0.1140 * b
+    
+    # Create mask for light pixels (threshold can be adjusted)
+    threshold = 230  # Adjust this value to control what's considered "light"
+    light_pixels = grayscale > threshold
+    
+    # Set alpha channel to 0 (transparent) for light pixels
+    data[..., 3] = np.where(light_pixels.T, 0, 255)
+    
+    return Image.fromarray(data)
 
 def cleanup_merged_outfits(max_age_hours=24):
     """Clean up old unsaved outfit files from merged_outfits folder"""
@@ -75,28 +99,30 @@ def generate_outfit(clothing_items, size, style, gender):
     
     # If we have a complete outfit, create a merged image
     if len(selected_outfit) == 3:  # We have all three items
-        # Create a new image with white background
+        # Create a new image with transparent background
         width = 200
         total_height = 600
-        merged_image = Image.new('RGB', (width, total_height), (255, 255, 255))
+        merged_image = Image.new('RGBA', (width, total_height), (255, 255, 255, 0))
         
         # Add each clothing item to the merged image
         for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
             try:
                 item_img = Image.open(selected_outfit[item_type]['image_path'])
+                # Remove background from the item image
+                item_img = remove_background(item_img)
                 # Resize while maintaining aspect ratio
                 item_img.thumbnail((width, 200))
                 # Calculate position to center horizontally
                 x_position = (width - item_img.size[0]) // 2
-                # Paste the image vertically
-                merged_image.paste(item_img, (x_position, i * 200))
+                # Paste the image vertically with transparency
+                merged_image.paste(item_img, (x_position, i * 200), item_img)
             except Exception as e:
                 logging.error(f"Error processing {item_type} image: {str(e)}")
         
-        # Save the merged image
+        # Save the merged image with transparency
         merged_filename = f"outfit_{uuid.uuid4()}.png"
         merged_path = os.path.join('merged_outfits', merged_filename)
-        merged_image.save(merged_path)
+        merged_image.save(merged_path, format='PNG')
         
         # Add the merged image path to the outfit dictionary
         selected_outfit['merged_image_path'] = merged_path
