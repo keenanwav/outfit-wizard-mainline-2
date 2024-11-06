@@ -280,11 +280,6 @@ def main_page():
             if 'merged_image_path' in current_outfit:
                 st.image(current_outfit['merged_image_path'], use_column_width=True)
                 
-                st.subheader("Outfit Color Palette")
-                outfit_colors = get_color_palette(current_outfit['merged_image_path'])
-                if outfit_colors is not None:
-                    display_color_palette(outfit_colors)
-                
                 cols = st.columns(3)
                 for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
                     with cols[i]:
@@ -294,10 +289,10 @@ def main_page():
                                 st.success(f"You liked this {item_type}!")
                                 logging.info(f"User liked {item_type} (ID: {current_outfit[item_type]['id']})")
                             
-                            st.write(f"{item_type.title()} Colors:")
-                            item_colors = get_color_palette(current_outfit[item_type]['image_path'], n_colors=3)
-                            if item_colors is not None:
-                                display_color_palette(item_colors)
+                            st.write(f"{item_type.title()} Color:")
+                            item_color = get_color_palette(current_outfit[item_type]['image_path'], n_colors=1)
+                            if item_color is not None:
+                                display_color_palette(item_color)
             
             if st.button("Save Outfit"):
                 saved_path = save_outfit(current_outfit)
