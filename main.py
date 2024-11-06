@@ -13,7 +13,8 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
 from color_utils import get_color_palette, display_color_palette
-from outfit_generator import generate_outfit
+from outfit_generator import generate_outfit, cleanup_merged_outfits
+from datetime import datetime
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,6 +22,21 @@ logging.basicConfig(
 )
 
 st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
+
+# Initialize session state for cleanup tracking
+if 'last_cleanup_time' not in st.session_state:
+    st.session_state.last_cleanup_time = datetime.now()
+    cleanup_merged_outfits()  # Initial cleanup on app startup
+
+def check_cleanup_needed():
+    current_time = datetime.now()
+    hours_since_cleanup = (current_time - st.session_state.last_cleanup_time).total_seconds() / 3600
+    
+    if hours_since_cleanup >= 1:  # Check every hour
+        cleanup_count = cleanup_merged_outfits()
+        st.session_state.last_cleanup_time = current_time
+        if cleanup_count > 0:
+            logging.info(f"Periodic cleanup removed {cleanup_count} old outfit files")
 
 def parse_color_string(color_string, default_color=(0, 0, 0)):
     try:
@@ -40,21 +56,6 @@ def parse_color_string(color_string, default_color=(0, 0, 0)):
 
 def normalize_case(value):
     return value.strip().title() if isinstance(value, str) else value
-
-def get_dominant_color(image):
-    try:
-        img = Image.open(image)
-        if img.mode != 'RGB':
-            img = img.convert('RGB')
-        img = img.resize((100, 100))
-        img_array = np.array(img)
-        colors = img_array.reshape(-1, 3)
-        color_counts = Counter(map(tuple, colors))
-        dominant_color = color_counts.most_common(1)[0][0]
-        return '#{:02x}{:02x}{:02x}'.format(*dominant_color)
-    except Exception as e:
-        logging.error(f"Error processing image: {str(e)}")
-        return "#000000"
 
 def personal_wardrobe_page():
     st.title("My Personal Wardrobe 👕")
@@ -79,9 +80,9 @@ def personal_wardrobe_page():
             if image_file is not None:
                 st.image(image_file, width=200)
                 try:
-                    dominant_color = get_dominant_color(image_file)
-                    st.write(f"Dominant color detected: {dominant_color}")
-                    color = st.color_picker("Adjust Color", dominant_color)
+                    dominant_color = get_color_palette(image_file, n_colors=1)[0]
+                    st.write(f"Dominant color detected: {rgb_to_hex(dominant_color)}")
+                    color = st.color_picker("Adjust Color", rgb_to_hex(dominant_color))
                 except Exception as e:
                     logging.error(f"Error detecting dominant color: {str(e)}")
                     color = st.color_picker("Select Color", "#000000")
@@ -179,9 +180,10 @@ def personal_wardrobe_page():
                                         with st.expander("Edit Details"):
                                             try:
                                                 color_values = parse_color_string(item['color'], (0, 0, 0))
+                                                hex_color = '#{:02x}{:02x}{:02x}'.format(*color_values)
                                                 new_color = st.color_picker(
                                                     "Color", 
-                                                    f"#{color_values[0]:02x}{color_values[1]:02x}{color_values[2]:02x}",
+                                                    hex_color,
                                                     key=f"color_{item_type}_{item['id']}"
                                                 )
                                                 
@@ -257,6 +259,9 @@ def main_page():
     st.title("Outfit Wizard 🧙‍♂️👚👖👞")
     
     try:
+        # Check if cleanup is needed
+        check_cleanup_needed()
+        
         clothing_items = load_clothing_items()
         logging.info("Successfully loaded clothing items for main page")
         
@@ -328,6 +333,9 @@ def saved_outfits_page():
     except Exception as e:
         st.error("Error loading saved outfits")
         logging.error(f"Error loading saved outfits: {str(e)}")
+
+def rgb_to_hex(rgb):
+    return '#{:02x}{:02x}{:02x}'.format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
 
 def main():
     if 'current_outfit' not in st.session_state:
