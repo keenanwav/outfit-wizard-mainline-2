@@ -52,14 +52,11 @@ def generate_outfit(clothing_items, size, style, gender):
     selected_outfit = {}
     missing_items = []
     
-    # Create directory for merged outfits if it doesn't exist
     if not os.path.exists('merged_outfits'):
         os.makedirs('merged_outfits')
     
-    # Clean up old files before generating new ones
     cleanup_merged_outfits()
     
-    # Filter items by preferences
     for item_type in ['shirt', 'pants', 'shoes']:
         type_items = clothing_items[clothing_items['type'] == item_type]
         filtered_items = type_items[
@@ -73,16 +70,20 @@ def generate_outfit(clothing_items, size, style, gender):
         else:
             missing_items.append(item_type)
     
-    # If we have a complete outfit, create a merged image
     if len(selected_outfit) == 3:  # We have all three items
         try:
             # Load the template image
             template = Image.open('yoyo.png')
             template_width, template_height = template.size
             
-            # Calculate vertical spacing
-            item_height = template_height // 4  # Divide height into 4 sections (3 items + spacing)
-            vertical_spacing = item_height // 4
+            # Make template more compact by reducing height
+            new_template_height = int(template_height * 0.7)  # Reduce template height
+            template = template.resize((template_width, new_template_height))
+            template_width, template_height = template.size
+            
+            # Calculate vertical spacing (reduced)
+            item_height = template_height // 5  # Smaller sections
+            vertical_spacing = item_height // 8  # Reduced spacing
             
             # Create a new image using the template
             merged_image = template.copy()
@@ -94,7 +95,7 @@ def generate_outfit(clothing_items, size, style, gender):
                     
                     # Calculate dimensions while maintaining aspect ratio
                     aspect_ratio = item_img.size[0] / item_img.size[1]
-                    new_height = int(item_height * 0.8)  # 80% of section height
+                    new_height = int(item_height * 0.9)  # Increased from 0.8 to 0.9 to use more vertical space
                     new_width = int(new_height * aspect_ratio)
                     
                     # Ensure width doesn't exceed template width
@@ -105,9 +106,9 @@ def generate_outfit(clothing_items, size, style, gender):
                     # Resize the item image
                     item_img = item_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
                     
-                    # Calculate position to center horizontally
+                    # Calculate position to center horizontally and adjust vertical position
                     x_position = (template_width - new_width) // 2
-                    y_position = (item_height * i) + vertical_spacing
+                    y_position = vertical_spacing + (i * (item_height + vertical_spacing))
                     
                     # Create a mask for transparency
                     if item_img.mode == 'RGBA':
