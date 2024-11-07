@@ -49,7 +49,7 @@ def cleanup_merged_outfits(max_age_hours=24):
         logging.error(f"Error during outfit cleanup: {str(e)}")
         return 0
 
-def add_text_to_image(draw, text, position, font_size=30, font_color="black"):
+def add_text_to_image(draw, text, position, font_size=30):
     """Add text to image with fixed styling"""
     try:
         # Try to use Arial font, fall back to default if not available
@@ -58,7 +58,7 @@ def add_text_to_image(draw, text, position, font_size=30, font_color="black"):
         except:
             font = ImageFont.load_default()
         
-        draw.text(position, text, fill=font_color, font=font)
+        draw.text(position, text, fill="black", font=font)
     except Exception as e:
         logging.error(f"Error adding text to image: {str(e)}")
 
@@ -97,33 +97,32 @@ def generate_outfit(clothing_items, size, style, gender):
             # Add title
             add_text_to_image(draw, "FULL OUTFIT", (template_width//2 - 80, 20), font_size=40)
             
-            # Add "TIPS:" text
-            add_text_to_image(draw, "TIPS:", (50, template_height - 200), font_size=30)
-            
             # Calculate dimensions for item placement
             item_width = template_width // 3
             item_height = template_height // 3
             padding = 20
             
-            # Create rounded rectangle sections
-            section_color = (230, 230, 230)  # Light gray background for sections
+            # Create sections for each item with rounded corners
+            section_color = (230, 230, 230)  # Light gray for item sections
             
+            # Function to create rounded rectangle section
             def create_section(width, height):
                 section = Image.new('RGBA', (width, height), (0, 0, 0, 0))
                 section_draw = ImageDraw.Draw(section)
                 section_draw.rounded_rectangle([(0, 0), (width-1, height-1)], radius=20, fill=section_color)
                 return section
             
+            # Add sections and items
             # Left section (shirt)
-            left_section = create_section(item_width - padding*2, item_height*1.2)
+            left_section = create_section(item_width - padding*2, item_height - padding)
             template.paste(left_section, (padding, 80), left_section)
-            add_text_to_image(draw, "shirt", (padding + 20, item_height + 50))
+            add_text_to_image(draw, "shirt", (padding + 20, item_height - padding))
             
-            # Right section (pants and shoes)
-            right_section = create_section(item_width - padding*2, item_height*2)
+            # Right section (pants)
+            right_section = create_section(item_width - padding*2, item_height*1.5 - padding)
             template.paste(right_section, (template_width - item_width, 80), right_section)
-            add_text_to_image(draw, "pants", (template_width - item_width + 20, item_height + 50))
-            add_text_to_image(draw, "shoes", (template_width - item_width + 20, item_height*1.5 + 50))
+            add_text_to_image(draw, "pants", (template_width - item_width + 20, item_height - padding))
+            add_text_to_image(draw, "shoes", (template_width - item_width + 20, item_height*1.2))
             
             # Place items in their sections
             for item_type in ['shirt', 'pants', 'shoes']:
@@ -134,7 +133,7 @@ def generate_outfit(clothing_items, size, style, gender):
                     else:
                         mask = None
                     
-                    # Calculate item dimensions and positions
+                    # Calculate item dimensions
                     if item_type == 'shirt':
                         max_width = item_width - padding*3
                         max_height = item_height - padding*2
@@ -154,10 +153,10 @@ def generate_outfit(clothing_items, size, style, gender):
                     # Resize item while maintaining aspect ratio
                     aspect_ratio = item_img.size[0] / item_img.size[1]
                     if aspect_ratio > 1:
-                        new_width = int(min(max_width, max_height * aspect_ratio))
+                        new_width = min(max_width, int(max_height * aspect_ratio))
                         new_height = int(new_width / aspect_ratio)
                     else:
-                        new_height = int(min(max_height, max_width / aspect_ratio))
+                        new_height = min(max_height, int(max_width / aspect_ratio))
                         new_width = int(new_height * aspect_ratio)
                     
                     item_img = item_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
@@ -174,8 +173,8 @@ def generate_outfit(clothing_items, size, style, gender):
             palette_y = template_height - 150
             add_text_to_image(draw, "COLOR PALLET", (template_width//2 - 60, palette_y - 30))
             
-            # Display color circles for each item
-            color_size = 40
+            # Display individual colors for each item
+            color_size = 50
             spacing = 20
             start_x = (template_width - (3 * color_size + 2 * spacing)) // 2
             
