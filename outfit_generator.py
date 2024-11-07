@@ -72,9 +72,11 @@ def generate_outfit(clothing_items, size, style, gender):
     
     if len(selected_outfit) == 3:  # We have all three items
         try:
-            # Load the template image
-            template = Image.open('yoyo.png')
-            template_width, template_height = template.size
+            # Create a new image with the specified background color
+            template_width = 800
+            template_height = 1000
+            background_color = (174, 162, 150)  # HEX AEA296 in RGB
+            template = Image.new('RGB', (template_width, template_height), background_color)
             
             # Make template more compact by reducing height
             new_template_height = int(template_height * 0.7)  # Reduce template height
