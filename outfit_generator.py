@@ -78,27 +78,31 @@ def generate_outfit(clothing_items, size, style, gender):
             background_color = (174, 162, 150)  # HEX AEA296 in RGB
             template = Image.new('RGB', (template_width, template_height), background_color)
             
-            # Add Rectangle 7 background with improved error handling and positioning
-            rect_7_path = 'Rectangle 7.png'
-            if os.path.exists(rect_7_path):
+            # Add vertical rectangle with rounded edges background
+            rect_path = 'vertical Rectangle rounded edges.png'
+            if os.path.exists(rect_path):
                 try:
-                    rect_7 = Image.open(rect_7_path)
-                    if rect_7.mode != 'RGBA':
-                        rect_7 = rect_7.convert('RGBA')
+                    rect = Image.open(rect_path)
+                    if rect.mode != 'RGBA':
+                        rect = rect.convert('RGBA')
                     
-                    # Adjust Rectangle 7 size and position
-                    rect_width = int(template_width * 0.4)  # Increased from 0.3
-                    rect_height = int(template_height * 0.25)  # Increased from 0.2
-                    rect_7 = rect_7.resize((rect_width, rect_height), Image.Resampling.LANCZOS)
+                    # Calculate dimensions for vertical rectangle (taller than wide)
+                    rect_width = int(template_width * 0.25)  # 25% of template width
+                    rect_height = int(template_height * 0.6)  # 60% of template height
+                    rect = rect.resize((rect_width, rect_height), Image.Resampling.LANCZOS)
+                    
+                    # Position the rectangle on the left side with proper padding
+                    padding_left = int(template_width * 0.05)  # 5% padding from left
+                    padding_top = int(template_height * 0.1)   # 10% padding from top
                     
                     # Create a temporary image for proper alpha compositing
                     temp = Image.new('RGBA', template.size, (0, 0, 0, 0))
-                    temp.paste(rect_7, (20, 20))  # Add 20px padding from edges
+                    temp.paste(rect, (padding_left, padding_top))
                     
                     # Convert template to RGBA for proper compositing
                     template = Image.alpha_composite(template.convert('RGBA'), temp)
                 except Exception as e:
-                    logging.error(f"Error adding Rectangle 7 background: {str(e)}")
+                    logging.error(f"Error adding vertical rectangle background: {str(e)}")
             
             # Convert back to RGB for further processing
             template = template.convert('RGB')
