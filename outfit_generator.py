@@ -75,30 +75,61 @@ def generate_outfit(clothing_items, size, style, gender):
     
     # If we have a complete outfit, create a merged image
     if len(selected_outfit) == 3:  # We have all three items
-        # Create a new image with white background
-        width = 200
-        total_height = 600
-        merged_image = Image.new('RGB', (width, total_height), (255, 255, 255))
-        
-        # Add each clothing item to the merged image
-        for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
-            try:
-                item_img = Image.open(selected_outfit[item_type]['image_path'])
-                # Resize while maintaining aspect ratio
-                item_img.thumbnail((width, 200))
-                # Calculate position to center horizontally
-                x_position = (width - item_img.size[0]) // 2
-                # Paste the image vertically
-                merged_image.paste(item_img, (x_position, i * 200))
-            except Exception as e:
-                logging.error(f"Error processing {item_type} image: {str(e)}")
-        
-        # Save the merged image
-        merged_filename = f"outfit_{uuid.uuid4()}.png"
-        merged_path = os.path.join('merged_outfits', merged_filename)
-        merged_image.save(merged_path)
-        
-        # Add the merged image path to the outfit dictionary
-        selected_outfit['merged_image_path'] = merged_path
+        try:
+            # Load the template image
+            template = Image.open('yoyo.png')
+            template_width, template_height = template.size
+            
+            # Calculate vertical spacing
+            item_height = template_height // 4  # Divide height into 4 sections (3 items + spacing)
+            vertical_spacing = item_height // 4
+            
+            # Create a new image using the template
+            merged_image = template.copy()
+            
+            # Add each clothing item to the merged image
+            for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
+                try:
+                    item_img = Image.open(selected_outfit[item_type]['image_path'])
+                    
+                    # Calculate dimensions while maintaining aspect ratio
+                    aspect_ratio = item_img.size[0] / item_img.size[1]
+                    new_height = int(item_height * 0.8)  # 80% of section height
+                    new_width = int(new_height * aspect_ratio)
+                    
+                    # Ensure width doesn't exceed template width
+                    if new_width > template_width * 0.8:
+                        new_width = int(template_width * 0.8)
+                        new_height = int(new_width / aspect_ratio)
+                    
+                    # Resize the item image
+                    item_img = item_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                    
+                    # Calculate position to center horizontally
+                    x_position = (template_width - new_width) // 2
+                    y_position = (item_height * i) + vertical_spacing
+                    
+                    # Create a mask for transparency
+                    if item_img.mode == 'RGBA':
+                        mask = item_img.split()[3]
+                    else:
+                        mask = None
+                    
+                    # Paste the item image
+                    merged_image.paste(item_img, (x_position, y_position), mask)
+                    
+                except Exception as e:
+                    logging.error(f"Error processing {item_type} image: {str(e)}")
+            
+            # Save the merged image
+            merged_filename = f"outfit_{uuid.uuid4()}.png"
+            merged_path = os.path.join('merged_outfits', merged_filename)
+            merged_image.save(merged_path)
+            
+            # Add the merged image path to the outfit dictionary
+            selected_outfit['merged_image_path'] = merged_path
+            
+        except Exception as e:
+            logging.error(f"Error creating merged outfit image: {str(e)}")
     
     return selected_outfit, missing_items
