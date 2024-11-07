@@ -358,6 +358,14 @@ def main_page():
         if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
             st.image(outfit['merged_image_path'], use_column_width=True)
             
+            # Add shopping buttons
+            st.markdown("### Shop Items")
+            shop_cols = st.columns(3)
+            for idx, (item_type, item) in enumerate(outfit.items()):
+                if item_type != 'merged_image_path' and item.get('hyperlink'):
+                    with shop_cols[idx]:
+                        st.link_button(f"Shop {item_type.capitalize()}", item['hyperlink'])
+            
             # Display individual item colors
             st.markdown("### Item Colors")
             cols = st.columns(3)
