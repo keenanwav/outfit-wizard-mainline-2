@@ -284,78 +284,74 @@ def main_page():
             if current_outfit:
                 if 'merged_image_path' in current_outfit:
                     with st.container():
-                        st.image(current_outfit['merged_image_path'], width=600)  # Increased from 400
+                        # Create two columns for the outfit display
+                        outfit_col1, outfit_col2 = st.columns([1, 3])
                         
-                        button_cols = st.columns(3)
-                        for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
-                            with button_cols[i]:
-                                if item_type in current_outfit:
-                                    if 'hyperlink' in current_outfit[item_type] and current_outfit[item_type]['hyperlink']:
-                                        st.markdown(f"<a href='{current_outfit[item_type]['hyperlink']}' target='_blank'><button style='width:100%; padding: 4px;'>Shop {item_type.title()}</button></a>", unsafe_allow_html=True)
-                                    
-                                    item_color = get_color_palette(current_outfit[item_type]['image_path'], n_colors=1)
-                                    if item_color is not None:
-                                        hex_color = rgb_to_hex(item_color[0])
-                                        st.markdown(f"""
-                                            <div style="display: flex; align-items: center; gap: 4px; margin-top: 4px;">
-                                                <div style="width: 20px; height: 20px; background-color: {hex_color}; border-radius: 4px;"></div>
-                                                <span style="font-size: 12px;">{hex_color}</span>
-                                            </div>
-                                        """, unsafe_allow_html=True)
-                
-                if st.button("Save Outfit", key="save_outfit"):
-                    saved_path = save_outfit(current_outfit)
-                    if saved_path:
-                        st.success("Outfit saved!")
-                        logging.info("Successfully saved outfit")
-                    else:
-                        st.error("Failed to save outfit")
-                        
-    except Exception as e:
-        st.error("An error occurred while generating the outfit")
-        logging.error(f"Error in main page: {str(e)}")
+                        with outfit_col1:
+                            # Add the "Shop Shirt" button in the vertical rectangle area
+                            if 'shirt' in current_outfit and 'hyperlink' in current_outfit['shirt'] and current_outfit['shirt']['hyperlink']:
+                                st.markdown(
+                                    f"""
+                                    <div style='
+                                        background-color: rgba(255, 255, 255, 0.5);
+                                        padding: 10px;
+                                        border-radius: 5px;
+                                        margin-top: 60px;
+                                        text-align: center;
+                                    '>
+                                        <a href='{current_outfit['shirt']['hyperlink']}' target='_blank'>
+                                            <button style='
+                                                width: 100%;
+                                                padding: 8px;
+                                                background-color: #f0f2f6;
+                                                border: none;
+                                                border-radius: 5px;
+                                                cursor: pointer;
+                                            '>
+                                                Shop Shirt
+                                            </button>
+                                        </a>
+                                    </div>
+                                    """,
+                                    unsafe_allow_html=True
+                                )
 
-def saved_outfits_page():
-    st.title("Saved Outfits 💾")
-    try:
-        outfits = load_saved_outfits()
-        if outfits:
-            for outfit in outfits:
-                if os.path.exists(outfit['image_path']):
-                    st.write(f"Saved on: {outfit['date']}")
-                    st.image(outfit['image_path'])
-                else:
-                    st.error(f"Image not found: {outfit['image_path']}")
-                    logging.error(f"Missing saved outfit image: {outfit['image_path']}")
-        else:
-            st.info("No saved outfits yet.")
+                        with outfit_col2:
+                            st.image(current_outfit['merged_image_path'], width=600)
+                            
+                            # Only show pants and shoes buttons below the image
+                            button_cols = st.columns(2)
+                            remaining_items = ['pants', 'shoes']
+                            for i, item_type in enumerate(remaining_items):
+                                with button_cols[i]:
+                                    if item_type in current_outfit:
+                                        if 'hyperlink' in current_outfit[item_type] and current_outfit[item_type]['hyperlink']:
+                                            st.markdown(f"<a href='{current_outfit[item_type]['hyperlink']}' target='_blank'><button style='width:100%; padding: 4px;'>Shop {item_type.title()}</button></a>", unsafe_allow_html=True)
+                                        
+                                        item_color = get_color_palette(current_outfit[item_type]['image_path'], n_colors=1)
+                                        if item_color is not None:
+                                            hex_color = rgb_to_hex(item_color[0])
+                                            st.markdown(f"""
+                                                <div style="display: flex; align-items: center; gap: 4px; margin-top: 4px;">
+                                                    <div style="width: 20px; height: 20px; background-color: {hex_color}; border-radius: 4px;"></div>
+                                                    <span style="font-size: 12px;">{hex_color}</span>
+                                                </div>
+                                            """, unsafe_allow_html=True)
+                            
+                            if missing_items:
+                                st.warning(f"Missing items: {', '.join(missing_items)}")
     except Exception as e:
-        st.error("Error loading saved outfits")
-        logging.error(f"Error loading saved outfits: {str(e)}")
+        st.error(f"Error: {str(e)}")
+        logging.error(f"Error in main page: {str(e)}")
 
 def rgb_to_hex(rgb):
     return '#{:02x}{:02x}{:02x}'.format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
 
-def main():
-    if 'current_outfit' not in st.session_state:
-        st.session_state.current_outfit = None
-    if 'missing_items' not in st.session_state:
-        st.session_state.missing_items = []
-    
-    st.sidebar.title("Navigation")
-    pages = {
-        "Home": main_page,
-        "My Wardrobe": personal_wardrobe_page,
-        "Saved Outfits": saved_outfits_page
-    }
-    
-    page = st.sidebar.radio("Go to", list(pages.keys()))
-    
-    try:
-        pages[page]()
-    except Exception as e:
-        st.error("An error occurred while loading the page")
-        logging.error(f"Error loading page {page}: {str(e)}")
+# Create tabs for navigation
+tab1, tab2 = st.tabs(["Generate Outfit", "My Wardrobe"])
 
-if __name__ == "__main__":
-    main()
+with tab1:
+    main_page()
+
+with tab2:
+    personal_wardrobe_page()
