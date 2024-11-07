@@ -24,9 +24,41 @@ logging.basicConfig(
 
 st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
 
+# Initialize session state for first visit
+if 'first_visit' not in st.session_state:
+    st.session_state.first_visit = True
+
 if 'last_cleanup_time' not in st.session_state:
     st.session_state.last_cleanup_time = datetime.now()
     cleanup_merged_outfits()
+
+def show_first_visit_tips():
+    if st.session_state.first_visit:
+        with st.sidebar:
+            with st.container():
+                st.markdown("""
+                <div style="
+                    background-color: #f0f2f6;
+                    padding: 20px;
+                    border-radius: 10px;
+                    border-left: 5px solid #ff4b4b;
+                    margin-bottom: 20px;
+                ">
+                    <h4 style="color: #ff4b4b; margin-top: 0;">👋 Welcome to Outfit Wizard!</h4>
+                    <p><b>Quick Tips to Get Started:</b></p>
+                    <ul>
+                        <li>Upload your clothing items in "My Personal Wardrobe"</li>
+                        <li>Add details like style, size, and season for better recommendations</li>
+                        <li>Generate outfits based on your preferences</li>
+                        <li>Save your favorite combinations</li>
+                        <li>Use tags to organize your wardrobe</li>
+                    </ul>
+                    <small>You can close this message by clicking the X below.</small>
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button("✕ Don't show again"):
+                    st.session_state.first_visit = False
+                    st.rerun()
 
 def check_cleanup_needed():
     current_time = datetime.now()
@@ -66,6 +98,9 @@ def personal_wardrobe_page():
         logging.error(f"Error creating user items table: {str(e)}")
         st.error("Error initializing wardrobe. Please try again later.")
         return
+
+    # Show first visit tips
+    show_first_visit_tips()
     
     tabs = st.tabs(["Upload New Item", "My Items"])
     
@@ -370,6 +405,9 @@ def main_page():
     st.title("Outfit Wizard 🧙‍♂️👚👖👞")
     
     try:
+        # Show first visit tips
+        show_first_visit_tips()
+        
         check_cleanup_needed()
         
         clothing_items = load_clothing_items()
@@ -429,6 +467,10 @@ def main_page():
 
 def saved_outfits_page():
     st.title("Saved Outfits 💾")
+    
+    # Show first visit tips
+    show_first_visit_tips()
+    
     outfits = load_saved_outfits()
     
     if not outfits:
