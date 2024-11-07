@@ -78,35 +78,6 @@ def generate_outfit(clothing_items, size, style, gender):
             background_color = (174, 162, 150)  # HEX AEA296 in RGB
             template = Image.new('RGB', (template_width, template_height), background_color)
             
-            # Add vertical rectangle with rounded edges background
-            rect_path = 'vertical Rectangle rounded edges.png'
-            if os.path.exists(rect_path):
-                try:
-                    rect = Image.open(rect_path)
-                    if rect.mode != 'RGBA':
-                        rect = rect.convert('RGBA')
-                    
-                    # Calculate dimensions for vertical rectangle (taller than wide)
-                    rect_width = int(template_width * 0.25)  # 25% of template width
-                    rect_height = int(template_height * 0.6)  # 60% of template height
-                    rect = rect.resize((rect_width, rect_height), Image.Resampling.LANCZOS)
-                    
-                    # Position the rectangle on the left side with proper padding
-                    padding_left = int(template_width * 0.05)  # 5% padding from left
-                    padding_top = int(template_height * 0.1)   # 10% padding from top
-                    
-                    # Create a temporary image for proper alpha compositing
-                    temp = Image.new('RGBA', template.size, (0, 0, 0, 0))
-                    temp.paste(rect, (padding_left, padding_top))
-                    
-                    # Convert template to RGBA for proper compositing
-                    template = Image.alpha_composite(template.convert('RGBA'), temp)
-                except Exception as e:
-                    logging.error(f"Error adding vertical rectangle background: {str(e)}")
-            
-            # Convert back to RGB for further processing
-            template = template.convert('RGB')
-            
             # Adjust template height while maintaining proportions
             new_template_height = int(template_height * 0.8)  # Increased from 0.7 for better vertical space usage
             template = template.resize((template_width, new_template_height))
