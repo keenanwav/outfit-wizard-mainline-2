@@ -7,7 +7,7 @@ from collections import Counter
 from data_manager import (
     load_clothing_items, save_outfit, load_saved_outfits,
     edit_clothing_item, delete_clothing_item, create_user_items_table,
-    add_user_clothing_item, store_user_preference, update_outfit_details,
+    add_user_clothing_item, update_outfit_details,
     get_outfit_details, update_item_details
 )
 from sklearn.preprocessing import LabelEncoder
@@ -111,7 +111,7 @@ def personal_wardrobe_page():
                 if size_cols[i].checkbox(size, key=f"size_{size}"):
                     sizes.append(size)
 
-            # New organization fields
+            # Organization fields
             st.write("Season:")
             season = st.selectbox("Select Season", ["", "Spring", "Summer", "Fall", "Winter"])
             
@@ -180,9 +180,46 @@ def personal_wardrobe_page():
                 st.info("No clothing items found.")
                 return
 
+            # Add filter options
+            st.sidebar.header("Filter Items")
+            
+            # Collect all unique tags and seasons
+            all_tags = set()
+            all_seasons = set()
+            for _, item in personal_items.iterrows():
+                if item.get('tags'):
+                    all_tags.update(item['tags'])
+                if item.get('season'):
+                    all_seasons.add(item['season'])
+            
+            # Filter by season
+            selected_season = st.sidebar.selectbox(
+                "Filter by Season",
+                ["All"] + sorted(list(all_seasons)),
+                key="filter_items_season"
+            )
+            
+            # Filter by tags
+            selected_tags = st.sidebar.multiselect(
+                "Filter by Tags",
+                sorted(list(all_tags)),
+                key="filter_items_tags"
+            )
+            
+            # Apply filters
+            filtered_items = personal_items
+            if selected_season != "All":
+                filtered_items = filtered_items[filtered_items['season'] == selected_season]
+            if selected_tags:
+                filtered_items = filtered_items[
+                    filtered_items['tags'].apply(
+                        lambda x: x is not None and any(tag in x for tag in selected_tags)
+                    )
+                ]
+
             item_types = ["shirt", "pants", "shoes"]
             for item_type in item_types:
-                type_items = personal_items[personal_items['type'] == item_type]
+                type_items = filtered_items[filtered_items['type'] == item_type]
                 if len(type_items) > 0:
                     st.subheader(f"{item_type.title()}s")
                     n_items = len(type_items)
@@ -200,6 +237,15 @@ def personal_wardrobe_page():
                                             st.image(item['image_path'], use_column_width=True)
                                         else:
                                             st.error(f"Image not found")
+                                        
+                                        # Display organization details
+                                        if item.get('season'):
+                                            st.caption(f"Season: {item['season']}")
+                                        if item.get('tags'):
+                                            st.caption(f"Tags: {', '.join(item['tags'])}")
+                                        if item.get('notes'):
+                                            with st.expander("Notes"):
+                                                st.write(item['notes'])
                                         
                                         if item.get('hyperlink'):
                                             st.markdown(f"[Shop Item]({item['hyperlink']})")
@@ -383,68 +429,110 @@ def main_page():
 
 def saved_outfits_page():
     st.title("Saved Outfits 💾")
-    try:
-        outfits = load_saved_outfits()
-        if outfits:
-            for outfit in outfits:
-                with st.container():
-                    cols = st.columns([2, 1])
-                    
-                    with cols[0]:
+    outfits = load_saved_outfits()
+    
+    if not outfits:
+        st.info("No saved outfits found.")
+        return
+    
+    # Add filter options
+    st.sidebar.header("Filter Outfits")
+    
+    # Collect all unique tags and seasons
+    all_tags = set()
+    all_seasons = set()
+    for outfit in outfits:
+        if outfit.get('tags'):
+            all_tags.update(outfit['tags'])
+        if outfit.get('season'):
+            all_seasons.add(outfit['season'])
+    
+    # Filter by season
+    selected_season = st.sidebar.selectbox(
+        "Filter by Season",
+        ["All"] + sorted(list(all_seasons)),
+        key="filter_season"
+    )
+    
+    # Filter by tags
+    selected_tags = st.sidebar.multiselect(
+        "Filter by Tags",
+        sorted(list(all_tags)),
+        key="filter_tags"
+    )
+    
+    # Apply filters
+    filtered_outfits = outfits
+    if selected_season != "All":
+        filtered_outfits = [outfit for outfit in filtered_outfits if outfit.get('season') == selected_season]
+    if selected_tags:
+        filtered_outfits = [
+            outfit for outfit in filtered_outfits 
+            if outfit.get('tags') and any(tag in outfit['tags'] for tag in selected_tags)
+        ]
+    
+    # Display outfits in a grid layout
+    cols_per_row = 3
+    n_outfits = len(filtered_outfits)
+    n_rows = (n_outfits + cols_per_row - 1) // cols_per_row
+    
+    for row in range(n_rows):
+        cols = st.columns(cols_per_row)
+        for col in range(cols_per_row):
+            idx = row * cols_per_row + col
+            if idx < n_outfits:
+                outfit = filtered_outfits[idx]
+                with cols[col]:
+                    with st.container():
                         if os.path.exists(outfit['image_path']):
-                            st.image(outfit['image_path'], width=400)
-                        else:
-                            st.error(f"Image not found: {outfit['image_path']}")
-                    
-                    with cols[1]:
-                        with st.expander("Outfit Details", expanded=True):
-                            outfit_details = get_outfit_details(outfit['outfit_id'])
+                            st.image(outfit['image_path'], use_column_width=True)
                             
-                            seasons = ["Spring", "Summer", "Fall", "Winter"]
-                            current_season = outfit_details.get('season', '') if outfit_details else ''
-                            new_season = st.selectbox(
-                                "Season",
-                                [""] + seasons,
-                                index=seasons.index(current_season) + 1 if current_season in seasons else 0,
-                                key=f"season_{outfit['outfit_id']}"
-                            )
+                            # Display organization details
+                            if outfit.get('season'):
+                                st.caption(f"Season: {outfit['season']}")
+                            if outfit.get('tags'):
+                                st.caption(f"Tags: {', '.join(outfit['tags'])}")
+                            if outfit.get('notes'):
+                                with st.expander("Notes"):
+                                    st.write(outfit['notes'])
                             
-                            current_tags = outfit_details.get('tags', []) if outfit_details else []
-                            new_tags = st.text_input(
-                                "Tags (comma-separated)",
-                                value=','.join(current_tags) if current_tags else '',
-                                help="Example: casual,favorite,work",
-                                key=f"tags_{outfit['outfit_id']}"
-                            ).split(',')
-                            new_tags = [tag.strip() for tag in new_tags if tag.strip()]
-                            
-                            current_notes = outfit_details.get('notes', '') if outfit_details else ''
-                            new_notes = st.text_area(
-                                "Notes",
-                                value=current_notes,
-                                help="Add any additional notes about this outfit",
-                                key=f"notes_{outfit['outfit_id']}"
-                            )
-                            
-                            if st.button("Update Details", key=f"update_{outfit['outfit_id']}"):
-                                success, message = update_outfit_details(
-                                    outfit['outfit_id'],
-                                    new_tags if new_tags else None,
-                                    new_season if new_season else None,
-                                    new_notes if new_notes.strip() else None
+                            # Add edit button for organization details
+                            with st.expander("Edit Details"):
+                                new_season = st.selectbox(
+                                    "Season",
+                                    ["", "Spring", "Summer", "Fall", "Winter"],
+                                    index=["", "Spring", "Summer", "Fall", "Winter"].index(outfit.get('season', '')) if outfit.get('season') else 0,
+                                    key=f"season_{outfit['outfit_id']}"
                                 )
-                                if success:
-                                    st.success("Outfit details updated successfully")
-                                    st.experimental_rerun()
-                                else:
-                                    st.error(f"Error updating outfit details: {message}")
-                    
-                    st.markdown("---")
-        else:
-            st.info("No saved outfits yet.")
-    except Exception as e:
-        st.error("Error loading saved outfits")
-        logging.error(f"Error loading saved outfits: {str(e)}")
+                                
+                                new_tags = st.text_input(
+                                    "Tags (comma-separated)",
+                                    value=','.join(outfit.get('tags', [])),
+                                    help="Example: casual,favorite,work",
+                                    key=f"tags_{outfit['outfit_id']}"
+                                ).split(',')
+                                new_tags = [tag.strip() for tag in new_tags if tag.strip()]
+                                
+                                new_notes = st.text_area(
+                                    "Notes",
+                                    value=outfit.get('notes', ''),
+                                    key=f"notes_{outfit['outfit_id']}"
+                                )
+                                
+                                if st.button("Update", key=f"update_{outfit['outfit_id']}"):
+                                    success, message = update_outfit_details(
+                                        outfit['outfit_id'],
+                                        new_tags if new_tags else None,
+                                        new_season if new_season else None,
+                                        new_notes if new_notes.strip() else None
+                                    )
+                                    if success:
+                                        st.success("Outfit details updated successfully")
+                                        st.experimental_rerun()
+                                    else:
+                                        st.error(f"Error updating outfit details: {message}")
+                        else:
+                            st.error("Image not found")
 
 def main():
     if 'current_outfit' not in st.session_state:
