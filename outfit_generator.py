@@ -78,6 +78,31 @@ def generate_outfit(clothing_items, size, style, gender):
             background_color = (174, 162, 150)  # HEX AEA296 in RGB
             template = Image.new('RGB', (template_width, template_height), background_color)
             
+            # Add Rectangle 7 background with improved error handling and positioning
+            rect_7_path = 'Rectangle 7.png'
+            if os.path.exists(rect_7_path):
+                try:
+                    rect_7 = Image.open(rect_7_path)
+                    if rect_7.mode != 'RGBA':
+                        rect_7 = rect_7.convert('RGBA')
+                    
+                    # Adjust Rectangle 7 size and position
+                    rect_width = int(template_width * 0.4)  # Increased from 0.3
+                    rect_height = int(template_height * 0.25)  # Increased from 0.2
+                    rect_7 = rect_7.resize((rect_width, rect_height), Image.Resampling.LANCZOS)
+                    
+                    # Create a temporary image for proper alpha compositing
+                    temp = Image.new('RGBA', template.size, (0, 0, 0, 0))
+                    temp.paste(rect_7, (20, 20))  # Add 20px padding from edges
+                    
+                    # Convert template to RGBA for proper compositing
+                    template = Image.alpha_composite(template.convert('RGBA'), temp)
+                except Exception as e:
+                    logging.error(f"Error adding Rectangle 7 background: {str(e)}")
+            
+            # Convert back to RGB for further processing
+            template = template.convert('RGB')
+            
             # Adjust template height while maintaining proportions
             new_template_height = int(template_height * 0.8)  # Increased from 0.7 for better vertical space usage
             template = template.resize((template_width, new_template_height))
