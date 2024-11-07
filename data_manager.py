@@ -363,3 +363,33 @@ def load_saved_outfits():
     finally:
         cur.close()
         conn.close()
+
+def delete_saved_outfit(outfit_id):
+    """Delete a saved outfit and its associated image"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get the image path before deleting
+        cur.execute("SELECT image_path FROM saved_outfits WHERE outfit_id = %s", (outfit_id,))
+        outfit = cur.fetchone()
+        
+        if outfit and outfit[0]:
+            image_path = outfit[0]
+            # Delete from database
+            cur.execute("DELETE FROM saved_outfits WHERE outfit_id = %s", (outfit_id,))
+            conn.commit()
+            
+            # Delete image file if it exists
+            if os.path.exists(image_path):
+                os.remove(image_path)
+            
+            return True, f"Outfit {outfit_id} deleted successfully"
+        return False, f"Outfit {outfit_id} not found"
+        
+    except Exception as e:
+        conn.rollback()
+        return False, str(e)
+    finally:
+        cur.close()
+        conn.close()

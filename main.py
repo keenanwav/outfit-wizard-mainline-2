@@ -8,7 +8,7 @@ from data_manager import (
     load_clothing_items, save_outfit, load_saved_outfits,
     edit_clothing_item, delete_clothing_item, create_user_items_table,
     add_user_clothing_item, update_outfit_details,
-    get_outfit_details, update_item_details
+    get_outfit_details, update_item_details, delete_saved_outfit
 )
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
@@ -476,6 +476,37 @@ def saved_outfits_page():
     n_outfits = len(filtered_outfits)
     n_rows = (n_outfits + cols_per_row - 1) // cols_per_row
     
+    # Custom CSS for delete button
+    st.markdown("""
+        <style>
+        .delete-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: rgba(255, 0, 0, 0.7);
+            color: white;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 20px;
+            transition: background-color 0.3s;
+            z-index: 1000;
+        }
+        .delete-button:hover {
+            background-color: rgba(255, 0, 0, 0.9);
+        }
+        .outfit-container {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
     for row in range(n_rows):
         cols = st.columns(cols_per_row)
         for col in range(cols_per_row):
@@ -485,6 +516,17 @@ def saved_outfits_page():
                 with cols[col]:
                     with st.container():
                         if os.path.exists(outfit['image_path']):
+                            # Add delete button
+                            st.markdown(
+                                f"""
+                                <div class="outfit-container">
+                                    <button class="delete-button" 
+                                            onclick="document.dispatchEvent(new CustomEvent('delete_outfit', {{detail: '{outfit["outfit_id"]}}}))"
+                                            title="Delete outfit">×</button>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
                             st.image(outfit['image_path'], use_column_width=True)
                             
                             # Display organization details
@@ -531,8 +573,26 @@ def saved_outfits_page():
                                         st.experimental_rerun()
                                     else:
                                         st.error(f"Error updating outfit details: {message}")
+                            
+                            # Add delete button functionality
+                            if st.button("Delete", key=f"delete_{outfit['outfit_id']}"):
+                                success, message = delete_saved_outfit(outfit['outfit_id'])
+                                if success:
+                                    st.success(message)
+                                    st.experimental_rerun()
+                                else:
+                                    st.error(message)
                         else:
                             st.error("Image not found")
+                            
+                            # Add delete button for cleanup
+                            if st.button("Remove broken outfit", key=f"delete_{outfit['outfit_id']}"):
+                                success, message = delete_saved_outfit(outfit['outfit_id'])
+                                if success:
+                                    st.success(message)
+                                    st.experimental_rerun()
+                                else:
+                                    st.error(message)
 
 def main():
     if 'current_outfit' not in st.session_state:
