@@ -12,7 +12,7 @@ from data_manager import (
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
-from color_utils import get_color_palette, display_color_palette
+from color_utils import get_color_palette, display_color_palette, rgb_to_hex
 from outfit_generator import generate_outfit, cleanup_merged_outfits
 from datetime import datetime
 
@@ -22,6 +22,10 @@ logging.basicConfig(
 )
 
 st.set_page_config(page_title="Outfit Wizard", page_icon="👕", layout="wide")
+
+# Initialize theme in session state if not present
+if 'theme' not in st.session_state:
+    st.session_state.theme = "light"
 
 if 'last_cleanup_time' not in st.session_state:
     st.session_state.last_cleanup_time = datetime.now()
@@ -36,6 +40,28 @@ def check_cleanup_needed():
         st.session_state.last_cleanup_time = current_time
         if cleanup_count > 0:
             logging.info(f"Periodic cleanup removed {cleanup_count} old outfit files")
+
+def toggle_theme():
+    st.session_state.theme = "dark" if st.session_state.theme == "light" else "light"
+    # Apply theme changes
+    if st.session_state.theme == "dark":
+        st.markdown("""
+            <style>
+            .stApp {
+                background-color: #0E1117;
+                color: #FAFAFA;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+            <style>
+            .stApp {
+                background-color: #FFFFFF;
+                color: #000000;
+            }
+            </style>
+        """, unsafe_allow_html=True)
 
 def parse_color_string(color_string, default_color=(0, 0, 0)):
     try:
@@ -276,6 +302,11 @@ def main_page():
                 st.session_state.current_outfit = outfit
                 st.session_state.missing_items = missing_items
                 logging.info("Generated new outfit")
+                
+            # Add theme toggle button under Generate New Outfit
+            theme_icon = "🌙" if st.session_state.theme == "light" else "☀️"
+            if st.sidebar.button(f"Toggle {theme_icon} Theme"):
+                toggle_theme()
         
         with col2:
             current_outfit = st.session_state.get('current_outfit')
@@ -284,25 +315,21 @@ def main_page():
             if current_outfit:
                 if 'merged_image_path' in current_outfit:
                     with st.container():
-                        st.image(current_outfit['merged_image_path'], width=600)  # Increased from 400
+                        st.image(current_outfit['merged_image_path'], width=600)
                         
                         button_cols = st.columns(3)
                         for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
-                            with button_cols[i]:
-                                if item_type in current_outfit:
-                                    if 'hyperlink' in current_outfit[item_type] and current_outfit[item_type]['hyperlink']:
-                                        st.markdown(f"<a href='{current_outfit[item_type]['hyperlink']}' target='_blank'><button style='width:100%; padding: 4px;'>Shop {item_type.title()}</button></a>", unsafe_allow_html=True)
-                                    
-                                    item_color = get_color_palette(current_outfit[item_type]['image_path'], n_colors=1)
-                                    if item_color is not None:
-                                        hex_color = rgb_to_hex(item_color[0])
-                                        st.markdown(f"""
-                                            <div style="display: flex; align-items: center; gap: 4px; margin-top: 4px;">
-                                                <div style="width: 20px; height: 20px; background-color: {hex_color}; border-radius: 4px;"></div>
-                                                <span style="font-size: 12px;">{hex_color}</span>
-                                            </div>
-                                        """, unsafe_allow_html=True)
-                
+                            if item_type in current_outfit:
+                                with button_cols[i]:
+                                    color = parse_color_string(current_outfit[item_type]['color'])
+                                    hex_color = rgb_to_hex(color)
+                                    st.markdown(f"""
+                                        <div style="display: flex; align-items: center; gap: 4px; margin-top: 4px;">
+                                            <div style="width: 20px; height: 20px; background-color: {hex_color}; border-radius: 4px;"></div>
+                                            <span>{hex_color}</span>
+                                        </div>
+                                    """, unsafe_allow_html=True)
+
                 if st.button("Save Outfit", key="save_outfit"):
                     saved_path = save_outfit(current_outfit)
                     if saved_path:
@@ -310,7 +337,13 @@ def main_page():
                         logging.info("Successfully saved outfit")
                     else:
                         st.error("Failed to save outfit")
-                        
+                        logging.error("Failed to save outfit")
+            elif missing_items:
+                st.warning(f"Missing items: {', '.join(missing_items)}")
+                logging.warning(f"Missing items in outfit generation: {missing_items}")
+            else:
+                st.info("Click 'Generate New Outfit' to create your first outfit!")
+                
     except Exception as e:
         st.error("An error occurred while generating the outfit")
         logging.error(f"Error in main page: {str(e)}")
@@ -332,9 +365,6 @@ def saved_outfits_page():
     except Exception as e:
         st.error("Error loading saved outfits")
         logging.error(f"Error loading saved outfits: {str(e)}")
-
-def rgb_to_hex(rgb):
-    return '#{:02x}{:02x}{:02x}'.format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
 
 def main():
     if 'current_outfit' not in st.session_state:
