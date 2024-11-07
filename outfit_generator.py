@@ -77,7 +77,7 @@ def generate_outfit(clothing_items, size, style, gender):
     if len(selected_outfit) == 3:  # We have all three items
         try:
             # Load the template image
-            template = Image.open('yoyo 2.png')
+            template = Image.open('yoyo.png')
             template_width, template_height = template.size
             
             # Calculate vertical spacing
