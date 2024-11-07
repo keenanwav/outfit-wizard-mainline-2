@@ -284,7 +284,7 @@ def main_page():
             if current_outfit:
                 if 'merged_image_path' in current_outfit:
                     with st.container():
-                        st.image(current_outfit['merged_image_path'], width=400)
+                        st.image(current_outfit['merged_image_path'], width=600)  # Increased from 400
                         
                         button_cols = st.columns(3)
                         for i, item_type in enumerate(['shirt', 'pants', 'shoes']):

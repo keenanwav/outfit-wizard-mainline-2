@@ -72,37 +72,37 @@ def generate_outfit(clothing_items, size, style, gender):
     
     if len(selected_outfit) == 3:  # We have all three items
         try:
-            # Create a new image with the specified background color
-            template_width = 800
-            template_height = 1000
+            # Increase template dimensions for larger display
+            template_width = 1000  # Increased from 800
+            template_height = 1200  # Increased from 1000
             background_color = (174, 162, 150)  # HEX AEA296 in RGB
             template = Image.new('RGB', (template_width, template_height), background_color)
             
-            # Make template more compact by reducing height
-            new_template_height = int(template_height * 0.7)  # Reduce template height
+            # Adjust template height while maintaining proportions
+            new_template_height = int(template_height * 0.8)  # Increased from 0.7 for better vertical space usage
             template = template.resize((template_width, new_template_height))
             template_width, template_height = template.size
             
-            # Calculate vertical spacing (reduced)
-            item_height = template_height // 5  # Smaller sections
-            vertical_spacing = item_height // 8  # Reduced spacing
+            # Optimize vertical spacing
+            item_height = template_height // 4  # Increased from 5 for larger items
+            vertical_spacing = item_height // 6  # Adjusted for better distribution
             
             # Create a new image using the template
             merged_image = template.copy()
             
-            # Add each clothing item to the merged image
+            # Add each clothing item to the merged image with improved sizing
             for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
                 try:
                     item_img = Image.open(selected_outfit[item_type]['image_path'])
                     
-                    # Calculate dimensions while maintaining aspect ratio
+                    # Calculate dimensions with improved scaling
                     aspect_ratio = item_img.size[0] / item_img.size[1]
-                    new_height = int(item_height * 0.9)  # Increased from 0.8 to 0.9 to use more vertical space
+                    new_height = int(item_height * 1.1)  # Increased from 0.9 for larger items
                     new_width = int(new_height * aspect_ratio)
                     
-                    # Ensure width doesn't exceed template width
-                    if new_width > template_width * 0.8:
-                        new_width = int(template_width * 0.8)
+                    # Ensure width doesn't exceed template width while maintaining good size
+                    if new_width > template_width * 0.9:  # Increased from 0.8 for larger items
+                        new_width = int(template_width * 0.9)
                         new_height = int(new_width / aspect_ratio)
                     
                     # Resize the item image
