@@ -6,9 +6,9 @@ import pandas as pd
 from collections import Counter
 from data_manager import (
     load_clothing_items, save_outfit, load_saved_outfits,
-    edit_clothing_item, delete_clothing_item, create_user_items_table,
+    delete_clothing_item, create_user_items_table,
     add_user_clothing_item, update_outfit_details,
-    get_outfit_details, update_item_details, delete_saved_outfit
+    update_item_details, delete_saved_outfit
 )
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
@@ -281,12 +281,11 @@ def personal_wardrobe_page():
                             # Edit/Delete buttons
                             edit_col, del_col = st.columns([3, 1])
                             with edit_col:
-                                if st.button(f"Edit Details {idx}"):
-                                    st.session_state.editing_item = item
-                                    
+                                st.button(f"Edit Details {idx}")
+                            
                             with del_col:
                                 if st.button(f"🗑️ {idx}"):
-                                    success, message = delete_clothing_item(item['id'])
+                                    success, message = delete_clothing_item(int(item['id']))
                                     if success:
                                         st.success(message)
                                         st.experimental_rerun()
@@ -295,8 +294,8 @@ def personal_wardrobe_page():
                             
                             # Display item details
                             color = parse_color_string(item['color'])
-                            st.markdown(f"**Style:** {item['style']}")
-                            st.markdown(f"**Size:** {item['size']}")
+                            st.markdown(f"**Style:** {', '.join(item['style'])}")
+                            st.markdown(f"**Size:** {', '.join(item['size'])}")
                             if item['hyperlink']:
                                 st.markdown(f"[Shop Link]({item['hyperlink']})")
                             
@@ -317,7 +316,7 @@ def personal_wardrobe_page():
                             
                             if st.button(f"Save Details {idx}"):
                                 success, message = update_item_details(
-                                    item['id'],
+                                    int(item['id']),
                                     tags=new_tags.split(',') if new_tags else None,
                                     season=season if season else None,
                                     notes=notes if notes else None
