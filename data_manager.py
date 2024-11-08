@@ -6,8 +6,6 @@ from psycopg2.extras import Json
 import logging
 import shutil
 from datetime import datetime
-import pandas as pd
-import numpy as np
 
 logging.basicConfig(level=logging.INFO)
 
