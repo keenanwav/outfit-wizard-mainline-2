@@ -192,7 +192,7 @@ def show_first_visit_tips():
             
             if st.checkbox("Don't show again"):
                 st.session_state.show_tips = False
-                st.experimental_rerun()
+                st.rerun()
 
 def check_cleanup_needed():
     """Check if cleanup is needed and perform it"""
@@ -255,7 +255,7 @@ def personal_wardrobe_page():
                     )
                     if success:
                         st.success(message)
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.error(message)
             
@@ -290,7 +290,7 @@ def personal_wardrobe_page():
                                     success, message = delete_clothing_item(int(item['id']))
                                     if success:
                                         st.success(message)
-                                        st.experimental_rerun()
+                                        st.rerun()
                                     else:
                                         st.error(message)
                             
@@ -325,7 +325,7 @@ def personal_wardrobe_page():
                                 )
                                 if success:
                                     st.success(message)
-                                    st.experimental_rerun()
+                                    st.rerun()
                                 else:
                                     st.error(message)
 
@@ -430,7 +430,7 @@ def saved_outfits_page():
                         )
                         if success:
                             st.success(message)
-                            st.experimental_rerun()
+                            st.rerun()
                         else:
                             st.error(message)
                 
@@ -439,7 +439,7 @@ def saved_outfits_page():
                         success, message = delete_saved_outfit(outfit['outfit_id'])
                         if success:
                             st.success(message)
-                            st.experimental_rerun()
+                            st.rerun()
                         else:
                             st.error(message)
 
@@ -458,12 +458,11 @@ def main():
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Go to", ["Generate Outfit", "My Items", "Saved Outfits"])
     
-    # Display selected page
     if page == "Generate Outfit":
         main_page()
     elif page == "My Items":
         personal_wardrobe_page()
-    else:
+    else:  # Saved Outfits
         saved_outfits_page()
 
 if __name__ == "__main__":
