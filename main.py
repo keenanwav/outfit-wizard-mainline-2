@@ -274,7 +274,7 @@ def personal_wardrobe_page():
                 # Create grid layout (3 items per row)
                 cols = st.columns(3)
                 for idx, item in type_items.iterrows():
-                    col = cols[idx % 3]
+                    col = cols[int(idx) % 3]
                     with col:
                         if os.path.exists(item['image_path']):
                             st.image(item['image_path'], use_column_width=True)
@@ -295,33 +295,33 @@ def personal_wardrobe_page():
                                         st.error(message)
                             
                             # Display item details
-                            color = parse_color_string(item['color'])
+                            color = parse_color_string(str(item['color']))
                             st.markdown(f"**Style:** {item['style']}")
                             st.markdown(f"**Size:** {item['size']}")
-                            if item['hyperlink']:
+                            if pd.notna(item['hyperlink']):
                                 st.markdown(f"[Shop Link]({item['hyperlink']})")
                             
                             # Organization features
-                            tags = item['tags'] if item['tags'] else []
+                            tags = item['tags'] if pd.notna(item['tags']) else []
                             new_tags = st.text_input(f"Tags {idx}", 
                                                    value=','.join(tags) if tags else "",
                                                    help="Comma-separated tags")
                             
+                            current_season = str(item['season']) if pd.notna(item['season']) else ""
                             season = st.selectbox(f"Season {idx}",
                                                 ["", "Spring", "Summer", "Fall", "Winter"],
-                                                index=0 if not item['season'] else 
-                                                ["", "Spring", "Summer", "Fall", "Winter"].index(item['season']))
+                                                index=["", "Spring", "Summer", "Fall", "Winter"].index(current_season) if current_season else 0)
                             
                             notes = st.text_area(f"Notes {idx}", 
-                                               value=item['notes'] if item['notes'] else "",
+                                               value=str(item['notes']) if pd.notna(item['notes']) else "",
                                                help="Add notes about this item")
                             
                             if st.button(f"Save Details {idx}"):
                                 success, message = update_item_details(
                                     int(item['id']),
-                                    tags=new_tags.split(',') if new_tags else None,
+                                    tags=new_tags.split(',') if new_tags.strip() else None,
                                     season=season if season else None,
-                                    notes=notes if notes else None
+                                    notes=notes if notes.strip() else None
                                 )
                                 if success:
                                     st.success(message)
@@ -381,7 +381,7 @@ def main_page():
             for idx, (item_type, item) in enumerate(outfit.items()):
                 if item_type != 'merged_image_path':
                     with cols[idx]:
-                        color = parse_color_string(item['color'])
+                        color = parse_color_string(str(item['color']))
                         st.markdown(f"**{item_type.capitalize()}**")
                         display_color_palette([color])
             
@@ -406,35 +406,48 @@ def saved_outfits_page():
     # Display outfits in grid layout
     cols = st.columns(3)
     for idx, outfit in enumerate(outfits):
-        col = cols[idx % 3]
+        col = cols[int(idx) % 3]  # Ensure integer division
         with col:
-            if os.path.exists(outfit['image_path']):
-                st.image(outfit['image_path'], use_column_width=True)
+            image_path = str(outfit.get('image_path', ''))  # Convert to string
+            if os.path.exists(image_path):
+                st.image(image_path, use_column_width=True)
                 
                 # Organization features
-                tags = outfit['tags'] if outfit['tags'] else []
-                new_tags = st.text_input(f"Tags {outfit['outfit_id']}", 
-                                       value=','.join(tags) if tags else "",
-                                       help="Comma-separated tags")
+                tags = outfit.get('tags', [])  # Use get with default
+                new_tags = st.text_input(
+                    f"Tags ###{idx}", 
+                    value=','.join(tags) if tags else "",
+                    help="Comma-separated tags"
+                )
                 
-                season = st.selectbox(f"Season {outfit['outfit_id']}",
-                                    ["", "Spring", "Summer", "Fall", "Winter"],
-                                    index=0 if not outfit['season'] else 
-                                    ["", "Spring", "Summer", "Fall", "Winter"].index(outfit['season']))
+                # Handle season selection with proper type conversion
+                current_season = str(outfit.get('season', ''))  # Convert to string
+                season_options = ["", "Spring", "Summer", "Fall", "Winter"]
+                season_index = season_options.index(current_season) if current_season in season_options else 0
                 
-                notes = st.text_area(f"Notes {outfit['outfit_id']}", 
-                                   value=outfit['notes'] if outfit['notes'] else "",
-                                   help="Add notes about this outfit")
+                season = st.selectbox(
+                    f"Season ###{idx}",
+                    season_options,
+                    index=season_index
+                )
+                
+                # Handle notes with proper type conversion
+                current_notes = str(outfit.get('notes', ''))  # Convert to string
+                notes = st.text_area(
+                    f"Notes ###{idx}", 
+                    value=current_notes,
+                    help="Add notes about this outfit"
+                )
                 
                 # Save and Delete buttons
                 save_col, del_col = st.columns([3, 1])
                 with save_col:
-                    if st.button(f"Save Details {outfit['outfit_id']}"):
+                    if st.button(f"Save Details ###{idx}"):
                         success, message = update_outfit_details(
-                            outfit['outfit_id'],
-                            tags=new_tags.split(',') if new_tags else None,
+                            str(outfit['outfit_id']),  # Convert to string
+                            tags=new_tags.split(',') if new_tags.strip() else None,
                             season=season if season else None,
-                            notes=notes if notes else None
+                            notes=notes if notes.strip() else None
                         )
                         if success:
                             st.success(message)
@@ -443,8 +456,8 @@ def saved_outfits_page():
                             st.error(message)
                 
                 with del_col:
-                    if st.button(f"🗑️ {outfit['outfit_id']}"):
-                        success, message = delete_saved_outfit(outfit['outfit_id'])
+                    if st.button(f"🗑️ ###{idx}"):
+                        success, message = delete_saved_outfit(str(outfit['outfit_id']))  # Convert to string
                         if success:
                             st.success(message)
                             st.rerun()
