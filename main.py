@@ -333,6 +333,10 @@ def main_page():
     """Display main page with outfit generation"""
     st.title("Outfit Generator")
     
+    # Initialize session state for current outfit
+    if 'current_outfit' not in st.session_state:
+        st.session_state.current_outfit = None
+    
     # Load clothing items
     items_df = load_clothing_items()
     
@@ -352,10 +356,14 @@ def main_page():
     
     if st.button("Generate Outfit"):
         outfit, missing_items = generate_outfit(items_df, size, style, gender)
+        st.session_state.current_outfit = outfit  # Store outfit in session state
         
         if missing_items:
             st.warning(f"Missing items: {', '.join(missing_items)}")
-        
+    
+    # Display current outfit if available
+    if st.session_state.current_outfit:
+        outfit = st.session_state.current_outfit
         if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
             st.image(outfit['merged_image_path'], use_column_width=True)
             
