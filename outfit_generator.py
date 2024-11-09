@@ -5,6 +5,13 @@ import os
 import uuid
 import logging
 from datetime import datetime, timedelta
+import numpy as np
+from color_recommendation import (
+    learn_color_preferences,
+    recommend_matching_colors,
+    calculate_color_harmony_score
+)
+from data_manager import load_saved_outfits
 
 def cleanup_merged_outfits(max_age_hours=24):
     """Clean up old unsaved outfit files from merged_outfits folder"""
@@ -48,7 +55,32 @@ def cleanup_merged_outfits(max_age_hours=24):
         logging.error(f"Error during outfit cleanup: {str(e)}")
         return 0
 
+def parse_color(color_str):
+    """Parse color string to RGB tuple"""
+    try:
+        return tuple(map(int, color_str.split(',')))
+    except:
+        return (0, 0, 0)
+
+def filter_by_color_harmony(items_df, selected_items, min_harmony_score=0.6):
+    """Filter items based on color harmony with already selected items"""
+    filtered_items = items_df.copy()
+    
+    if selected_items:
+        selected_colors = [parse_color(item['color']) for item in selected_items.values()]
+        
+        def calculate_harmony(color_str):
+            color = parse_color(color_str)
+            scores = [calculate_color_harmony_score(color, sc) for sc in selected_colors]
+            return np.mean(scores)
+        
+        filtered_items['harmony_score'] = filtered_items['color'].apply(calculate_harmony)
+        filtered_items = filtered_items[filtered_items['harmony_score'] >= min_harmony_score]
+    
+    return filtered_items
+
 def generate_outfit(clothing_items, size, style, gender):
+    """Generate outfit with smart color matching"""
     selected_outfit = {}
     missing_items = []
     
@@ -57,7 +89,14 @@ def generate_outfit(clothing_items, size, style, gender):
     
     cleanup_merged_outfits()
     
-    for item_type in ['shirt', 'pants', 'shoes']:
+    # Load saved outfits for learning color preferences
+    saved_outfits = load_saved_outfits()
+    color_combinations, color_scores = learn_color_preferences(saved_outfits)
+    
+    # Order of selection: shirt first (as anchor), then pants, then shoes
+    selection_order = ['shirt', 'pants', 'shoes']
+    
+    for item_type in selection_order:
         type_items = clothing_items[clothing_items['type'] == item_type]
         filtered_items = type_items[
             (type_items['size'].str.contains(size, na=False)) &
@@ -65,71 +104,89 @@ def generate_outfit(clothing_items, size, style, gender):
             (type_items['gender'].str.contains(gender, na=False))
         ]
         
+        # Apply color harmony filtering if we already have selected items
+        if selected_outfit:
+            filtered_items = filter_by_color_harmony(filtered_items, selected_outfit)
+        
         if len(filtered_items) > 0:
-            selected_outfit[item_type] = filtered_items.iloc[random.randint(0, len(filtered_items) - 1)].to_dict()
+            # If this is not the first item, use color recommendations
+            if selected_outfit:
+                best_harmony_score = 0
+                best_item = None
+                
+                for _, item in filtered_items.iterrows():
+                    current_color = parse_color(item['color'])
+                    harmony_scores = []
+                    
+                    for selected_item in selected_outfit.values():
+                        selected_color = parse_color(selected_item['color'])
+                        harmony_scores.append(
+                            calculate_color_harmony_score(current_color, selected_color)
+                        )
+                    
+                    avg_harmony = np.mean(harmony_scores)
+                    if avg_harmony > best_harmony_score:
+                        best_harmony_score = avg_harmony
+                        best_item = item
+                
+                if best_item is not None:
+                    selected_outfit[item_type] = best_item.to_dict()
+            else:
+                # For the first item, select randomly
+                selected_outfit[item_type] = filtered_items.iloc[
+                    random.randint(0, len(filtered_items) - 1)
+                ].to_dict()
         else:
             missing_items.append(item_type)
     
     if len(selected_outfit) == 3:  # We have all three items
         try:
-            # Increase template dimensions for larger display
-            template_width = 1000  # Increased from 800
-            template_height = 1200  # Increased from 1000
+            # Create outfit visualization
+            template_width = 1000
+            template_height = 1200
             background_color = (174, 162, 150)  # HEX AEA296 in RGB
             template = Image.new('RGB', (template_width, template_height), background_color)
             
-            # Adjust template height while maintaining proportions
-            new_template_height = int(template_height * 0.8)  # Increased from 0.7 for better vertical space usage
+            new_template_height = int(template_height * 0.8)
             template = template.resize((template_width, new_template_height))
             template_width, template_height = template.size
             
-            # Optimize vertical spacing
-            item_height = template_height // 4  # Increased from 5 for larger items
-            vertical_spacing = item_height // 6  # Adjusted for better distribution
+            item_height = template_height // 4
+            vertical_spacing = item_height // 6
             
-            # Create a new image using the template
             merged_image = template.copy()
             
-            # Add each clothing item to the merged image with improved sizing
             for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
                 try:
                     item_img = Image.open(selected_outfit[item_type]['image_path'])
                     
-                    # Calculate dimensions with improved scaling
                     aspect_ratio = item_img.size[0] / item_img.size[1]
-                    new_height = int(item_height * 1.1)  # Increased from 0.9 for larger items
+                    new_height = int(item_height * 1.1)
                     new_width = int(new_height * aspect_ratio)
                     
-                    # Ensure width doesn't exceed template width while maintaining good size
-                    if new_width > template_width * 0.9:  # Increased from 0.8 for larger items
+                    if new_width > template_width * 0.9:
                         new_width = int(template_width * 0.9)
                         new_height = int(new_width / aspect_ratio)
                     
-                    # Resize the item image
                     item_img = item_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
                     
-                    # Calculate position to center horizontally and adjust vertical position
                     x_position = (template_width - new_width) // 2
                     y_position = vertical_spacing + (i * (item_height + vertical_spacing))
                     
-                    # Create a mask for transparency
                     if item_img.mode == 'RGBA':
                         mask = item_img.split()[3]
                     else:
                         mask = None
                     
-                    # Paste the item image
                     merged_image.paste(item_img, (x_position, y_position), mask)
                     
                 except Exception as e:
                     logging.error(f"Error processing {item_type} image: {str(e)}")
             
-            # Save the merged image
             merged_filename = f"outfit_{uuid.uuid4()}.png"
             merged_path = os.path.join('merged_outfits', merged_filename)
             merged_image.save(merged_path)
             
-            # Add the merged image path to the outfit dictionary
             selected_outfit['merged_image_path'] = merged_path
             
         except Exception as e:
