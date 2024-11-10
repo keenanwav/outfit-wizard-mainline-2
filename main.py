@@ -16,6 +16,7 @@ import logging
 from color_utils import get_color_palette, display_color_palette, rgb_to_hex, parse_color_string
 from outfit_generator import generate_outfit, cleanup_merged_outfits
 from datetime import datetime, timedelta
+from style_assistant import get_style_recommendation, format_clothing_items
 
 logging.basicConfig(
     level=logging.INFO,
@@ -76,62 +77,96 @@ def main_page():
         st.warning("Please add some clothing items in the 'My Items' section first!")
         return
     
-    # Outfit generation form
-    col1, col2 = st.columns(2)
+    # Add tabs for different features
+    tab1, tab2 = st.tabs(["📋 Generate Outfit", "🎯 Smart Style Assistant"])
     
-    with col1:
-        size = st.selectbox("Size", ["S", "M", "L", "XL"])
-        style = st.selectbox("Style", ["Casual", "Formal", "Sport", "Beach"])
-    
-    with col2:
-        gender = st.selectbox("Gender", ["Male", "Female", "Unisex"])
-    
-    # Create a container for the outfit display
-    outfit_container = st.empty()
-    
-    if st.button("Generate Outfit"):
-        with st.spinner("🔮 Generating your perfect outfit..."):
-            # Generate the outfit
-            outfit, missing_items = generate_outfit(items_df, size, style, gender)
-            st.session_state.current_outfit = outfit
-            
-            # Display the outfit in the container
-            with outfit_container:
-                if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
-                    st.image(outfit['merged_image_path'], use_column_width=True)
+    with tab1:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            size = st.selectbox("Size", ["S", "M", "L", "XL"])
+            style = st.selectbox("Style", ["Casual", "Formal", "Sport", "Beach"])
+        
+        with col2:
+            gender = st.selectbox("Gender", ["Male", "Female", "Unisex"])
+        
+        # Create a container for the outfit display
+        outfit_container = st.empty()
+        
+        if st.button("Generate Outfit"):
+            with st.spinner("🔮 Generating your perfect outfit..."):
+                # Generate the outfit
+                outfit, missing_items = generate_outfit(items_df, size, style, gender)
+                st.session_state.current_outfit = outfit
                 
-                if missing_items:
-                    st.warning(f"Missing items: {', '.join(missing_items)}")
+                # Display the outfit in the container
+                with outfit_container:
+                    if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
+                        st.image(outfit['merged_image_path'], use_column_width=True)
+                    
+                    if missing_items:
+                        st.warning(f"Missing items: {', '.join(missing_items)}")
     
-    # Display current outfit details if available
-    if st.session_state.current_outfit:
-        outfit = st.session_state.current_outfit
+        # Display current outfit details if available
+        if st.session_state.current_outfit:
+            outfit = st.session_state.current_outfit
+            
+            # Add shopping buttons
+            st.markdown("### Shop Items")
+            shop_cols = st.columns(3)
+            for idx, (item_type, item) in enumerate(outfit.items()):
+                if item_type != 'merged_image_path' and item.get('hyperlink'):
+                    with shop_cols[idx]:
+                        st.link_button(f"Shop {item_type.capitalize()}", item['hyperlink'])
+            
+            # Display individual item colors
+            st.markdown("### Item Colors")
+            cols = st.columns(3)
+            for idx, (item_type, item) in enumerate(outfit.items()):
+                if item_type != 'merged_image_path':
+                    with cols[idx]:
+                        color = parse_color_string(str(item['color']))
+                        st.markdown(f"**{item_type.capitalize()}**")
+                        display_color_palette([color])
+            
+            # Save outfit option
+            if st.button("Save Outfit"):
+                saved_path = save_outfit(outfit)
+                if saved_path:
+                    st.success("Outfit saved successfully!")
+                else:
+                    st.error("Error saving outfit")
+    
+    with tab2:
+        st.markdown("### 🤖 Smart Style Assistant")
+        st.markdown("Get personalized style recommendations based on your wardrobe and preferences.")
         
-        # Add shopping buttons
-        st.markdown("### Shop Items")
-        shop_cols = st.columns(3)
-        for idx, (item_type, item) in enumerate(outfit.items()):
-            if item_type != 'merged_image_path' and item.get('hyperlink'):
-                with shop_cols[idx]:
-                    st.link_button(f"Shop {item_type.capitalize()}", item['hyperlink'])
+        # Input fields for style assistant
+        occasion = st.text_input("What's the occasion?", 
+                               placeholder="E.g., job interview, casual dinner, wedding")
         
-        # Display individual item colors
-        st.markdown("### Item Colors")
-        cols = st.columns(3)
-        for idx, (item_type, item) in enumerate(outfit.items()):
-            if item_type != 'merged_image_path':
-                with cols[idx]:
-                    color = parse_color_string(str(item['color']))
-                    st.markdown(f"**{item_type.capitalize()}**")
-                    display_color_palette([color])
+        weather = st.text_input("Weather conditions?", 
+                              placeholder="E.g., sunny and warm, cold and rainy")
         
-        # Save outfit option
-        if st.button("Save Outfit"):
-            saved_path = save_outfit(outfit)
-            if saved_path:
-                st.success("Outfit saved successfully!")
-            else:
-                st.error("Error saving outfit")
+        preferences = st.text_area("Additional preferences or requirements?",
+                                 placeholder="E.g., prefer dark colors, need to look professional")
+        
+        if st.button("Get Style Advice"):
+            with st.spinner("🎨 Analyzing your wardrobe and generating recommendations..."):
+                # Format clothing items for the AI
+                formatted_items = format_clothing_items(items_df)
+                
+                # Get AI recommendation
+                recommendation = get_style_recommendation(
+                    formatted_items,
+                    occasion=occasion,
+                    weather=weather,
+                    preferences=preferences
+                )
+                
+                # Display recommendation in a nice format
+                st.markdown("### Your Personalized Style Recommendation")
+                st.markdown(recommendation)
 
 def personal_wardrobe_page():
     """Display and manage personal wardrobe items"""
