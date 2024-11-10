@@ -1033,6 +1033,20 @@ files = [
 ]
 
 [[package]]
+name = "psycopg2-pool"
+version = "1.2"
+description = "Proper pooling of psycopg2 connections"
+optional = false
+python-versions = ">=3.3"
+files = [
+    {file = "psycopg2-pool-1.2.tar.gz", hash = "sha256:e9ec38d5af15b7cef5546452797935129c99482b25646f258a21786bfb826bf3"},
+    {file = "psycopg2_pool-1.2-py2.py3-none-any.whl", hash = "sha256:3c8251f6fac3145eb4c5bf3407bb61543dbbcbb8117af1341cd7a8b5468aedbb"},
+]
+
+[package.dependencies]
+psycopg2-binary = "*"
+
+[[package]]
 name = "pyarrow"
 version = "17.0.0"
 description = "Python library for Apache Arrow"
@@ -1740,4 +1754,4 @@ watchmedo = ["PyYAML (>=3.10)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "1be5eade9de09698c9f19fa6c3007509cfb8f18a3eedb04d69abf1f32f6bdcae"
+content-hash = "178630ff00a41efa45f7c0aed85dcfdcacc8da43a6bb19d3375bf83dc61bccbe"
