@@ -64,7 +64,7 @@ def check_cleanup_needed():
 
 def main_page():
     """Display main page with outfit generation"""
-    st.title("Outfit Generator")
+    st.title("Outfit Wizard")
     
     # Initialize session state for current outfit
     if 'current_outfit' not in st.session_state:
