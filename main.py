@@ -304,8 +304,8 @@ def personal_wardrobe_page():
                             # Organization features
                             tags = item['tags'] if pd.notna(item['tags']) else []
                             new_tags = st.text_input(f"Tags {idx}", 
-                                                   value=','.join(tags) if tags else "",
-                                                   help="Comma-separated tags")
+                                                    value=','.join(tags) if tags else "",
+                                                    help="Comma-separated tags")
                             
                             current_season = str(item['season']) if pd.notna(item['season']) else ""
                             season = st.selectbox(f"Season {idx}",
@@ -313,8 +313,8 @@ def personal_wardrobe_page():
                                                 index=["", "Spring", "Summer", "Fall", "Winter"].index(current_season) if current_season else 0)
                             
                             notes = st.text_area(f"Notes {idx}", 
-                                               value=str(item['notes']) if pd.notna(item['notes']) else "",
-                                               help="Add notes about this item")
+                                                value=str(item['notes']) if pd.notna(item['notes']) else "",
+                                                help="Add notes about this item")
                             
                             if st.button(f"Save Details {idx}"):
                                 success, message = update_item_details(
@@ -355,11 +355,13 @@ def main_page():
         gender = st.selectbox("Gender", ["Male", "Female", "Unisex"])
     
     if st.button("Generate Outfit"):
-        outfit, missing_items = generate_outfit(items_df, size, style, gender)
-        st.session_state.current_outfit = outfit  # Store outfit in session state
-        
-        if missing_items:
-            st.warning(f"Missing items: {', '.join(missing_items)}")
+        # Add loading animation while generating outfit
+        with st.spinner("🔮 Generating your perfect outfit..."):
+            outfit, missing_items = generate_outfit(items_df, size, style, gender)
+            st.session_state.current_outfit = outfit  # Store outfit in session state
+            
+            if missing_items:
+                st.warning(f"Missing items: {', '.join(missing_items)}")
     
     # Display current outfit if available
     if st.session_state.current_outfit:
@@ -454,37 +456,30 @@ def saved_outfits_page():
                             st.rerun()
                         else:
                             st.error(message)
-                
+                            
                 with del_col:
                     if st.button(f"🗑️ ###{idx}"):
-                        success, message = delete_saved_outfit(str(outfit['outfit_id']))  # Convert to string
+                        success, message = delete_saved_outfit(str(outfit['outfit_id']))
                         if success:
                             st.success(message)
                             st.rerun()
                         else:
                             st.error(message)
 
-def main():
-    """Main application entry point"""
-    # Initialize database tables
-    create_user_items_table()
-    
-    # Show first-visit tips
-    show_first_visit_tips()
-    
-    # Check for cleanup needed
-    check_cleanup_needed()
-    
-    # Sidebar navigation
-    st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Generate Outfit", "My Items", "Saved Outfits"])
-    
-    if page == "Generate Outfit":
-        main_page()
-    elif page == "My Items":
-        personal_wardrobe_page()
-    else:  # Saved Outfits
-        saved_outfits_page()
+# Add your pages here
+show_first_visit_tips()
+check_cleanup_needed()
 
-if __name__ == "__main__":
-    main()
+# Create database tables if they don't exist
+create_user_items_table()
+
+# Navigation in sidebar
+st.sidebar.title("Navigation")
+page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits"])
+
+if page == "Home":
+    main_page()
+elif page == "My Items":
+    personal_wardrobe_page()
+else:
+    saved_outfits_page()
