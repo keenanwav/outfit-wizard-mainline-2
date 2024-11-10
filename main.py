@@ -106,7 +106,7 @@ def main_page():
                     
                     if missing_items:
                         st.warning(f"Missing items: {', '.join(missing_items)}")
-    
+        
         # Display current outfit details if available
         if st.session_state.current_outfit:
             outfit = st.session_state.current_outfit
@@ -164,9 +164,27 @@ def main_page():
                     preferences=preferences
                 )
                 
-                # Display recommendation in a nice format
+                # Display recommendation text
                 st.markdown("### Your Personalized Style Recommendation")
-                st.markdown(recommendation)
+                st.markdown(recommendation['text'])
+                
+                # Display recommended items in a grid
+                if recommendation['recommended_items']:
+                    st.markdown("### Recommended Items")
+                    
+                    # Create columns for the grid (3 items per row)
+                    cols = st.columns(3)
+                    for idx, item in enumerate(recommendation['recommended_items']):
+                        col = cols[idx % 3]
+                        with col:
+                            if os.path.exists(item['image_path']):
+                                st.image(item['image_path'], use_column_width=True)
+                                st.markdown(f"**{item['type'].capitalize()}**")
+                                st.markdown(f"Style: {item['style']}")
+                                
+                                # Display item color
+                                color = parse_color_string(str(item['color']))
+                                display_color_palette([color])
 
 def personal_wardrobe_page():
     """Display and manage personal wardrobe items"""
