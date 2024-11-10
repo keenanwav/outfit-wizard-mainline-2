@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import base64
 from PIL import Image
 import numpy as np
 import pandas as pd
@@ -23,12 +24,78 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
+# Set page configuration with logo
+logo_path = os.path.join("assets", "logo.svg")
+logging.info(f"Looking for logo at path: {logo_path}")
+
+# Configure page before any other Streamlit commands
 st.set_page_config(
     page_title="Outfit Wizard",
     page_icon="👕",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Custom CSS for logo styling
+st.markdown("""
+    <style>
+        .logo-img {
+            width: 60px;
+            height: auto;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding: 0.75rem;
+            background-color: rgba(107, 47, 186, 0.1);
+            border-radius: 8px;
+        }
+        .logo-title {
+            font-size: 2rem;
+            margin: 0;
+            color: #6b2fba;
+            font-weight: bold;
+        }
+        .sidebar-logo {
+            width: 80px;
+            height: auto;
+            margin: 1rem auto;
+            display: block;
+        }
+        .stApp > header {
+            background-color: transparent !important;
+        }
+        .stApp > header .decoration {
+            background-image: none !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+def display_logo_header(title_text):
+    """Display logo with title text"""
+    try:
+        if os.path.exists(logo_path):
+            with open(logo_path, 'r') as f:
+                svg_content = f.read()
+                st.markdown(
+                    f"""
+                    <div class="logo-container">
+                        {svg_content}
+                        <h1 class="logo-title">{title_text}</h1>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+        else:
+            logging.warning("Logo file not found, displaying title only")
+            st.title(title_text)
+    except Exception as e:
+        logging.error(f"Error displaying logo header: {str(e)}")
+        st.title(title_text)
 
 def show_first_visit_tips():
     """Show first-visit tips in the sidebar"""
@@ -64,7 +131,7 @@ def check_cleanup_needed():
 
 def main_page():
     """Display main page with outfit generation"""
-    st.title("Outfit Wizard")
+    display_logo_header("Generate Outfit")
     
     # Initialize session state for current outfit
     if 'current_outfit' not in st.session_state:
@@ -101,7 +168,7 @@ def main_page():
                 
                 # Display the outfit in the container
                 with outfit_container:
-                    if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
+                    if outfit.get('merged_image_path') and os.path.exists(outfit['merged_image_path']):
                         st.image(outfit['merged_image_path'], use_column_width=True)
                     
                     if missing_items:
@@ -153,10 +220,7 @@ def main_page():
         
         if st.button("Get Style Advice"):
             with st.spinner("🎨 Analyzing your wardrobe and generating recommendations..."):
-                # Format clothing items for the AI
                 formatted_items = format_clothing_items(items_df)
-                
-                # Get AI recommendation
                 recommendation = get_style_recommendation(
                     formatted_items,
                     occasion=occasion,
@@ -164,31 +228,24 @@ def main_page():
                     preferences=preferences
                 )
                 
-                # Display recommendation text
                 st.markdown("### Your Personalized Style Recommendation")
                 st.markdown(recommendation['text'])
                 
-                # Display recommended items in a grid
                 if recommendation['recommended_items']:
                     st.markdown("### Recommended Items")
-                    
-                    # Create columns for the grid (3 items per row)
                     cols = st.columns(3)
                     for idx, item in enumerate(recommendation['recommended_items']):
-                        col = cols[idx % 3]
-                        with col:
+                        with cols[idx % 3]:
                             if os.path.exists(item['image_path']):
                                 st.image(item['image_path'], use_column_width=True)
                                 st.markdown(f"**{item['type'].capitalize()}**")
                                 st.markdown(f"Style: {item['style']}")
-                                
-                                # Display item color
                                 color = parse_color_string(str(item['color']))
                                 display_color_palette([color])
 
 def personal_wardrobe_page():
-    """Display and manage personal wardrobe items"""
-    st.title("My Items")
+    """Display personal wardrobe items"""
+    display_logo_header("My Items")
     
     # Load existing items
     items_df = load_clothing_items()
@@ -243,22 +300,24 @@ def personal_wardrobe_page():
                 
                 # Create grid layout (3 items per row)
                 cols = st.columns(3)
-                for idx, item in type_items.iterrows():
-                    col = cols[int(idx) % 3]
+                for i, (idx, item) in enumerate(type_items.iterrows()):
+                    col = cols[i % 3]
                     with col:
-                        if os.path.exists(item['image_path']):
-                            st.image(item['image_path'], use_column_width=True)
+                        image_path = str(item['image_path'])
+                        if os.path.exists(image_path):
+                            st.image(image_path, use_column_width=True)
                             
                             # Edit/Delete buttons
                             edit_col, del_col = st.columns([3, 1])
                             
                             with edit_col:
-                                if st.button(f"Edit Details {idx}"):
-                                    st.session_state.editing_item = item
+                                if st.button(f"Edit Details", key=f"edit_{idx}"):
+                                    st.session_state.editing_item = item.to_dict()
                             
                             with del_col:
-                                if st.button(f"🗑️ {idx}"):
-                                    success, message = delete_clothing_item(int(item['id']))
+                                if st.button("🗑️", key=f"delete_{idx}"):
+                                    item_id = int(idx)
+                                    success, message = delete_clothing_item(item_id)
                                     if success:
                                         st.success(message)
                                         st.rerun()
@@ -266,48 +325,61 @@ def personal_wardrobe_page():
                                         st.error(message)
                             
                             # Display item details
-                            st.markdown(f"**Style:** {item['style']}")
-                            st.markdown(f"**Size:** {item['size']}")
-                            if pd.notna(item['hyperlink']):
-                                st.markdown(f"[Shop Link]({item['hyperlink']})")
+                            st.markdown(f"**Style:** {str(item['style'])}")
+                            st.markdown(f"**Size:** {str(item['size'])}")
+                            
+                            # Check if hyperlink exists and is not empty
+                            hyperlink = item.get('hyperlink')
+                            if isinstance(hyperlink, str) and hyperlink.strip():
+                                st.markdown(f"[Shop Link]({hyperlink})")
                             
                             # Organization features
-                            tags = item['tags'] if pd.notna(item['tags']) else []
+                            tags_list = item.get('tags', [])
+                            if isinstance(tags_list, list):
+                                tags_str = ','.join(tags_list)
+                            else:
+                                tags_str = ""
+                            
                             new_tags = st.text_input(
-                                f"Tags {idx}", 
-                                value=','.join(tags) if tags else "",
-                                help="Comma-separated tags"
+                                "Tags",
+                                value=tags_str,
+                                help="Comma-separated tags",
+                                key=f"tags_{idx}"
                             )
                             
-                            current_season = str(item['season']) if pd.notna(item['season']) else ""
                             season = st.selectbox(
-                                f"Season {idx}",
+                                "Season",
                                 ["", "Spring", "Summer", "Fall", "Winter"],
-                                index=["", "Spring", "Summer", "Fall", "Winter"].index(current_season) if current_season else 0
+                                index=["", "Spring", "Summer", "Fall", "Winter"].index(str(item.get('season', ''))) if item.get('season') else 0,
+                                key=f"season_{idx}"
                             )
                             
                             notes = st.text_area(
-                                f"Notes {idx}", 
-                                value=str(item['notes']) if pd.notna(item['notes']) else "",
-                                help="Add notes about this item"
+                                "Notes",
+                                value=str(item.get('notes', '')),
+                                help="Add notes about this item",
+                                key=f"notes_{idx}"
                             )
                             
-                            if st.button(f"Save Details {idx}"):
-                                success, message = update_item_details(
-                                    int(item['id']),
-                                    tags=new_tags.split(',') if new_tags.strip() else None,
-                                    season=season if season else None,
-                                    notes=notes if notes.strip() else None
-                                )
-                                if success:
-                                    st.success(message)
-                                    st.rerun()
-                                else:
-                                    st.error(message)
+                            if st.button("Save Details", key=f"save_{idx}"):
+                                try:
+                                    success, message = update_item_details(
+                                        int(idx),
+                                        tags=new_tags.split(',') if new_tags.strip() else None,
+                                        season=season if season else None,
+                                        notes=notes if notes.strip() else None
+                                    )
+                                    if success:
+                                        st.success(message)
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+                                except Exception as e:
+                                    st.error(f"Error updating item: {str(e)}")
 
 def saved_outfits_page():
     """Display saved outfits page"""
-    st.title("Saved Outfits")
+    display_logo_header("Saved Outfits")
     
     outfits = load_saved_outfits()
     
@@ -318,43 +390,41 @@ def saved_outfits_page():
     # Display outfits in grid layout
     cols = st.columns(3)
     for idx, outfit in enumerate(outfits):
-        col = cols[int(idx) % 3]
+        col = cols[idx % 3]
         with col:
-            image_path = str(outfit.get('image_path', ''))
-            if os.path.exists(image_path):
+            image_path = outfit.get('image_path', '')
+            if image_path and os.path.exists(image_path):
                 st.image(image_path, use_column_width=True)
                 
                 # Organization features
                 tags = outfit.get('tags', [])
                 new_tags = st.text_input(
-                    f"Tags ###{idx}", 
+                    "Tags",
                     value=','.join(tags) if tags else "",
-                    help="Comma-separated tags"
+                    help="Comma-separated tags",
+                    key=f"outfit_tags_{idx}"
                 )
-                
-                current_season = str(outfit.get('season', ''))
-                season_options = ["", "Spring", "Summer", "Fall", "Winter"]
-                season_index = season_options.index(current_season) if current_season in season_options else 0
                 
                 season = st.selectbox(
-                    f"Season ###{idx}",
-                    season_options,
-                    index=season_index
+                    "Season",
+                    ["", "Spring", "Summer", "Fall", "Winter"],
+                    index=["", "Spring", "Summer", "Fall", "Winter"].index(outfit.get('season', '')) if outfit.get('season') else 0,
+                    key=f"outfit_season_{idx}"
                 )
                 
-                current_notes = str(outfit.get('notes', ''))
                 notes = st.text_area(
-                    f"Notes ###{idx}", 
-                    value=current_notes,
-                    help="Add notes about this outfit"
+                    "Notes",
+                    value=outfit.get('notes', ''),
+                    help="Add notes about this outfit",
+                    key=f"outfit_notes_{idx}"
                 )
                 
                 # Save and Delete buttons
                 save_col, del_col = st.columns([3, 1])
                 with save_col:
-                    if st.button(f"Save Details ###{idx}"):
+                    if st.button("Save Details", key=f"save_outfit_{idx}"):
                         success, message = update_outfit_details(
-                            str(outfit['outfit_id']),
+                            outfit['outfit_id'],
                             tags=new_tags.split(',') if new_tags.strip() else None,
                             season=season if season else None,
                             notes=notes if notes.strip() else None
@@ -366,8 +436,8 @@ def saved_outfits_page():
                             st.error(message)
                 
                 with del_col:
-                    if st.button(f"🗑️ ###{idx}"):
-                        success, message = delete_saved_outfit(str(outfit['outfit_id']))
+                    if st.button("🗑️", key=f"delete_outfit_{idx}"):
+                        success, message = delete_saved_outfit(outfit['outfit_id'])
                         if success:
                             st.success(message)
                             st.rerun()
@@ -381,11 +451,30 @@ check_cleanup_needed()
 # Create database tables if they don't exist
 create_user_items_table()
 
-# Navigation in sidebar
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits"])
+# Add navigation in sidebar with logo
+with st.sidebar:
+    try:
+        if os.path.exists(logo_path):
+            with open(logo_path, 'r') as f:
+                svg_content = f.read()
+                st.markdown(
+                    f"""
+                    <div style="text-align: center;">
+                        {svg_content}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+        else:
+            logging.warning("Logo not available for sidebar")
+    except Exception as e:
+        logging.error(f"Error displaying sidebar logo: {str(e)}")
+    
+    st.markdown("---")
+    page = st.radio("Navigation", ["Generate Outfit", "My Items", "Saved Outfits"])
 
-if page == "Home":
+# Display selected page
+if page == "Generate Outfit":
     main_page()
 elif page == "My Items":
     personal_wardrobe_page()
