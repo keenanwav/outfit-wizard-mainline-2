@@ -4,6 +4,14 @@ from sklearn.cluster import KMeans
 import os
 import streamlit as st
 
+def parse_color_string(color_str):
+    try:
+        # Handle color strings in format "r,g,b"
+        return [int(c) for c in color_str.split(',')]
+    except:
+        # Return a default color if parsing fails
+        return [0, 0, 0]
+
 def get_center_color(image_path):
     """Extract the color from the center of the image"""
     try:
