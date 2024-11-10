@@ -5,6 +5,7 @@ import os
 import uuid
 import logging
 from datetime import datetime, timedelta
+import time
 
 def cleanup_merged_outfits(max_age_hours=24):
     """Clean up old unsaved outfit files from merged_outfits folder"""
@@ -57,6 +58,9 @@ def generate_outfit(clothing_items, size, style, gender):
     
     cleanup_merged_outfits()
     
+    # Add a small delay for better user experience
+    time.sleep(0.5)
+    
     for item_type in ['shirt', 'pants', 'shoes']:
         type_items = clothing_items[clothing_items['type'] == item_type]
         filtered_items = type_items[
@@ -72,6 +76,9 @@ def generate_outfit(clothing_items, size, style, gender):
     
     if len(selected_outfit) == 3:  # We have all three items
         try:
+            # Add a small delay before image processing
+            time.sleep(0.5)
+            
             # Increase template dimensions for larger display
             template_width = 1000  # Increased from 800
             template_height = 1200  # Increased from 1000

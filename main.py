@@ -13,7 +13,7 @@ from data_manager import (
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
-from color_utils import get_color_palette, display_color_palette, rgb_to_hex
+from color_utils import get_color_palette, display_color_palette, rgb_to_hex, parse_color_string
 from outfit_generator import generate_outfit, cleanup_merged_outfits
 from datetime import datetime, timedelta
 
@@ -28,150 +28,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# Add custom CSS for dark theme styling
-st.markdown("""
-<style>
-    /* General theme */
-    .stApp {
-        background-color: #0E1117;
-    }
-    
-    /* Button styling */
-    .stButton>button {
-        background-color: #FF4B4B;
-        color: #FAFAFA;
-        border: none;
-        padding: 0.5rem 1rem;
-        border-radius: 0.3rem;
-        transition: background-color 0.3s;
-    }
-    
-    .stButton>button:hover {
-        background-color: #FF6B6B;
-    }
-    
-    /* Input fields styling */
-    .stTextInput>div>div>input,
-    .stSelectbox>div>div>input,
-    .stTextArea>div>div>textarea {
-        background-color: #262730;
-        color: #FAFAFA;
-        border: 1px solid #4B4B4B;
-    }
-    
-    /* File uploader styling */
-    .stFileUploader {
-        background-color: #262730;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border: 1px dashed #4B4B4B;
-    }
-    
-    .stFileUploader>div>button {
-        background-color: #262730;
-        color: #FAFAFA;
-        border: 1px solid #4B4B4B;
-    }
-    
-    /* Expander and container styling */
-    div[data-testid="stExpander"],
-    div.stContainer {
-        background-color: #262730;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        border: 1px solid #4B4B4B;
-    }
-    
-    /* Image container styling */
-    div[data-testid="stImage"] {
-        background-color: #262730;
-        border-radius: 0.5rem;
-        padding: 0.5rem;
-        border: 1px solid #4B4B4B;
-    }
-    
-    /* Sidebar styling */
-    section[data-testid="stSidebar"] {
-        background-color: #262730;
-        border-right: 1px solid #4B4B4B;
-    }
-    
-    section[data-testid="stSidebar"] .stMarkdown {
-        color: #FAFAFA;
-    }
-    
-    /* Headers styling */
-    h1, h2, h3, h4, h5, h6 {
-        color: #FAFAFA !important;
-    }
-    
-    /* Text styling */
-    p, span, div, label {
-        color: #FAFAFA;
-    }
-    
-    /* Link styling */
-    a {
-        color: #FF4B4B !important;
-        text-decoration: none;
-    }
-    
-    a:hover {
-        text-decoration: underline;
-    }
-    
-    /* Tabs styling */
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #262730;
-        padding: 0.5rem;
-        border-radius: 0.5rem;
-        border: 1px solid #4B4B4B;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        color: #FAFAFA;
-    }
-    
-    .stTabs [data-baseweb="tab-highlight"] {
-        background-color: #FF4B4B;
-    }
-    
-    /* Success/Error message styling */
-    div[data-testid="stAlert"] {
-        background-color: #262730;
-        border: 1px solid #4B4B4B;
-        color: #FAFAFA;
-    }
-    
-    /* Checkbox styling */
-    .stCheckbox>label>div[data-testid="stMarkdownContainer"]>p {
-        color: #FAFAFA;
-    }
-    
-    /* Radio button styling */
-    .stRadio>label>div[data-testid="stMarkdownContainer"]>p {
-        color: #FAFAFA;
-    }
-    
-    /* Selectbox styling */
-    .stSelectbox>div>div>div {
-        background-color: #262730;
-        color: #FAFAFA;
-    }
-    
-    /* Color picker styling */
-    .stColorPicker>label {
-        color: #FAFAFA;
-    }
-    
-    /* Caption styling */
-    .stCaption {
-        color: #B0B0B0;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 def show_first_visit_tips():
     """Show first-visit tips in the sidebar"""
@@ -205,16 +61,77 @@ def check_cleanup_needed():
             cleanup_merged_outfits()
             st.session_state.last_cleanup = datetime.now()
 
-def parse_color_string(color_str):
-    """Parse color string to RGB tuple"""
-    try:
-        return tuple(map(int, color_str.split(',')))
-    except:
-        return (0, 0, 0)
-
-def normalize_case(text):
-    """Normalize text case for consistent display"""
-    return text.strip().lower().capitalize()
+def main_page():
+    """Display main page with outfit generation"""
+    st.title("Outfit Generator")
+    
+    # Initialize session state for current outfit
+    if 'current_outfit' not in st.session_state:
+        st.session_state.current_outfit = None
+    
+    # Load clothing items
+    items_df = load_clothing_items()
+    
+    if items_df.empty:
+        st.warning("Please add some clothing items in the 'My Items' section first!")
+        return
+    
+    # Outfit generation form
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        size = st.selectbox("Size", ["S", "M", "L", "XL"])
+        style = st.selectbox("Style", ["Casual", "Formal", "Sport", "Beach"])
+    
+    with col2:
+        gender = st.selectbox("Gender", ["Male", "Female", "Unisex"])
+    
+    # Create a container for the outfit display
+    outfit_container = st.empty()
+    
+    if st.button("Generate Outfit"):
+        with st.spinner("🔮 Generating your perfect outfit..."):
+            # Generate the outfit
+            outfit, missing_items = generate_outfit(items_df, size, style, gender)
+            st.session_state.current_outfit = outfit
+            
+            # Display the outfit in the container
+            with outfit_container:
+                if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
+                    st.image(outfit['merged_image_path'], use_column_width=True)
+                
+                if missing_items:
+                    st.warning(f"Missing items: {', '.join(missing_items)}")
+    
+    # Display current outfit details if available
+    if st.session_state.current_outfit:
+        outfit = st.session_state.current_outfit
+        
+        # Add shopping buttons
+        st.markdown("### Shop Items")
+        shop_cols = st.columns(3)
+        for idx, (item_type, item) in enumerate(outfit.items()):
+            if item_type != 'merged_image_path' and item.get('hyperlink'):
+                with shop_cols[idx]:
+                    st.link_button(f"Shop {item_type.capitalize()}", item['hyperlink'])
+        
+        # Display individual item colors
+        st.markdown("### Item Colors")
+        cols = st.columns(3)
+        for idx, (item_type, item) in enumerate(outfit.items()):
+            if item_type != 'merged_image_path':
+                with cols[idx]:
+                    color = parse_color_string(str(item['color']))
+                    st.markdown(f"**{item_type.capitalize()}**")
+                    display_color_palette([color])
+        
+        # Save outfit option
+        if st.button("Save Outfit"):
+            saved_path = save_outfit(outfit)
+            if saved_path:
+                st.success("Outfit saved successfully!")
+            else:
+                st.error("Error saving outfit")
 
 def personal_wardrobe_page():
     """Display and manage personal wardrobe items"""
@@ -281,10 +198,11 @@ def personal_wardrobe_page():
                             
                             # Edit/Delete buttons
                             edit_col, del_col = st.columns([3, 1])
+                            
                             with edit_col:
                                 if st.button(f"Edit Details {idx}"):
                                     st.session_state.editing_item = item
-                                    
+                            
                             with del_col:
                                 if st.button(f"🗑️ {idx}"):
                                     success, message = delete_clothing_item(int(item['id']))
@@ -295,7 +213,6 @@ def personal_wardrobe_page():
                                         st.error(message)
                             
                             # Display item details
-                            color = parse_color_string(str(item['color']))
                             st.markdown(f"**Style:** {item['style']}")
                             st.markdown(f"**Size:** {item['size']}")
                             if pd.notna(item['hyperlink']):
@@ -303,18 +220,24 @@ def personal_wardrobe_page():
                             
                             # Organization features
                             tags = item['tags'] if pd.notna(item['tags']) else []
-                            new_tags = st.text_input(f"Tags {idx}", 
-                                                    value=','.join(tags) if tags else "",
-                                                    help="Comma-separated tags")
+                            new_tags = st.text_input(
+                                f"Tags {idx}", 
+                                value=','.join(tags) if tags else "",
+                                help="Comma-separated tags"
+                            )
                             
                             current_season = str(item['season']) if pd.notna(item['season']) else ""
-                            season = st.selectbox(f"Season {idx}",
-                                                ["", "Spring", "Summer", "Fall", "Winter"],
-                                                index=["", "Spring", "Summer", "Fall", "Winter"].index(current_season) if current_season else 0)
+                            season = st.selectbox(
+                                f"Season {idx}",
+                                ["", "Spring", "Summer", "Fall", "Winter"],
+                                index=["", "Spring", "Summer", "Fall", "Winter"].index(current_season) if current_season else 0
+                            )
                             
-                            notes = st.text_area(f"Notes {idx}", 
-                                                value=str(item['notes']) if pd.notna(item['notes']) else "",
-                                                help="Add notes about this item")
+                            notes = st.text_area(
+                                f"Notes {idx}", 
+                                value=str(item['notes']) if pd.notna(item['notes']) else "",
+                                help="Add notes about this item"
+                            )
                             
                             if st.button(f"Save Details {idx}"):
                                 success, message = update_item_details(
@@ -329,72 +252,6 @@ def personal_wardrobe_page():
                                 else:
                                     st.error(message)
 
-def main_page():
-    """Display main page with outfit generation"""
-    st.title("Outfit Generator")
-    
-    # Initialize session state for current outfit
-    if 'current_outfit' not in st.session_state:
-        st.session_state.current_outfit = None
-    
-    # Load clothing items
-    items_df = load_clothing_items()
-    
-    if items_df.empty:
-        st.warning("Please add some clothing items in the 'My Items' section first!")
-        return
-    
-    # Outfit generation form
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        size = st.selectbox("Size", ["S", "M", "L", "XL"])
-        style = st.selectbox("Style", ["Casual", "Formal", "Sport", "Beach"])
-    
-    with col2:
-        gender = st.selectbox("Gender", ["Male", "Female", "Unisex"])
-    
-    if st.button("Generate Outfit"):
-        # Add loading animation while generating outfit
-        with st.spinner("🔮 Generating your perfect outfit..."):
-            outfit, missing_items = generate_outfit(items_df, size, style, gender)
-            st.session_state.current_outfit = outfit  # Store outfit in session state
-            
-            if missing_items:
-                st.warning(f"Missing items: {', '.join(missing_items)}")
-    
-    # Display current outfit if available
-    if st.session_state.current_outfit:
-        outfit = st.session_state.current_outfit
-        if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
-            st.image(outfit['merged_image_path'], use_column_width=True)
-            
-            # Add shopping buttons
-            st.markdown("### Shop Items")
-            shop_cols = st.columns(3)
-            for idx, (item_type, item) in enumerate(outfit.items()):
-                if item_type != 'merged_image_path' and item.get('hyperlink'):
-                    with shop_cols[idx]:
-                        st.link_button(f"Shop {item_type.capitalize()}", item['hyperlink'])
-            
-            # Display individual item colors
-            st.markdown("### Item Colors")
-            cols = st.columns(3)
-            for idx, (item_type, item) in enumerate(outfit.items()):
-                if item_type != 'merged_image_path':
-                    with cols[idx]:
-                        color = parse_color_string(str(item['color']))
-                        st.markdown(f"**{item_type.capitalize()}**")
-                        display_color_palette([color])
-            
-            # Save outfit option
-            if st.button("Save Outfit"):
-                saved_path = save_outfit(outfit)
-                if saved_path:
-                    st.success("Outfit saved successfully!")
-                else:
-                    st.error("Error saving outfit")
-
 def saved_outfits_page():
     """Display saved outfits page"""
     st.title("Saved Outfits")
@@ -408,22 +265,21 @@ def saved_outfits_page():
     # Display outfits in grid layout
     cols = st.columns(3)
     for idx, outfit in enumerate(outfits):
-        col = cols[int(idx) % 3]  # Ensure integer division
+        col = cols[int(idx) % 3]
         with col:
-            image_path = str(outfit.get('image_path', ''))  # Convert to string
+            image_path = str(outfit.get('image_path', ''))
             if os.path.exists(image_path):
                 st.image(image_path, use_column_width=True)
                 
                 # Organization features
-                tags = outfit.get('tags', [])  # Use get with default
+                tags = outfit.get('tags', [])
                 new_tags = st.text_input(
                     f"Tags ###{idx}", 
                     value=','.join(tags) if tags else "",
                     help="Comma-separated tags"
                 )
                 
-                # Handle season selection with proper type conversion
-                current_season = str(outfit.get('season', ''))  # Convert to string
+                current_season = str(outfit.get('season', ''))
                 season_options = ["", "Spring", "Summer", "Fall", "Winter"]
                 season_index = season_options.index(current_season) if current_season in season_options else 0
                 
@@ -433,8 +289,7 @@ def saved_outfits_page():
                     index=season_index
                 )
                 
-                # Handle notes with proper type conversion
-                current_notes = str(outfit.get('notes', ''))  # Convert to string
+                current_notes = str(outfit.get('notes', ''))
                 notes = st.text_area(
                     f"Notes ###{idx}", 
                     value=current_notes,
@@ -446,7 +301,7 @@ def saved_outfits_page():
                 with save_col:
                     if st.button(f"Save Details ###{idx}"):
                         success, message = update_outfit_details(
-                            str(outfit['outfit_id']),  # Convert to string
+                            str(outfit['outfit_id']),
                             tags=new_tags.split(',') if new_tags.strip() else None,
                             season=season if season else None,
                             notes=notes if notes.strip() else None
@@ -456,7 +311,7 @@ def saved_outfits_page():
                             st.rerun()
                         else:
                             st.error(message)
-                            
+                
                 with del_col:
                     if st.button(f"🗑️ ###{idx}"):
                         success, message = delete_saved_outfit(str(outfit['outfit_id']))
@@ -466,7 +321,7 @@ def saved_outfits_page():
                         else:
                             st.error(message)
 
-# Add your pages here
+# Initialize app
 show_first_visit_tips()
 check_cleanup_needed()
 
