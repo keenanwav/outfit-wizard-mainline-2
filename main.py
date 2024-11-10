@@ -24,10 +24,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# Set page configuration with logo
-logo_path = os.path.join("assets", "logo.svg")
-logging.info(f"Looking for logo at path: {logo_path}")
-
 # Configure page before any other Streamlit commands
 st.set_page_config(
     page_title="Outfit Wizard",
@@ -39,29 +35,23 @@ st.set_page_config(
 # Custom CSS for logo styling
 st.markdown("""
     <style>
-        .logo-img {
-            width: 60px;
-            height: auto;
-            margin-bottom: 0.5rem;
-            display: block;
-        }
         .logo-container {
             display: flex;
             align-items: center;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-            padding: 0.75rem;
-            background-color: rgba(107, 47, 186, 0.1);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background-color: transparent;
             border-radius: 8px;
+            gap: 1rem;
         }
         .logo-title {
-            font-size: 2rem;
             margin: 0;
-            color: #6b2fba;
-            font-weight: bold;
+            color: #FAFAFA;
+            font-size: 24px;
+            font-weight: 600;
         }
         .sidebar-logo {
-            width: 80px;
+            max-width: 80px;
             height: auto;
             margin: 1rem auto;
             display: block;
@@ -72,15 +62,27 @@ st.markdown("""
         .stApp > header .decoration {
             background-image: none !important;
         }
+        .logo-svg {
+            width: 60px !important;
+            height: 60px !important;
+            min-width: 60px !important;
+            display: block;
+        }
+        .logo-svg path {
+            fill: currentColor;
+        }
     </style>
 """, unsafe_allow_html=True)
 
 def display_logo_header(title_text):
     """Display logo with title text"""
     try:
+        logo_path = os.path.join("assets", "logo.svg")
         if os.path.exists(logo_path):
             with open(logo_path, 'r') as f:
                 svg_content = f.read()
+                # Add class to SVG for better styling control
+                svg_content = svg_content.replace('<svg', '<svg class="logo-svg"')
                 st.markdown(
                     f"""
                     <div class="logo-container">
@@ -316,7 +318,7 @@ def personal_wardrobe_page():
                             
                             with del_col:
                                 if st.button("🗑️", key=f"delete_{idx}"):
-                                    item_id = int(idx)
+                                    item_id = int(item['id'])
                                     success, message = delete_clothing_item(item_id)
                                     if success:
                                         st.success(message)
@@ -364,10 +366,10 @@ def personal_wardrobe_page():
                             if st.button("Save Details", key=f"save_{idx}"):
                                 try:
                                     success, message = update_item_details(
-                                        int(idx),
+                                        int(item['id']),
                                         tags=new_tags.split(',') if new_tags.strip() else None,
                                         season=season if season else None,
-                                        notes=notes if notes.strip() else None
+                                        notes=notes.strip() if notes else None
                                     )
                                     if success:
                                         st.success(message)
@@ -427,7 +429,7 @@ def saved_outfits_page():
                             outfit['outfit_id'],
                             tags=new_tags.split(',') if new_tags.strip() else None,
                             season=season if season else None,
-                            notes=notes if notes.strip() else None
+                            notes=notes.strip() if notes else None
                         )
                         if success:
                             st.success(message)
@@ -454,12 +456,15 @@ create_user_items_table()
 # Add navigation in sidebar with logo
 with st.sidebar:
     try:
+        logo_path = os.path.join("assets", "logo.svg")
         if os.path.exists(logo_path):
             with open(logo_path, 'r') as f:
                 svg_content = f.read()
+                # Add class to SVG for better styling control
+                svg_content = svg_content.replace('<svg', '<svg class="logo-svg"')
                 st.markdown(
                     f"""
-                    <div style="text-align: center;">
+                    <div style="text-align: center; margin-bottom: 1rem;">
                         {svg_content}
                     </div>
                     """,
