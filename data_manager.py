@@ -47,12 +47,17 @@ except Exception as e:
 def get_pool_status():
     """Get current status of the connection pool"""
     if connection_pool:
-        return {
-            'min_connections': MIN_CONNECTIONS,
-            'max_connections': MAX_CONNECTIONS,
-            'used_connections': len(connection_pool._used),
-            'free_connections': len(connection_pool._pool)
-        }
+        try:
+            used = len([conn for conn in connection_pool._pool if conn.closed == 0])
+            free = connection_pool.maxconn - used
+            return {
+                'min_connections': MIN_CONNECTIONS,
+                'max_connections': MAX_CONNECTIONS,
+                'used_connections': used,
+                'free_connections': free
+            }
+        except Exception as e:
+            logging.error(f"Error getting pool status: {str(e)}")
     return None
 
 @contextmanager
@@ -69,7 +74,10 @@ def get_db_connection():
         raise
     finally:
         if conn:
-            connection_pool.putconn(conn)
+            try:
+                connection_pool.putconn(conn)
+            except Exception as e:
+                logging.error(f"Error returning connection to pool: {str(e)}")
 
 def retry_on_error(max_retries=3, delay=1):
     """Decorator for retrying database operations"""
@@ -96,47 +104,49 @@ def create_user_items_table():
     """Create necessary database tables with indexes"""
     with get_db_connection() as conn:
         cur = conn.cursor()
-        
-        # Create tables with proper indexes
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS user_clothing_items (
-                id SERIAL PRIMARY KEY,
-                type VARCHAR(50),
-                color VARCHAR(50),
-                style VARCHAR(255),
-                gender VARCHAR(50),
-                size VARCHAR(50),
-                image_path VARCHAR(255),
-                hyperlink VARCHAR(255),
-                tags TEXT[],
-                season VARCHAR(10),
-                notes TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        # Add indexes for frequently queried columns
-        cur.execute('CREATE INDEX IF NOT EXISTS idx_type ON user_clothing_items(type)')
-        cur.execute('CREATE INDEX IF NOT EXISTS idx_style ON user_clothing_items(style)')
-        cur.execute('CREATE INDEX IF NOT EXISTS idx_tags ON user_clothing_items USING gin(tags)')
-        
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS saved_outfits (
-                id SERIAL PRIMARY KEY,
-                outfit_id VARCHAR(50),
-                image_path VARCHAR(255),
-                tags TEXT[],
-                season VARCHAR(10),
-                notes TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        # Add indexes for saved_outfits
-        cur.execute('CREATE INDEX IF NOT EXISTS idx_outfit_id ON saved_outfits(outfit_id)')
-        cur.execute('CREATE INDEX IF NOT EXISTS idx_outfit_tags ON saved_outfits USING gin(tags)')
-        
-        conn.commit()
+        try:
+            # Create tables with proper indexes
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS user_clothing_items (
+                    id SERIAL PRIMARY KEY,
+                    type VARCHAR(50),
+                    color VARCHAR(50),
+                    style VARCHAR(255),
+                    gender VARCHAR(50),
+                    size VARCHAR(50),
+                    image_path VARCHAR(255),
+                    hyperlink VARCHAR(255),
+                    tags TEXT[],
+                    season VARCHAR(10),
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Add indexes for frequently queried columns
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_type ON user_clothing_items(type)')
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_style ON user_clothing_items(style)')
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_tags ON user_clothing_items USING gin(tags)')
+            
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS saved_outfits (
+                    id SERIAL PRIMARY KEY,
+                    outfit_id VARCHAR(50),
+                    image_path VARCHAR(255),
+                    tags TEXT[],
+                    season VARCHAR(10),
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Add indexes for saved_outfits
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_outfit_id ON saved_outfits(outfit_id)')
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_outfit_tags ON saved_outfits USING gin(tags)')
+            
+            conn.commit()
+        finally:
+            cur.close()
 
 def cleanup_merged_outfits(max_age_hours=24):
     """Clean up old unsaved outfit files from merged_outfits folder"""
@@ -181,5 +191,22 @@ def cleanup_merged_outfits(max_age_hours=24):
         logging.error(f"Error during outfit cleanup: {str(e)}")
         return 0
 
-# Remaining functions from the original code (load_clothing_items, add_user_clothing_item, etc.) would continue here
-# I'll omit them for brevity, but they should be included in the full implementation
+@retry_on_error()
+def load_clothing_items():
+    """Load clothing items with optimized query and connection pooling"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute('''
+                SELECT id, type, color, style, gender, size, image_path, hyperlink, 
+                       tags, season, notes
+                FROM user_clothing_items
+                ORDER BY type, created_at DESC
+            ''')
+            columns = ['id', 'type', 'color', 'style', 'gender', 'size', 
+                      'image_path', 'hyperlink', 'tags', 'season', 'notes']
+            data = cur.fetchall()
+            return pd.DataFrame(data, columns=columns)
+        finally:
+            cur.close()
+    return pd.DataFrame()
