@@ -9,7 +9,7 @@ from sklearn.decomposition import TruncatedSVD
 from scipy.sparse import csr_matrix
 from sklearn.neighbors import NearestNeighbors
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 import joblib
 import psycopg2
 from psycopg2.pool import SimpleConnectionPool
@@ -38,35 +38,13 @@ def create_connection_pool():
         raise
 
 # Create the connection pool
-try:
-    connection_pool = create_connection_pool()
-except Exception as e:
-    logging.error(f"Failed to create initial connection pool: {str(e)}")
-    connection_pool = None
-
-def get_pool_status():
-    """Get current status of the connection pool"""
-    if connection_pool:
-        try:
-            # Use direct pool access for performance
-            used_count = sum(1 for conn in connection_pool._pool if not conn.closed)
-            return {
-                'min_connections': MIN_CONNECTIONS,
-                'max_connections': MAX_CONNECTIONS,
-                'used_connections': used_count,
-                'free_connections': MAX_CONNECTIONS - used_count
-            }
-        except Exception as e:
-            logging.error(f"Error getting pool status: {str(e)}")
-    return None
+connection_pool = create_connection_pool()
 
 @contextmanager
 def get_db_connection():
     """Context manager for handling database connections from the pool"""
     conn = None
     try:
-        if not connection_pool:
-            raise Exception("Database connection pool not initialized")
         conn = connection_pool.getconn()
         yield conn
     except Exception as e:
@@ -74,244 +52,381 @@ def get_db_connection():
         raise
     finally:
         if conn:
-            try:
-                connection_pool.putconn(conn)
-            except Exception as e:
-                logging.error(f"Error returning connection to pool: {str(e)}")
+            connection_pool.putconn(conn)
 
 def retry_on_error(max_retries=3, delay=1):
     """Decorator for retrying database operations"""
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            last_error = None
             for attempt in range(max_retries):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
-                    last_error = e
                     if attempt == max_retries - 1:
                         logging.error(f"Operation failed after {max_retries} attempts: {str(e)}")
                         raise
-                    time.sleep(delay * (2 ** attempt))  # Exponential backoff
+                    time.sleep(delay * (attempt + 1))
             return None
         return wrapper
     return decorator
-
-def is_numpy_integer(value):
-    """Helper function to check if a value is a numpy integer"""
-    return hasattr(value, 'dtype') and np.issubdtype(value.dtype, np.integer)
 
 def create_user_items_table():
     """Create necessary database tables with indexes"""
     with get_db_connection() as conn:
         cur = conn.cursor()
-        try:
-            # Create tables with proper indexes
-            cur.execute('''
-                CREATE TABLE IF NOT EXISTS user_clothing_items (
-                    id SERIAL PRIMARY KEY,
-                    type VARCHAR(50),
-                    color VARCHAR(50),
-                    style VARCHAR(255),
-                    gender VARCHAR(50),
-                    size VARCHAR(50),
-                    image_path VARCHAR(255),
-                    hyperlink VARCHAR(255),
-                    tags TEXT[],
-                    season VARCHAR(10),
-                    notes TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # Add indexes for frequently queried columns
-            cur.execute('CREATE INDEX IF NOT EXISTS idx_type ON user_clothing_items(type)')
-            cur.execute('CREATE INDEX IF NOT EXISTS idx_style ON user_clothing_items(style)')
-            cur.execute('CREATE INDEX IF NOT EXISTS idx_tags ON user_clothing_items USING gin(tags)')
-            
-            cur.execute('''
-                CREATE TABLE IF NOT EXISTS saved_outfits (
-                    id SERIAL PRIMARY KEY,
-                    outfit_id VARCHAR(50),
-                    image_path VARCHAR(255),
-                    tags TEXT[],
-                    season VARCHAR(10),
-                    notes TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # Add indexes for saved_outfits
-            cur.execute('CREATE INDEX IF NOT EXISTS idx_outfit_id ON saved_outfits(outfit_id)')
-            cur.execute('CREATE INDEX IF NOT EXISTS idx_outfit_tags ON saved_outfits USING gin(tags)')
-            
-            conn.commit()
-        finally:
-            cur.close()
+        
+        # Create tables with proper indexes
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS user_clothing_items (
+                id SERIAL PRIMARY KEY,
+                type VARCHAR(50),
+                color VARCHAR(50),
+                style VARCHAR(255),
+                gender VARCHAR(50),
+                size VARCHAR(50),
+                image_path VARCHAR(255),
+                hyperlink VARCHAR(255),
+                tags TEXT[],
+                season VARCHAR(10),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Add indexes for frequently queried columns
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_type ON user_clothing_items(type)')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_style ON user_clothing_items(style)')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_tags ON user_clothing_items USING gin(tags)')
+        
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS saved_outfits (
+                id SERIAL PRIMARY KEY,
+                outfit_id VARCHAR(50),
+                image_path VARCHAR(255),
+                tags TEXT[],
+                season VARCHAR(10),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Add indexes for saved_outfits
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_outfit_id ON saved_outfits(outfit_id)')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_outfit_tags ON saved_outfits USING gin(tags)')
+        
+        conn.commit()
 
 @retry_on_error()
 def load_clothing_items():
-    """Load clothing items with optimized query and connection pooling"""
+    """Load clothing items with optimized query"""
     with get_db_connection() as conn:
         cur = conn.cursor()
-        try:
-            cur.execute('''
-                SELECT id, type, color, style, gender, size, image_path, hyperlink, 
-                       tags, season, notes
-                FROM user_clothing_items
-                ORDER BY type, created_at DESC
-            ''')
-            columns = ['id', 'type', 'color', 'style', 'gender', 'size', 
-                      'image_path', 'hyperlink', 'tags', 'season', 'notes']
-            data = cur.fetchall()
-            df = pd.DataFrame(data, columns=columns)
-            return df
-        finally:
-            cur.close()
-    return pd.DataFrame()
+        cur.execute("""
+            SELECT id, type, color, style, gender, size, image_path, hyperlink, tags, season, notes
+            FROM user_clothing_items
+            ORDER BY type, created_at DESC
+        """)
+        user_items = cur.fetchall()
+        
+        columns = ['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink', 'tags', 'season', 'notes']
+        items_df = pd.DataFrame(user_items, columns=columns)
+        return items_df
 
 @retry_on_error()
-def save_outfit(outfit_data):
-    """Save outfit to database and copy image to permanent storage"""
-    try:
-        # Generate a unique outfit ID
-        outfit_id = str(uuid.uuid4())
-        
-        # Copy merged image to a permanent location if it exists
-        image_path = outfit_data.get('merged_image_path')
-        if image_path and os.path.exists(image_path):
-            # Save outfit image to database
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                try:
-                    cur.execute("""
-                        INSERT INTO saved_outfits (outfit_id, image_path)
-                        VALUES (%s, %s)
-                        RETURNING id
-                    """, (outfit_id, image_path))
-                    conn.commit()
-                    return image_path
-                finally:
-                    cur.close()
-        return None
-    except Exception as e:
-        logging.error(f"Error saving outfit: {str(e)}")
-        return None
-
-# Add batch operations support
-def batch_insert_items(items_data):
-    """Batch insert multiple clothing items"""
+def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file, hyperlink=""):
+    """Add clothing item with prepared statement"""
+    if not os.path.exists("user_images"):
+        os.makedirs("user_images", exist_ok=True)
+    
+    image_filename = f"{item_type}_{uuid.uuid4()}.png"
+    image_path = os.path.join("user_images", image_filename)
+    
+    with Image.open(image_file) as img:
+        img.save(image_path)
+    
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
-            execute_values(
-                cur,
-                """
+            cur.execute("""
                 INSERT INTO user_clothing_items 
                 (type, color, style, gender, size, image_path, hyperlink)
-                VALUES %s
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
-                """,
-                items_data
-            )
+            """, (
+                item_type, 
+                f"{color[0]},{color[1]},{color[2]}", 
+                ','.join(styles),
+                ','.join(genders),
+                ','.join(sizes),
+                image_path,
+                hyperlink
+            ))
+            new_id = cur.fetchone()[0]
             conn.commit()
-            return True
+            return True, f"New {item_type} added successfully with ID: {new_id}"
         except Exception as e:
-            logging.error(f"Error in batch insert: {str(e)}")
-            return False
-        finally:
-            cur.close()
-
-@retry_on_error()
-def load_saved_outfits():
-    """Load saved outfits with optimized query and connection pooling"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            cur.execute('''
-                SELECT outfit_id, image_path, tags, season, notes, created_at
-                FROM saved_outfits
-                ORDER BY created_at DESC
-            ''')
-            columns = ['outfit_id', 'image_path', 'tags', 'season', 'notes', 'created_at']
-            data = cur.fetchall()
-            return [dict(zip(columns, row)) for row in data]
-        finally:
-            cur.close()
-    return []
-
-@retry_on_error()
-def batch_update_outfits(updates):
-    """Batch update multiple outfits"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            execute_batch(
-                cur,
-                """
-                UPDATE saved_outfits 
-                SET tags = %(tags)s,
-                    season = %(season)s,
-                    notes = %(notes)s
-                WHERE outfit_id = %(outfit_id)s
-                """,
-                updates
-            )
-            conn.commit()
-            return True
-        except Exception as e:
-            logging.error(f"Error in batch update: {str(e)}")
-            return False
-        finally:
-            cur.close()
+            conn.rollback()
+            return False, str(e)
 
 @retry_on_error()
 def update_outfit_details(outfit_id, tags=None, season=None, notes=None):
-    """Update outfit details with optimized connection handling"""
+    """Update outfit details with optimized query"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            update_fields = []
+            params = []
+            
+            if tags is not None:
+                update_fields.append("tags = %s")
+                params.append(tags)
+            
+            if season is not None:
+                update_fields.append("season = %s")
+                params.append(season)
+                
+            if notes is not None:
+                update_fields.append("notes = %s")
+                params.append(notes)
+                
+            if update_fields:
+                params.append(outfit_id)
+                query = f"""
+                    UPDATE saved_outfits 
+                    SET {', '.join(update_fields)}
+                    WHERE outfit_id = %s
+                    RETURNING outfit_id
+                """
+                cur.execute(query, params)
+                
+                if cur.fetchone():
+                    conn.commit()
+                    return True, f"Outfit {outfit_id} updated successfully"
+                return False, f"Outfit {outfit_id} not found"
+                
+        except Exception as e:
+            conn.rollback()
+            return False, str(e)
+
+@retry_on_error()
+def get_outfit_details(outfit_id):
+    """Get outfit details with prepared statement"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT outfit_id, tags, season, notes, image_path, created_at
+                FROM saved_outfits 
+                WHERE outfit_id = %s
+            """, (outfit_id,))
+            
+            result = cur.fetchone()
+            if result:
+                return {
+                    'outfit_id': result[0],
+                    'tags': result[1] if result[1] else [],
+                    'season': result[2],
+                    'notes': result[3],
+                    'image_path': result[4],
+                    'date': result[5].strftime("%Y-%m-%d %H:%M:%S") if result[5] else None
+                }
+            return None
+        except Exception as e:
+            logging.error(f"Error getting outfit details: {str(e)}")
+            return None
+
+@retry_on_error()
+def update_item_details(item_id, tags=None, season=None, notes=None):
+    """Update item details with optimized query"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            update_fields = []
+            params = []
+            
+            if tags is not None:
+                update_fields.append("tags = %s")
+                params.append(tags)
+            
+            if season is not None:
+                update_fields.append("season = %s")
+                params.append(season)
+                
+            if notes is not None:
+                update_fields.append("notes = %s")
+                params.append(notes)
+                
+            if update_fields:
+                params.append(int(item_id) if isinstance(item_id, (np.int64, np.integer)) else item_id)
+                query = f"""
+                    UPDATE user_clothing_items 
+                    SET {', '.join(update_fields)}
+                    WHERE id = %s
+                    RETURNING id
+                """
+                cur.execute(query, params)
+                
+                if cur.fetchone():
+                    conn.commit()
+                    return True, f"Item {item_id} updated successfully"
+                return False, f"Item {item_id} not found"
+                
+        except Exception as e:
+            conn.rollback()
+            return False, str(e)
+
+@retry_on_error()
+def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink):
+    """Edit clothing item with prepared statement"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                UPDATE user_clothing_items 
+                SET color = %s, style = %s, gender = %s, size = %s, hyperlink = %s
+                WHERE id = %s
+                RETURNING id
+            """, (
+                f"{color[0]},{color[1]},{color[2]}",
+                ','.join(styles),
+                ','.join(genders),
+                ','.join(sizes),
+                hyperlink,
+                int(item_id) if isinstance(item_id, (np.int64, np.integer)) else item_id
+            ))
+            
+            if cur.fetchone():
+                conn.commit()
+                return True, f"Item with ID {item_id} updated successfully"
+            return False, f"Item with ID {item_id} not found"
+            
+        except Exception as e:
+            conn.rollback()
+            return False, str(e)
+
+@retry_on_error()
+def delete_clothing_item(item_id):
+    """Delete clothing item with prepared statement"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            item_id = int(item_id) if isinstance(item_id, (np.int64, np.integer)) else item_id
+            
+            cur.execute("SELECT image_path FROM user_clothing_items WHERE id = %s", (item_id,))
+            item = cur.fetchone()
+            
+            if item and item[0]:
+                if os.path.exists(item[0]):
+                    os.remove(item[0])
+                
+                cur.execute("DELETE FROM user_clothing_items WHERE id = %s", (item_id,))
+                conn.commit()
+                return True, f"Item with ID {item_id} deleted successfully"
+            
+            return False, f"Item with ID {item_id} not found"
+            
+        except Exception as e:
+            conn.rollback()
+            return False, str(e)
+
+@retry_on_error()
+def save_outfit(outfit):
+    """Save outfit with optimized file handling and database operations"""
     try:
+        if not os.path.exists('wardrobe'):
+            os.makedirs('wardrobe')
+        
+        outfit_id = str(uuid.uuid4())
+        outfit_filename = f"outfit_{outfit_id}.png"
+        outfit_path = os.path.join('wardrobe', outfit_filename)
+        
+        if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
+            Image.open(outfit['merged_image_path']).save(outfit_path)
+        else:
+            total_width = 600
+            height = 200
+            outfit_img = Image.new('RGB', (total_width, height), (255, 255, 255))
+            
+            for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
+                if item_type in outfit:
+                    item_img = Image.open(outfit[item_type]['image_path'])
+                    item_img = item_img.resize((200, 200))
+                    outfit_img.paste(item_img, (i * 200, 0))
+            
+            outfit_img.save(outfit_path)
+        
         with get_db_connection() as conn:
             cur = conn.cursor()
             try:
                 cur.execute("""
-                    UPDATE saved_outfits 
-                    SET tags = COALESCE(%s, tags),
-                        season = COALESCE(%s, season),
-                        notes = COALESCE(%s, notes)
-                    WHERE outfit_id = %s
-                    RETURNING id
-                """, (tags, season, notes, outfit_id))
+                    INSERT INTO saved_outfits (outfit_id, image_path)
+                    VALUES (%s, %s)
+                    RETURNING outfit_id
+                """, (outfit_id, outfit_path))
+                
                 conn.commit()
-                return True, "Outfit details updated successfully"
-            finally:
-                cur.close()
+                return outfit_path
+                
+            except Exception as e:
+                conn.rollback()
+                raise e
+                
     except Exception as e:
-        return False, f"Error updating outfit details: {str(e)}"
+        logging.error(f"Error saving outfit: {str(e)}")
+        return None
+
+@retry_on_error()
+def load_saved_outfits():
+    """Load saved outfits with optimized query"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT outfit_id, image_path, tags, season, notes, created_at 
+                FROM saved_outfits 
+                ORDER BY created_at DESC
+            """)
+            
+            outfits = cur.fetchall()
+            if outfits:
+                return [
+                    {
+                        'outfit_id': outfit[0],
+                        'image_path': outfit[1],
+                        'tags': outfit[2] if outfit[2] else [],
+                        'season': outfit[3],
+                        'notes': outfit[4],
+                        'date': outfit[5].strftime("%Y-%m-%d %H:%M:%S")
+                    }
+                    for outfit in outfits
+                ]
+            return []
+            
+        except Exception as e:
+            logging.error(f"Error loading saved outfits: {str(e)}")
+            return []
 
 @retry_on_error()
 def delete_saved_outfit(outfit_id):
-    """Delete a saved outfit with proper connection handling"""
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            try:
-                # Get the image path first
-                cur.execute("SELECT image_path FROM saved_outfits WHERE outfit_id = %s", (outfit_id,))
-                result = cur.fetchone()
-                if result:
-                    image_path = result[0]
-                    
-                    # Delete from database
-                    cur.execute("DELETE FROM saved_outfits WHERE outfit_id = %s", (outfit_id,))
-                    conn.commit()
-                    
-                    # Delete the image file if it exists
-                    if os.path.exists(image_path):
-                        os.remove(image_path)
-                    
-                    return True, "Outfit deleted successfully"
-                return False, "Outfit not found"
-            finally:
-                cur.close()
-    except Exception as e:
-        return False, f"Error deleting outfit: {str(e)}"
+    """Delete saved outfit with prepared statement"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT image_path FROM saved_outfits WHERE outfit_id = %s", (outfit_id,))
+            outfit = cur.fetchone()
+            
+            if outfit and outfit[0]:
+                image_path = outfit[0]
+                cur.execute("DELETE FROM saved_outfits WHERE outfit_id = %s", (outfit_id,))
+                conn.commit()
+                
+                if os.path.exists(image_path):
+                    os.remove(image_path)
+                
+                return True, f"Outfit {outfit_id} deleted successfully"
+            return False, f"Outfit {outfit_id} not found"
+            
+        except Exception as e:
+            conn.rollback()
+            return False, str(e)
