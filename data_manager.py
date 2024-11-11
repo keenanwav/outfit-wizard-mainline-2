@@ -71,6 +71,10 @@ def retry_on_error(max_retries=3, delay=1):
         return wrapper
     return decorator
 
+def is_numpy_integer(value):
+    """Helper function to check if a value is a numpy integer"""
+    return hasattr(value, 'dtype') and np.issubdtype(value.dtype, np.integer)
+
 def create_user_items_table():
     """Create necessary database tables with indexes"""
     with get_db_connection() as conn:
@@ -129,8 +133,11 @@ def load_clothing_items():
         """)
         user_items = cur.fetchall()
         
-        columns = ['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink', 'tags', 'season', 'notes']
-        items_df = pd.DataFrame(user_items, columns=columns)
+        # Create DataFrame with proper column specification
+        items_df = pd.DataFrame(
+            data=user_items,
+            columns=['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink', 'tags', 'season', 'notes']
+        )
         return items_df
 
 @retry_on_error()
@@ -258,7 +265,8 @@ def update_item_details(item_id, tags=None, season=None, notes=None):
                 params.append(notes)
                 
             if update_fields:
-                params.append(int(item_id) if isinstance(item_id, (np.int64, np.integer)) else item_id)
+                # Convert numpy int to Python int
+                params.append(int(item_id) if is_numpy_integer(item_id) else item_id)
                 query = f"""
                     UPDATE user_clothing_items 
                     SET {', '.join(update_fields)}
@@ -293,7 +301,7 @@ def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink):
                 ','.join(genders),
                 ','.join(sizes),
                 hyperlink,
-                int(item_id) if isinstance(item_id, (np.int64, np.integer)) else item_id
+                int(item_id) if is_numpy_integer(item_id) else item_id
             ))
             
             if cur.fetchone():
@@ -311,7 +319,8 @@ def delete_clothing_item(item_id):
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
-            item_id = int(item_id) if isinstance(item_id, (np.int64, np.integer)) else item_id
+            # Convert numpy int to Python int
+            item_id = int(item_id) if is_numpy_integer(item_id) else item_id
             
             cur.execute("SELECT image_path FROM user_clothing_items WHERE id = %s", (item_id,))
             item = cur.fetchone()
