@@ -9,7 +9,7 @@ from sklearn.decomposition import TruncatedSVD
 from scipy.sparse import csr_matrix
 from sklearn.neighbors import NearestNeighbors
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 import joblib
 import psycopg2
 from psycopg2.pool import SimpleConnectionPool
@@ -21,9 +21,10 @@ from functools import wraps
 # Initialize connection pool
 MIN_CONNECTIONS = 1
 MAX_CONNECTIONS = 20
+POOL_TIMEOUT = 30
 
 def create_connection_pool():
-    """Create and return a connection pool"""
+    """Create and return a connection pool with optimized settings"""
     try:
         return SimpleConnectionPool(
             MIN_CONNECTIONS,
@@ -31,7 +32,11 @@ def create_connection_pool():
             host=os.environ['PGHOST'],
             database=os.environ['PGDATABASE'],
             user=os.environ['PGUSER'],
-            password=os.environ['PGPASSWORD']
+            password=os.environ['PGPASSWORD'],
+            keepalives=1,
+            keepalives_idle=30,
+            keepalives_interval=10,
+            keepalives_count=5
         )
     except Exception as e:
         logging.error(f"Error creating connection pool: {str(e)}")
@@ -42,32 +47,40 @@ connection_pool = create_connection_pool()
 
 @contextmanager
 def get_db_connection():
-    """Context manager for handling database connections from the pool"""
+    """Context manager for handling database connections from the pool with timeout"""
     conn = None
     try:
         conn = connection_pool.getconn()
-        yield conn
+        if conn:
+            conn.set_session(autocommit=False)  # Explicit transaction control
+            yield conn
     except Exception as e:
         logging.error(f"Database connection error: {str(e)}")
         raise
     finally:
         if conn:
+            try:
+                conn.rollback()  # Ensure no hanging transactions
+            except Exception:
+                pass
             connection_pool.putconn(conn)
 
 def retry_on_error(max_retries=3, delay=1):
-    """Decorator for retrying database operations"""
+    """Decorator for retrying database operations with exponential backoff"""
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
+            last_error = None
             for attempt in range(max_retries):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
-                    if attempt == max_retries - 1:
-                        logging.error(f"Operation failed after {max_retries} attempts: {str(e)}")
-                        raise
-                    time.sleep(delay * (attempt + 1))
-            return None
+                    last_error = e
+                    if attempt < max_retries - 1:
+                        sleep_time = delay * (2 ** attempt)  # Exponential backoff
+                        time.sleep(sleep_time)
+            logging.error(f"Operation failed after {max_retries} attempts: {str(last_error)}")
+            raise last_error
         return wrapper
     return decorator
 
@@ -117,6 +130,55 @@ def create_user_items_table():
         
         conn.commit()
 
+def cleanup_merged_outfits(max_age_hours=24):
+    """Clean up old unsaved outfit files from merged_outfits folder with optimized DB operations"""
+    try:
+        if not os.path.exists('merged_outfits'):
+            return
+            
+        current_time = datetime.now()
+        cleaned_count = 0
+        
+        # Get list of saved outfits from database to avoid deleting them
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT image_path 
+                    FROM saved_outfits 
+                    WHERE image_path IS NOT NULL
+                """)
+                saved_paths = set(path[0] for path in cur.fetchall())
+        
+        # Batch process files
+        files_to_delete = []
+        for filename in os.listdir('merged_outfits'):
+            file_path = os.path.join('merged_outfits', filename)
+            
+            # Skip if file is in saved outfits
+            if file_path in saved_paths:
+                continue
+                
+            # Check file age
+            file_time = datetime.fromtimestamp(os.path.getctime(file_path))
+            age = current_time - file_time
+            
+            if age > timedelta(hours=max_age_hours):
+                files_to_delete.append(file_path)
+        
+        # Batch delete files
+        for file_path in files_to_delete:
+            try:
+                os.remove(file_path)
+                cleaned_count += 1
+            except Exception as e:
+                logging.error(f"Error removing old outfit file {file_path}: {str(e)}")
+                    
+        logging.info(f"Cleaned up {cleaned_count} old outfit files")
+        return cleaned_count
+    except Exception as e:
+        logging.error(f"Error during outfit cleanup: {str(e)}")
+        return 0
+
 @retry_on_error()
 def load_clothing_items():
     """Load clothing items with optimized query"""
@@ -130,7 +192,7 @@ def load_clothing_items():
         user_items = cur.fetchall()
         
         columns = ['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink', 'tags', 'season', 'notes']
-        items_df = pd.DataFrame(user_items, columns=columns)
+        items_df = pd.DataFrame.from_records(user_items, columns=columns)
         return items_df
 
 @retry_on_error()
@@ -258,7 +320,7 @@ def update_item_details(item_id, tags=None, season=None, notes=None):
                 params.append(notes)
                 
             if update_fields:
-                params.append(int(item_id) if isinstance(item_id, (np.int64, np.integer)) else item_id)
+                params.append(int(item_id) if hasattr(item_id, 'item') else item_id)
                 query = f"""
                     UPDATE user_clothing_items 
                     SET {', '.join(update_fields)}
@@ -293,7 +355,7 @@ def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink):
                 ','.join(genders),
                 ','.join(sizes),
                 hyperlink,
-                int(item_id) if isinstance(item_id, (np.int64, np.integer)) else item_id
+                int(item_id) if hasattr(item_id, 'item') else item_id
             ))
             
             if cur.fetchone():
@@ -311,7 +373,7 @@ def delete_clothing_item(item_id):
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
-            item_id = int(item_id) if isinstance(item_id, (np.int64, np.integer)) else item_id
+            item_id = int(item_id) if hasattr(item_id, 'item') else item_id
             
             cur.execute("SELECT image_path FROM user_clothing_items WHERE id = %s", (item_id,))
             item = cur.fetchone()
