@@ -22,6 +22,29 @@ from functools import wraps
 MIN_CONNECTIONS = 1
 MAX_CONNECTIONS = 20
 POOL_TIMEOUT = 30
+STATEMENT_TIMEOUT = 30000  # 30 seconds statement timeout
+
+# Statement cache for prepared statements
+PREPARED_STATEMENTS = {
+    'insert_item': """
+        INSERT INTO user_clothing_items 
+        (type, color, style, gender, size, image_path, hyperlink)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
+    """,
+    'update_item': """
+        UPDATE user_clothing_items 
+        SET color = %s, style = %s, gender = %s, size = %s, hyperlink = %s
+        WHERE id = %s
+        RETURNING id
+    """,
+    'delete_item': "DELETE FROM user_clothing_items WHERE id = %s",
+    'select_items': """
+        SELECT id, type, color, style, gender, size, image_path, hyperlink, tags, season, notes
+        FROM user_clothing_items
+        ORDER BY type, created_at DESC
+    """
+}
 
 def create_connection_pool():
     """Create and return a connection pool with optimized settings"""
@@ -36,7 +59,8 @@ def create_connection_pool():
             keepalives=1,
             keepalives_idle=30,
             keepalives_interval=10,
-            keepalives_count=5
+            keepalives_count=5,
+            options=f'-c statement_timeout={STATEMENT_TIMEOUT}'
         )
     except Exception as e:
         logging.error(f"Error creating connection pool: {str(e)}")
@@ -54,6 +78,9 @@ def get_db_connection():
         if conn:
             conn.set_session(autocommit=False)  # Explicit transaction control
             yield conn
+    except psycopg2.OperationalError as e:
+        logging.error(f"Database connection timeout: {str(e)}")
+        raise
     except Exception as e:
         logging.error(f"Database connection error: {str(e)}")
         raise
@@ -65,6 +92,54 @@ def get_db_connection():
                 pass
             connection_pool.putconn(conn)
 
+def create_user_items_table():
+    """Create necessary database tables with indexes"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            # Create tables with proper indexes
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS user_clothing_items (
+                    id SERIAL PRIMARY KEY,
+                    type VARCHAR(50),
+                    color VARCHAR(50),
+                    style VARCHAR(255),
+                    gender VARCHAR(50),
+                    size VARCHAR(50),
+                    image_path VARCHAR(255),
+                    hyperlink VARCHAR(255),
+                    tags TEXT[],
+                    season VARCHAR(10),
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Add indexes for frequently queried columns
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_type ON user_clothing_items(type)')
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_style ON user_clothing_items(style)')
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_tags ON user_clothing_items USING gin(tags)')
+            
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS saved_outfits (
+                    id SERIAL PRIMARY KEY,
+                    outfit_id VARCHAR(50),
+                    image_path VARCHAR(255),
+                    tags TEXT[],
+                    season VARCHAR(10),
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Add indexes for saved_outfits
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_outfit_id ON saved_outfits(outfit_id)')
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_outfit_tags ON saved_outfits USING gin(tags)')
+            
+            conn.commit()
+        finally:
+            cur.close()
+
 def retry_on_error(max_retries=3, delay=1):
     """Decorator for retrying database operations with exponential backoff"""
     def decorator(func):
@@ -74,126 +149,40 @@ def retry_on_error(max_retries=3, delay=1):
             for attempt in range(max_retries):
                 try:
                     return func(*args, **kwargs)
+                except psycopg2.OperationalError as e:
+                    last_error = e
+                    if "statement timeout" in str(e):
+                        logging.error(f"Statement timeout in {func.__name__}: {str(e)}")
+                        raise
+                    if attempt < max_retries - 1:
+                        sleep_time = delay * (2 ** attempt)
+                        time.sleep(sleep_time)
                 except Exception as e:
                     last_error = e
                     if attempt < max_retries - 1:
-                        sleep_time = delay * (2 ** attempt)  # Exponential backoff
+                        sleep_time = delay * (2 ** attempt)
                         time.sleep(sleep_time)
             logging.error(f"Operation failed after {max_retries} attempts: {str(last_error)}")
-            raise last_error
+            if last_error:
+                raise last_error
+            raise Exception("Operation failed with unknown error")
         return wrapper
     return decorator
-
-def create_user_items_table():
-    """Create necessary database tables with indexes"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        
-        # Create tables with proper indexes
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS user_clothing_items (
-                id SERIAL PRIMARY KEY,
-                type VARCHAR(50),
-                color VARCHAR(50),
-                style VARCHAR(255),
-                gender VARCHAR(50),
-                size VARCHAR(50),
-                image_path VARCHAR(255),
-                hyperlink VARCHAR(255),
-                tags TEXT[],
-                season VARCHAR(10),
-                notes TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        # Add indexes for frequently queried columns
-        cur.execute('CREATE INDEX IF NOT EXISTS idx_type ON user_clothing_items(type)')
-        cur.execute('CREATE INDEX IF NOT EXISTS idx_style ON user_clothing_items(style)')
-        cur.execute('CREATE INDEX IF NOT EXISTS idx_tags ON user_clothing_items USING gin(tags)')
-        
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS saved_outfits (
-                id SERIAL PRIMARY KEY,
-                outfit_id VARCHAR(50),
-                image_path VARCHAR(255),
-                tags TEXT[],
-                season VARCHAR(10),
-                notes TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        # Add indexes for saved_outfits
-        cur.execute('CREATE INDEX IF NOT EXISTS idx_outfit_id ON saved_outfits(outfit_id)')
-        cur.execute('CREATE INDEX IF NOT EXISTS idx_outfit_tags ON saved_outfits USING gin(tags)')
-        
-        conn.commit()
-
-def cleanup_merged_outfits(max_age_hours=24):
-    """Clean up old unsaved outfit files from merged_outfits folder with optimized DB operations"""
-    try:
-        if not os.path.exists('merged_outfits'):
-            return
-            
-        current_time = datetime.now()
-        cleaned_count = 0
-        
-        # Get list of saved outfits from database to avoid deleting them
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT image_path 
-                    FROM saved_outfits 
-                    WHERE image_path IS NOT NULL
-                """)
-                saved_paths = set(path[0] for path in cur.fetchall())
-        
-        # Batch process files
-        files_to_delete = []
-        for filename in os.listdir('merged_outfits'):
-            file_path = os.path.join('merged_outfits', filename)
-            
-            # Skip if file is in saved outfits
-            if file_path in saved_paths:
-                continue
-                
-            # Check file age
-            file_time = datetime.fromtimestamp(os.path.getctime(file_path))
-            age = current_time - file_time
-            
-            if age > timedelta(hours=max_age_hours):
-                files_to_delete.append(file_path)
-        
-        # Batch delete files
-        for file_path in files_to_delete:
-            try:
-                os.remove(file_path)
-                cleaned_count += 1
-            except Exception as e:
-                logging.error(f"Error removing old outfit file {file_path}: {str(e)}")
-                    
-        logging.info(f"Cleaned up {cleaned_count} old outfit files")
-        return cleaned_count
-    except Exception as e:
-        logging.error(f"Error during outfit cleanup: {str(e)}")
-        return 0
 
 @retry_on_error()
 def load_clothing_items():
     """Load clothing items with optimized query"""
     with get_db_connection() as conn:
         cur = conn.cursor()
-        cur.execute("""
-            SELECT id, type, color, style, gender, size, image_path, hyperlink, tags, season, notes
-            FROM user_clothing_items
-            ORDER BY type, created_at DESC
-        """)
-        user_items = cur.fetchall()
-        
-        columns = ['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink', 'tags', 'season', 'notes']
-        items_df = pd.DataFrame.from_records(user_items, columns=columns)
-        return items_df
+        try:
+            cur.execute(PREPARED_STATEMENTS['select_items'])
+            user_items = cur.fetchall()
+            
+            columns = ['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink', 'tags', 'season', 'notes']
+            items_df = pd.DataFrame.from_records(user_items, columns=columns)
+            return items_df
+        finally:
+            cur.close()
 
 @retry_on_error()
 def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file, hyperlink=""):
@@ -210,12 +199,7 @@ def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file,
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
-            cur.execute("""
-                INSERT INTO user_clothing_items 
-                (type, color, style, gender, size, image_path, hyperlink)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                RETURNING id
-            """, (
+            cur.execute(PREPARED_STATEMENTS['insert_item'], (
                 item_type, 
                 f"{color[0]},{color[1]},{color[2]}", 
                 ','.join(styles),
@@ -230,6 +214,8 @@ def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file,
         except Exception as e:
             conn.rollback()
             return False, str(e)
+        finally:
+            cur.close()
 
 @retry_on_error()
 def update_outfit_details(outfit_id, tags=None, season=None, notes=None):
@@ -266,10 +252,8 @@ def update_outfit_details(outfit_id, tags=None, season=None, notes=None):
                     conn.commit()
                     return True, f"Outfit {outfit_id} updated successfully"
                 return False, f"Outfit {outfit_id} not found"
-                
-        except Exception as e:
-            conn.rollback()
-            return False, str(e)
+        finally:
+            cur.close()
 
 @retry_on_error()
 def get_outfit_details(outfit_id):
@@ -294,9 +278,8 @@ def get_outfit_details(outfit_id):
                     'date': result[5].strftime("%Y-%m-%d %H:%M:%S") if result[5] else None
                 }
             return None
-        except Exception as e:
-            logging.error(f"Error getting outfit details: {str(e)}")
-            return None
+        finally:
+            cur.close()
 
 @retry_on_error()
 def update_item_details(item_id, tags=None, season=None, notes=None):
@@ -333,10 +316,8 @@ def update_item_details(item_id, tags=None, season=None, notes=None):
                     conn.commit()
                     return True, f"Item {item_id} updated successfully"
                 return False, f"Item {item_id} not found"
-                
-        except Exception as e:
-            conn.rollback()
-            return False, str(e)
+        finally:
+            cur.close()
 
 @retry_on_error()
 def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink):
@@ -344,12 +325,7 @@ def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink):
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
-            cur.execute("""
-                UPDATE user_clothing_items 
-                SET color = %s, style = %s, gender = %s, size = %s, hyperlink = %s
-                WHERE id = %s
-                RETURNING id
-            """, (
+            cur.execute(PREPARED_STATEMENTS['update_item'], (
                 f"{color[0]},{color[1]},{color[2]}",
                 ','.join(styles),
                 ','.join(genders),
@@ -362,10 +338,8 @@ def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink):
                 conn.commit()
                 return True, f"Item with ID {item_id} updated successfully"
             return False, f"Item with ID {item_id} not found"
-            
-        except Exception as e:
-            conn.rollback()
-            return False, str(e)
+        finally:
+            cur.close()
 
 @retry_on_error()
 def delete_clothing_item(item_id):
@@ -382,15 +356,13 @@ def delete_clothing_item(item_id):
                 if os.path.exists(item[0]):
                     os.remove(item[0])
                 
-                cur.execute("DELETE FROM user_clothing_items WHERE id = %s", (item_id,))
+                cur.execute(PREPARED_STATEMENTS['delete_item'], (item_id,))
                 conn.commit()
                 return True, f"Item with ID {item_id} deleted successfully"
             
             return False, f"Item with ID {item_id} not found"
-            
-        except Exception as e:
-            conn.rollback()
-            return False, str(e)
+        finally:
+            cur.close()
 
 @retry_on_error()
 def save_outfit(outfit):
@@ -429,10 +401,8 @@ def save_outfit(outfit):
                 
                 conn.commit()
                 return outfit_path
-                
-            except Exception as e:
-                conn.rollback()
-                raise e
+            finally:
+                cur.close()
                 
     except Exception as e:
         logging.error(f"Error saving outfit: {str(e)}")
@@ -464,10 +434,8 @@ def load_saved_outfits():
                     for outfit in outfits
                 ]
             return []
-            
-        except Exception as e:
-            logging.error(f"Error loading saved outfits: {str(e)}")
-            return []
+        finally:
+            cur.close()
 
 @retry_on_error()
 def delete_saved_outfit(outfit_id):
@@ -488,7 +456,5 @@ def delete_saved_outfit(outfit_id):
                 
                 return True, f"Outfit {outfit_id} deleted successfully"
             return False, f"Outfit {outfit_id} not found"
-            
-        except Exception as e:
-            conn.rollback()
-            return False, str(e)
+        finally:
+            cur.close()
