@@ -12,26 +12,33 @@ def parse_color_string(color_str):
         # Return a default color if parsing fails
         return [0, 0, 0]
 
-def get_center_color(image_path):
-    """Extract the color from the center of the image"""
+def get_center_color(image_path, item_type=None):
+    """Extract the color from the image based on item type"""
     try:
         img = Image.open(image_path)
         if img.mode != 'RGB':
             img = img.convert('RGB')
         
-        # Get the center pixel coordinates
+        # Get image dimensions
         width, height = img.size
         center_x = width // 2
         center_y = height // 2
         
-        # Get color from a small central region (5x5 pixels)
+        # Adjust sampling point based on item type
+        if item_type == 'pants':
+            # Sample 20 pixels left of center
+            sample_x = max(0, center_x - 20)
+        else:
+            sample_x = center_x
+            
+        # Get color from a small region (5x5 pixels)
         region_size = 5
-        x1 = max(0, center_x - region_size // 2)
+        x1 = max(0, sample_x - region_size // 2)
         y1 = max(0, center_y - region_size // 2)
         x2 = min(width, x1 + region_size)
         y2 = min(height, y1 + region_size)
         
-        # Get the average color of the central region
+        # Get the average color of the sampled region
         center_region = img.crop((x1, y1, x2, y2))
         pixels = np.array(center_region)
         center_color = pixels.mean(axis=(0, 1)).astype(int)
@@ -41,11 +48,11 @@ def get_center_color(image_path):
         st.error(f"Error extracting center color: {str(e)}")
         return None
 
-def get_color_palette(image_path, n_colors=1):
+def get_color_palette(image_path, n_colors=1, item_type=None):
     """Extract colors from an image"""
     try:
         if n_colors == 1:
-            color = get_center_color(image_path)
+            color = get_center_color(image_path, item_type)
             return np.array([color]) if color is not None else None
             
         # Original k-means clustering for multiple colors
