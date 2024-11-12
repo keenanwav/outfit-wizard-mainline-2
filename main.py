@@ -214,7 +214,7 @@ def personal_wardrobe_page():
             with open(temp_path, "wb") as f:
                 f.write(uploaded_file.getvalue())
             
-            colors = get_color_palette(temp_path, item_type=item_type.lower())
+            colors = get_color_palette(temp_path)
             if colors is not None:
                 st.write("Extracted Color:")
                 display_color_palette(colors)
