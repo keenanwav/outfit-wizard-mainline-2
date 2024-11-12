@@ -47,7 +47,7 @@ def show_first_visit_tips():
             4. Use tags and seasons to organize your wardrobe
             """)
             
-            if st.checkbox("Don't show again"):
+            if st.checkbox("Don't show again", key="first_visit_checkbox"):
                 st.session_state.show_tips = False
                 st.rerun()
 
