@@ -26,8 +26,8 @@ def get_center_color(image_path, item_type=None):
         
         # Adjust sampling point based on item type
         if item_type == 'pants':
-            # Sample 20 pixels left of center
-            sample_x = max(0, center_x - 20)
+            # Sample 5 pixels left of center (changed from 20)
+            sample_x = max(0, center_x - 5)
         else:
             sample_x = center_x
             
