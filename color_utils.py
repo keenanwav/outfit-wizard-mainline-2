@@ -6,7 +6,13 @@ import streamlit as st
 
 def parse_color_string(color_str):
     try:
-        # Handle color strings in format "r,g,b"
+        # Handle color strings in format "r,g,b" or multiple colors "[r,g,b],[r,g,b]"
+        if '[' in color_str:
+            colors = []
+            for color_part in color_str.split(']['):
+                color_part = color_part.strip('[]')
+                colors.append([int(c) for c in color_part.split(',')])
+            return colors
         return [int(c) for c in color_str.split(',')]
     except:
         # Return a default color if parsing fails
@@ -22,8 +28,12 @@ def get_region_color(img, region_bounds):
         st.error(f"Error extracting region color: {str(e)}")
         return None
 
+def is_white_color(color, threshold=20):
+    """Check if a color is close to white"""
+    return all(abs(255 - c) <= threshold for c in color)
+
 def get_pants_colors(image_path):
-    """Extract colors from multiple regions of pants image"""
+    """Extract colors from multiple regions of pants image with special handling for white"""
     try:
         img = Image.open(image_path)
         if img.mode != 'RGB':
@@ -44,10 +54,14 @@ def get_pants_colors(image_path):
         ]
         
         colors = []
+        non_white_colors = []
+        
         for region in regions:
             color = get_region_color(img, region)
             if color is not None:
                 colors.append(color)
+                if not is_white_color(color):
+                    non_white_colors.append(color)
         
         if not colors:
             return None
@@ -58,7 +72,18 @@ def get_pants_colors(image_path):
         kmeans.fit(colors_array)
         dominant_color = kmeans.cluster_centers_[0].astype(int)
         
-        return dominant_color
+        # Special handling for white pants
+        if is_white_color(dominant_color) and non_white_colors:
+            # Find secondary color from non-white regions
+            non_white_array = np.array(non_white_colors)
+            kmeans_secondary = KMeans(n_clusters=1, random_state=42)
+            kmeans_secondary.fit(non_white_array)
+            secondary_color = kmeans_secondary.cluster_centers_[0].astype(int)
+            
+            # Return both white and secondary color
+            return np.array([dominant_color, secondary_color])
+        
+        return np.array([dominant_color])
         
     except Exception as e:
         st.error(f"Error extracting pants colors: {str(e)}")
@@ -69,8 +94,8 @@ def get_color_palette(image_path, n_colors=1, item_type=None):
     try:
         if item_type == 'pants':
             # Use specialized pants color detection
-            color = get_pants_colors(image_path)
-            return np.array([color]) if color is not None else None
+            colors = get_pants_colors(image_path)
+            return colors if colors is not None else None
             
         elif n_colors == 1:
             # Use center color detection for other items
