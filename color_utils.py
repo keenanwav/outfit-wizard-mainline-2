@@ -12,56 +12,107 @@ def parse_color_string(color_str):
         # Return a default color if parsing fails
         return [0, 0, 0]
 
-def get_center_color(image_path):
-    """Extract the color from the center of the image"""
+def get_region_color(img, region_bounds):
+    """Extract the average color from a specific region of the image"""
     try:
-        img = Image.open(image_path)
-        if img.mode != 'RGB':
-            img = img.convert('RGB')
-        
-        # Get the center pixel coordinates
-        width, height = img.size
-        center_x = width // 2
-        center_y = height // 2
-        
-        # Get color from a small central region (5x5 pixels)
-        region_size = 5
-        x1 = max(0, center_x - region_size // 2)
-        y1 = max(0, center_y - region_size // 2)
-        x2 = min(width, x1 + region_size)
-        y2 = min(height, y1 + region_size)
-        
-        # Get the average color of the central region
-        center_region = img.crop((x1, y1, x2, y2))
-        pixels = np.array(center_region)
-        center_color = pixels.mean(axis=(0, 1)).astype(int)
-        
-        return center_color
+        region = img.crop(region_bounds)
+        pixels = np.array(region)
+        return pixels.mean(axis=(0, 1)).astype(int)
     except Exception as e:
-        st.error(f"Error extracting center color: {str(e)}")
+        st.error(f"Error extracting region color: {str(e)}")
         return None
 
-def get_color_palette(image_path, n_colors=1):
-    """Extract colors from an image"""
+def get_pants_colors(image_path):
+    """Extract colors from multiple regions of pants image"""
     try:
-        if n_colors == 1:
-            color = get_center_color(image_path)
-            return np.array([color]) if color is not None else None
-            
-        # Original k-means clustering for multiple colors
         img = Image.open(image_path)
         if img.mode != 'RGB':
             img = img.convert('RGB')
         
-        img.thumbnail((150, 150))
-        pixels = np.array(img)
-        pixels = pixels.reshape(-1, 3)
+        width, height = img.size
         
-        kmeans = KMeans(n_clusters=n_colors, random_state=42)
-        kmeans.fit(pixels)
-        colors = kmeans.cluster_centers_
+        # Define multiple sampling regions for pants
+        regions = [
+            # Upper region (waist area)
+            (width//4, 0, 3*width//4, height//4),
+            # Middle region (thigh area)
+            (width//4, height//4, 3*width//4, height//2),
+            # Lower region (leg area)
+            (width//4, height//2, 3*width//4, 3*height//4),
+            # Bottom region (ankle area)
+            (width//4, 3*height//4, 3*width//4, height)
+        ]
         
-        return colors.astype(int)
+        colors = []
+        for region in regions:
+            color = get_region_color(img, region)
+            if color is not None:
+                colors.append(color)
+        
+        if not colors:
+            return None
+            
+        # Use K-means to find the dominant color from all regions
+        colors_array = np.array(colors)
+        kmeans = KMeans(n_clusters=1, random_state=42)
+        kmeans.fit(colors_array)
+        dominant_color = kmeans.cluster_centers_[0].astype(int)
+        
+        return dominant_color
+        
+    except Exception as e:
+        st.error(f"Error extracting pants colors: {str(e)}")
+        return None
+
+def get_color_palette(image_path, n_colors=1, item_type=None):
+    """Extract colors from an image with item type specific handling"""
+    try:
+        if item_type == 'pants':
+            # Use specialized pants color detection
+            color = get_pants_colors(image_path)
+            return np.array([color]) if color is not None else None
+            
+        elif n_colors == 1:
+            # Use center color detection for other items
+            img = Image.open(image_path)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Get the center pixel coordinates
+            width, height = img.size
+            center_x = width // 2
+            center_y = height // 2
+            
+            # Get color from a small central region (5x5 pixels)
+            region_size = 5
+            x1 = max(0, center_x - region_size // 2)
+            y1 = max(0, center_y - region_size // 2)
+            x2 = min(width, x1 + region_size)
+            y2 = min(height, y1 + region_size)
+            
+            # Get the average color of the central region
+            center_region = img.crop((x1, y1, x2, y2))
+            pixels = np.array(center_region)
+            center_color = pixels.mean(axis=(0, 1)).astype(int)
+            
+            return np.array([center_color])
+            
+        else:
+            # Original k-means clustering for multiple colors
+            img = Image.open(image_path)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            img.thumbnail((150, 150))
+            pixels = np.array(img)
+            pixels = pixels.reshape(-1, 3)
+            
+            kmeans = KMeans(n_clusters=n_colors, random_state=42)
+            kmeans.fit(pixels)
+            colors = kmeans.cluster_centers_
+            
+            return colors.astype(int)
+            
     except Exception as e:
         st.error(f"Error extracting color palette: {str(e)}")
         return None

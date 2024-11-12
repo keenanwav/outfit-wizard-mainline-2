@@ -186,7 +186,7 @@ def load_clothing_items():
 
 @retry_on_error()
 def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file, hyperlink=""):
-    """Add clothing item with prepared statement"""
+    """Add clothing item with prepared statement and improved color detection"""
     if not os.path.exists("user_images"):
         os.makedirs("user_images", exist_ok=True)
     
@@ -195,6 +195,13 @@ def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file,
     
     with Image.open(image_file) as img:
         img.save(image_path)
+    
+    # Use item-specific color detection
+    if item_type == 'pants':
+        from color_utils import get_pants_colors
+        color = get_pants_colors(image_path)
+        if color is None:
+            return False, "Failed to detect pants color"
     
     with get_db_connection() as conn:
         cur = conn.cursor()
