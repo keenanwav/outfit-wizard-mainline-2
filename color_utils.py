@@ -58,7 +58,10 @@ def get_pants_colors(image_path):
             # Bottom region (ankle area)
             (width//4, 3*height//4, 3*width//4, height),
             # Center vertical strip
-            (width//2 - width//8, height//4, width//2 + width//8, 3*height//4)
+            (width//2 - width//8, height//4, width//2 + width//8, 3*height//4),
+            # Additional sampling points for pattern detection
+            (width//4, height//2, width//2, 3*height//4),
+            (width//2, height//2, 3*width//4, 3*height//4)
         ]
         
         colors = []
@@ -88,12 +91,20 @@ def get_pants_colors(image_path):
         sorted_indices = np.argsort(-color_counts)
         dominant_colors = dominant_colors[sorted_indices]
         
-        # If the most dominant color is white-like, use the next color
-        if is_white_color(dominant_colors[0]) and len(dominant_colors) > 1:
-            # Return both white and the next most prominent color
-            return np.array([dominant_colors[0], dominant_colors[1]])
+        # Always return both primary and secondary colors for white pants
+        if is_white_color(dominant_colors[0]):
+            # If we have a secondary color, return both
+            if len(dominant_colors) > 1 and not is_white_color(dominant_colors[1]):
+                return np.array([dominant_colors[0], dominant_colors[1]])
+            # If we have non-white colors from sampling, use the most different one
+            elif non_white_colors:
+                non_white_array = np.array(non_white_colors)
+                # Find the color most different from white
+                differences = np.abs(non_white_array - np.array([255, 255, 255])).sum(axis=1)
+                secondary_color = non_white_array[np.argmax(differences)]
+                return np.array([dominant_colors[0], secondary_color])
         
-        # Return the most dominant non-white color
+        # For non-white pants, return the most dominant color
         return np.array([dominant_colors[0]])
         
     except Exception as e:

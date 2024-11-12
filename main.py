@@ -62,6 +62,26 @@ def check_cleanup_needed():
             cleanup_merged_outfits()
             st.session_state.last_cleanup = datetime.now()
 
+def main():
+    """Main function to handle page routing"""
+    # Add navigation to sidebar
+    st.sidebar.title("Navigation")
+    page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits"])
+    
+    # Show first visit tips
+    show_first_visit_tips()
+    
+    # Check if cleanup is needed
+    check_cleanup_needed()
+    
+    # Route to appropriate page
+    if page == "Home":
+        main_page()
+    elif page == "My Items":
+        personal_wardrobe_page()
+    elif page == "Saved Outfits":
+        saved_outfits_page()
+
 def main_page():
     """Display main page with outfit generation"""
     st.title("Outfit Wizard")
@@ -253,6 +273,14 @@ def personal_wardrobe_page():
                         if os.path.exists(item['image_path']):
                             st.image(item['image_path'], use_column_width=True)
                             
+                            # Add color display
+                            colors = parse_color_string(str(item['color']))
+                            st.write("Item Colors:")
+                            if isinstance(colors[0], list):
+                                display_color_palette(colors)
+                            else:
+                                display_color_palette([colors])
+                            
                             # Edit/Delete buttons
                             edit_col, del_col = st.columns([3, 1])
                             
@@ -385,13 +413,5 @@ check_cleanup_needed()
 # Create database tables if they don't exist
 create_user_items_table()
 
-# Navigation in sidebar
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits"])
-
-if page == "Home":
-    main_page()
-elif page == "My Items":
-    personal_wardrobe_page()
-else:
-    saved_outfits_page()
+if __name__ == "__main__":
+    main()
