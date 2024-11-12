@@ -125,9 +125,13 @@ def main_page():
             for idx, (item_type, item) in enumerate(outfit.items()):
                 if item_type != 'merged_image_path':
                     with cols[idx]:
-                        color = parse_color_string(str(item['color']))
                         st.markdown(f"**{item_type.capitalize()}**")
-                        display_color_palette([color])
+                        colors = parse_color_string(str(item['color']))
+                        # If colors is a list of lists (multiple colors), display all of them
+                        if isinstance(colors[0], list):
+                            display_color_palette(colors)
+                        else:
+                            display_color_palette([colors])
             
             # Save outfit option
             if st.button("Save Outfit"):
