@@ -152,6 +152,15 @@ def cleanup_merged_outfits():
         logging.error(f"Error during outfit cleanup: {str(e)}")
         return 0
 
+def calculate_outfit_total_price(outfit: Dict) -> float:
+    """Calculate the total price of an outfit"""
+    total_price = 0.0
+    for item_type, item in outfit.items():
+        if item_type != 'merged_image_path' and isinstance(item, dict):
+            if 'price' in item and item['price'] is not None:
+                total_price += float(item['price'])
+    return total_price
+
 def generate_outfit(clothing_items, size, style, gender):
     selected_outfit = {}
     missing_items = []
@@ -241,6 +250,9 @@ def generate_outfit(clothing_items, size, style, gender):
             
             # Add the merged image path to the outfit dictionary
             selected_outfit['merged_image_path'] = merged_path
+            
+            # Calculate and add total price to the outfit dictionary
+            selected_outfit['total_price'] = calculate_outfit_total_price(selected_outfit)
             
         except Exception as e:
             logging.error(f"Error creating merged outfit image: {str(e)}")
