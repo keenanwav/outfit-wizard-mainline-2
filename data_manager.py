@@ -776,7 +776,7 @@ def update_item_image(item_id, new_image_path):
             
             # Update database with new image path
             cur.execute("""
-                UPDATE user_clothing_items 
+                UPDATE user_clothing_items
                 SET image_path = %s
                 WHERE id = %s
                 RETURNING id
