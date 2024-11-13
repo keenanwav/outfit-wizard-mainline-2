@@ -6,9 +6,10 @@ import uuid
 import logging
 from datetime import datetime, timedelta
 import time
+from contextlib import contextmanager
 
 def cleanup_merged_outfits(max_age_hours=24):
-    """Clean up old unsaved outfit files from merged_outfits folder"""
+    """Clean up old unsaved outfit files from merged_outfits folder with improved connection handling"""
     try:
         if not os.path.exists('merged_outfits'):
             return
@@ -18,13 +19,18 @@ def cleanup_merged_outfits(max_age_hours=24):
         
         # Get list of saved outfits from database to avoid deleting them
         from data_manager import get_db_connection
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT image_path FROM saved_outfits")
-        saved_paths = set(path[0] for path in cur.fetchall())
-        cur.close()
-        conn.close()
         
+        with get_db_connection() as conn:  # Properly use context manager
+            cur = conn.cursor()
+            try:
+                # Use prepared statement for better performance
+                cur.execute("SELECT image_path FROM saved_outfits WHERE image_path IS NOT NULL")
+                saved_paths = set(path[0] for path in cur.fetchall())
+            finally:
+                cur.close()
+        
+        # Get all files to delete
+        files_to_delete = []
         for filename in os.listdir('merged_outfits'):
             file_path = os.path.join('merged_outfits', filename)
             
@@ -33,15 +39,24 @@ def cleanup_merged_outfits(max_age_hours=24):
                 continue
                 
             # Check file age
-            file_time = datetime.fromtimestamp(os.path.getctime(file_path))
-            age = current_time - file_time
-            
-            if age > timedelta(hours=max_age_hours):
-                try:
-                    os.remove(file_path)
-                    cleaned_count += 1
-                except Exception as e:
-                    logging.error(f"Error removing old outfit file {file_path}: {str(e)}")
+            try:
+                file_time = datetime.fromtimestamp(os.path.getctime(file_path))
+                age = current_time - file_time
+                
+                if age > timedelta(hours=max_age_hours):
+                    files_to_delete.append(file_path)
+            except OSError as e:
+                logging.error(f"Error checking file age for {file_path}: {str(e)}")
+                continue
+        
+        # Batch delete files
+        for file_path in files_to_delete:
+            try:
+                os.remove(file_path)
+                cleaned_count += 1
+            except Exception as e:
+                logging.error(f"Error removing old outfit file {file_path}: {str(e)}")
+                continue
                     
         logging.info(f"Cleaned up {cleaned_count} old outfit files")
         return cleaned_count
