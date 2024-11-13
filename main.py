@@ -9,7 +9,7 @@ from data_manager import (
     edit_clothing_item, delete_clothing_item, create_user_items_table,
     add_user_clothing_item, update_outfit_details,
     get_outfit_details, update_item_details, delete_saved_outfit,
-    get_price_history
+    get_price_history, update_item_image
 )
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
@@ -256,12 +256,11 @@ def personal_wardrobe_page():
             item_type = st.selectbox("Type", ["Shirt", "Pants", "Shoes"])
             styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"])
             sizes = st.multiselect("Size", ["S", "M", "L", "XL"])
-            # Add price input
             price = st.number_input("Price ($)", min_value=0.0, step=0.01, format="%.2f")
         
         with col2:
             genders = st.multiselect("Gender", ["Male", "Female", "Unisex"])
-            uploaded_file = st.file_uploader("Upload Image", type=['png', 'jpg', 'jpeg'])
+            uploaded_file = st.file_uploader("Upload Image", type=['png', 'jpg', 'jpeg'], key="new_item_upload")
             hyperlink = st.text_input("Shopping Link (optional)", 
                                     help="Add a link to where this item can be purchased")
         
@@ -308,11 +307,31 @@ def personal_wardrobe_page():
                             st.image(item['image_path'], use_column_width=True)
                             
                             # Edit/Delete buttons
-                            edit_col, del_col = st.columns([3, 1])
+                            edit_col, change_img_col, del_col = st.columns([2, 2, 1])
                             
                             with edit_col:
                                 if st.button(f"Edit Details {idx}"):
                                     st.session_state.editing_item = item
+                            
+                            with change_img_col:
+                                new_image = st.file_uploader(
+                                    "Change Image", 
+                                    type=['png', 'jpg', 'jpeg'],
+                                    key=f"change_image_{idx}"
+                                )
+                                if new_image:
+                                    temp_path = f"temp_update_{new_image.name}"
+                                    with open(temp_path, "wb") as f:
+                                        f.write(new_image.getvalue())
+                                    
+                                    success, message = update_item_image(int(item['id']), temp_path)
+                                    if success:
+                                        st.success(message)
+                                        os.remove(temp_path)
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+                                        os.remove(temp_path)
                             
                             with del_col:
                                 if st.button(f"🗑️ {idx}"):
@@ -326,7 +345,6 @@ def personal_wardrobe_page():
                             # Display item details
                             st.markdown(f"**Style:** {item['style']}")
                             st.markdown(f"**Size:** {item['size']}")
-                            # Display price if available
                             if pd.notna(item['price']):
                                 st.markdown(f"**Price:** ${item['price']:.2f}")
                             if pd.notna(item['hyperlink']):

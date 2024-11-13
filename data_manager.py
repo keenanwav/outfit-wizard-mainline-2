@@ -748,3 +748,56 @@ def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file,
             return False, str(e)
         finally:
             cur.close()
+
+# Add the new function after line 382
+def update_item_image(item_id, new_image_path):
+    """Update item image with proper cleanup of old image"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            # Get current image path and type
+            cur.execute("SELECT image_path, type FROM user_clothing_items WHERE id = %s", (item_id,))
+            result = cur.fetchone()
+            if not result:
+                return False, "Item not found"
+            
+            old_image_path, item_type = result
+            
+            # Create new image path
+            if not os.path.exists("user_images"):
+                os.makedirs("user_images", exist_ok=True)
+            
+            image_filename = f"{item_type}_{uuid.uuid4()}.png"
+            new_image_save_path = os.path.join("user_images", image_filename)
+            
+            # Save new image
+            with Image.open(new_image_path) as img:
+                img.save(new_image_save_path)
+            
+            # Update database with new image path
+            cur.execute("""
+                UPDATE user_clothing_items 
+                SET image_path = %s
+                WHERE id = %s
+                RETURNING id
+            """, (new_image_save_path, item_id))
+            
+            if cur.fetchone():
+                # Delete old image if it exists
+                if old_image_path and os.path.exists(old_image_path):
+                    try:
+                        os.remove(old_image_path)
+                    except Exception as e:
+                        logging.error(f"Error removing old image: {str(e)}")
+                
+                conn.commit()
+                return True, f"Image updated successfully for item {item_id}"
+            return False, f"Failed to update image for item {item_id}"
+            
+        except Exception as e:
+            conn.rollback()
+            return False, str(e)
+        finally:
+            cur.close()
+
+```
