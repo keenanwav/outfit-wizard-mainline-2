@@ -47,7 +47,7 @@ def show_first_visit_tips():
             4. Use tags and seasons to organize your wardrobe
             """)
             
-            if st.checkbox("Don't show again", key="first_visit_checkbox"):
+            if st.checkbox("Don't show again"):
                 st.session_state.show_tips = False
                 st.rerun()
 
@@ -61,26 +61,6 @@ def check_cleanup_needed():
         if time_since_cleanup.total_seconds() > 3600:  # Check every hour
             cleanup_merged_outfits()
             st.session_state.last_cleanup = datetime.now()
-
-def main():
-    """Main function to handle page routing"""
-    # Add navigation to sidebar
-    st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits"])
-    
-    # Show first visit tips
-    show_first_visit_tips()
-    
-    # Check if cleanup is needed
-    check_cleanup_needed()
-    
-    # Route to appropriate page
-    if page == "Home":
-        main_page()
-    elif page == "My Items":
-        personal_wardrobe_page()
-    elif page == "Saved Outfits":
-        saved_outfits_page()
 
 def main_page():
     """Display main page with outfit generation"""
@@ -145,13 +125,9 @@ def main_page():
             for idx, (item_type, item) in enumerate(outfit.items()):
                 if item_type != 'merged_image_path':
                     with cols[idx]:
+                        color = parse_color_string(str(item['color']))
                         st.markdown(f"**{item_type.capitalize()}**")
-                        colors = parse_color_string(str(item['color']))
-                        # If colors is a list of lists (multiple colors), display all of them
-                        if isinstance(colors[0], list):
-                            display_color_palette(colors)
-                        else:
-                            display_color_palette([colors])
+                        display_color_palette([color])
             
             # Save outfit option
             if st.button("Save Outfit"):
@@ -272,14 +248,6 @@ def personal_wardrobe_page():
                     with col:
                         if os.path.exists(item['image_path']):
                             st.image(item['image_path'], use_column_width=True)
-                            
-                            # Add color display
-                            colors = parse_color_string(str(item['color']))
-                            st.write("Item Colors:")
-                            if isinstance(colors[0], list):
-                                display_color_palette(colors)
-                            else:
-                                display_color_palette([colors])
                             
                             # Edit/Delete buttons
                             edit_col, del_col = st.columns([3, 1])
@@ -413,5 +381,13 @@ check_cleanup_needed()
 # Create database tables if they don't exist
 create_user_items_table()
 
-if __name__ == "__main__":
-    main()
+# Navigation in sidebar
+st.sidebar.title("Navigation")
+page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits"])
+
+if page == "Home":
+    main_page()
+elif page == "My Items":
+    personal_wardrobe_page()
+else:
+    saved_outfits_page()

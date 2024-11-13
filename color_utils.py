@@ -6,13 +6,7 @@ import streamlit as st
 
 def parse_color_string(color_str):
     try:
-        # Handle color strings in format "r,g,b" or multiple colors "[r,g,b],[r,g,b]"
-        if '[' in color_str:
-            colors = []
-            for color_part in color_str.split(']['):
-                color_part = color_part.strip('[]')
-                colors.append([int(c) for c in color_part.split(',')])
-            return colors
+        # Handle color strings in format "r,g,b"
         return [int(c) for c in color_str.split(',')]
     except:
         # Return a default color if parsing fails
@@ -28,16 +22,8 @@ def get_region_color(img, region_bounds):
         st.error(f"Error extracting region color: {str(e)}")
         return None
 
-def is_white_color(color, threshold=15):
-    """Check if a color is close to white with stricter threshold"""
-    return all(c >= (255 - threshold) for c in color)
-
-def is_pure_white(color):
-    """Check if a color is pure white (#ffffff)"""
-    return all(c >= 254 for c in color)
-
 def get_pants_colors(image_path):
-    """Extract colors from multiple regions of pants image with improved white handling"""
+    """Extract colors from multiple regions of pants image"""
     try:
         img = Image.open(image_path)
         if img.mode != 'RGB':
@@ -45,67 +31,34 @@ def get_pants_colors(image_path):
         
         width, height = img.size
         
-        # Define multiple sampling regions including center points
+        # Define multiple sampling regions for pants
         regions = [
             # Upper region (waist area)
-            (width//4, height//8, 3*width//4, height//4),
-            # Upper-middle region
+            (width//4, 0, 3*width//4, height//4),
+            # Middle region (thigh area)
             (width//4, height//4, 3*width//4, height//2),
-            # Center region (main body)
-            (width//3, height//3, 2*width//3, 2*height//3),
-            # Lower-middle region
+            # Lower region (leg area)
             (width//4, height//2, 3*width//4, 3*height//4),
             # Bottom region (ankle area)
-            (width//4, 3*height//4, 3*width//4, height),
-            # Center vertical strip
-            (width//2 - width//8, height//4, width//2 + width//8, 3*height//4),
-            # Additional sampling points for pattern detection
-            (width//4, height//2, width//2, 3*height//4),
-            (width//2, height//2, 3*width//4, 3*height//4)
+            (width//4, 3*height//4, 3*width//4, height)
         ]
         
         colors = []
-        non_white_colors = []
-        
-        # Sample colors from all regions
         for region in regions:
             color = get_region_color(img, region)
             if color is not None:
-                # Skip pure white colors (likely background)
-                if not is_pure_white(color):
-                    colors.append(color)
-                    if not is_white_color(color):
-                        non_white_colors.append(color)
+                colors.append(color)
         
         if not colors:
             return None
             
-        # Use K-means to find dominant colors
+        # Use K-means to find the dominant color from all regions
         colors_array = np.array(colors)
-        kmeans = KMeans(n_clusters=min(3, len(colors)), random_state=42)
+        kmeans = KMeans(n_clusters=1, random_state=42)
         kmeans.fit(colors_array)
-        dominant_colors = kmeans.cluster_centers_.astype(int)
+        dominant_color = kmeans.cluster_centers_[0].astype(int)
         
-        # Sort colors by occurrence (most frequent first)
-        color_counts = np.bincount(kmeans.labels_, minlength=len(dominant_colors))
-        sorted_indices = np.argsort(-color_counts)
-        dominant_colors = dominant_colors[sorted_indices]
-        
-        # Always return both primary and secondary colors for white pants
-        if is_white_color(dominant_colors[0]):
-            # If we have a secondary color, return both
-            if len(dominant_colors) > 1 and not is_white_color(dominant_colors[1]):
-                return np.array([dominant_colors[0], dominant_colors[1]])
-            # If we have non-white colors from sampling, use the most different one
-            elif non_white_colors:
-                non_white_array = np.array(non_white_colors)
-                # Find the color most different from white
-                differences = np.abs(non_white_array - np.array([255, 255, 255])).sum(axis=1)
-                secondary_color = non_white_array[np.argmax(differences)]
-                return np.array([dominant_colors[0], secondary_color])
-        
-        # For non-white pants, return the most dominant color
-        return np.array([dominant_colors[0]])
+        return dominant_color
         
     except Exception as e:
         st.error(f"Error extracting pants colors: {str(e)}")
@@ -116,8 +69,8 @@ def get_color_palette(image_path, n_colors=1, item_type=None):
     try:
         if item_type == 'pants':
             # Use specialized pants color detection
-            colors = get_pants_colors(image_path)
-            return colors if colors is not None else None
+            color = get_pants_colors(image_path)
+            return np.array([color]) if color is not None else None
             
         elif n_colors == 1:
             # Use center color detection for other items

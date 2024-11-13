@@ -199,20 +199,16 @@ def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file,
     # Use item-specific color detection
     if item_type == 'pants':
         from color_utils import get_pants_colors
-        colors = get_pants_colors(image_path)
-        if colors is None:
+        color = get_pants_colors(image_path)
+        if color is None:
             return False, "Failed to detect pants color"
-        # Convert multiple colors to string format
-        color_str = '[' + '],['.join(','.join(map(str, c)) for c in colors) + ']'
-    else:
-        color_str = f"{color[0]},{color[1]},{color[2]}"
     
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
             cur.execute(PREPARED_STATEMENTS['insert_item'], (
                 item_type, 
-                color_str,
+                f"{color[0]},{color[1]},{color[2]}", 
                 ','.join(styles),
                 ','.join(genders),
                 ','.join(sizes),
