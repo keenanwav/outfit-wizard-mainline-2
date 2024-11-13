@@ -750,37 +750,47 @@ def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file,
             cur.close()
 
 # Add the new function after line 382
+@retry_on_error()
 def update_item_image(item_id, new_image_path):
-    """Update item image with proper cleanup of old image"""
+    """Update the image of an existing clothing item"""
+    if not os.path.exists(new_image_path):
+        return False, "New image file does not exist"
+        
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
-            # Get current image path and type
-            cur.execute("SELECT image_path, type FROM user_clothing_items WHERE id = %s", (item_id,))
+            # Get current item details
+            cur.execute("""
+                SELECT type, image_path 
+                FROM user_clothing_items 
+                WHERE id = %s
+            """, (item_id,))
+            
             result = cur.fetchone()
             if not result:
-                return False, "Item not found"
+                return False, f"Item with ID {item_id} not found"
+                
+            item_type, old_image_path = result
             
-            old_image_path, item_type = result
-            
-            # Create new image path
-            if not os.path.exists("user_images"):
-                os.makedirs("user_images", exist_ok=True)
-            
+            # Create new image filename
             image_filename = f"{item_type}_{uuid.uuid4()}.png"
-            new_image_save_path = os.path.join("user_images", image_filename)
+            new_path = os.path.join("user_images", image_filename)
             
-            # Save new image
+            # Create user_images directory if it doesn't exist
+            if not os.path.exists("user_images"):
+                os.makedirs("user_images")
+            
+            # Copy new image to user_images directory
             with Image.open(new_image_path) as img:
-                img.save(new_image_save_path)
+                img.save(new_path)
             
             # Update database with new image path
             cur.execute("""
-                UPDATE user_clothing_items
+                UPDATE user_clothing_items 
                 SET image_path = %s
                 WHERE id = %s
                 RETURNING id
-            """, (new_image_save_path, item_id))
+            """, (new_path, item_id))
             
             if cur.fetchone():
                 # Delete old image if it exists
@@ -788,16 +798,85 @@ def update_item_image(item_id, new_image_path):
                     try:
                         os.remove(old_image_path)
                     except Exception as e:
-                        logging.error(f"Error removing old image: {str(e)}")
+                        logging.error(f"Error deleting old image {old_image_path}: {str(e)}")
                 
                 conn.commit()
-                return True, f"Image updated successfully for item {item_id}"
-            return False, f"Failed to update image for item {item_id}"
+                return True, "Image updated successfully"
+            
+            return False, "Failed to update image in database"
             
         except Exception as e:
             conn.rollback()
-            return False, str(e)
+            return False, f"Error updating image: {str(e)}"
         finally:
             cur.close()
 
-```
+def get_price_history(item_id):
+    """Get price history for an item"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT price, created_at
+                FROM item_price_history
+                WHERE item_id = %s
+                ORDER BY created_at DESC
+            """, (item_id,))
+            
+            history = cur.fetchall()
+            return [(float(price), date) for price, date in history] if history else []
+        finally:
+            cur.close()
+
+def get_cleanup_settings():
+    """Get cleanup settings from database"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT * FROM cleanup_settings ORDER BY created_at DESC LIMIT 1")
+            result = cur.fetchone()
+            
+            if result:
+                return {
+                    'max_age_hours': result[1],
+                    'cleanup_interval_hours': result[2],
+                    'batch_size': result[3],
+                    'max_workers': result[4],
+                    'last_cleanup': result[5]
+                }
+            else:
+                # Insert default settings if none exist
+                cur.execute("""
+                    INSERT INTO cleanup_settings 
+                    (max_age_hours, cleanup_interval_hours, batch_size, max_workers)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING *
+                """, (24, 12, 100, 4))
+                
+                result = cur.fetchone()
+                conn.commit()
+                
+                return {
+                    'max_age_hours': result[1],
+                    'cleanup_interval_hours': result[2],
+                    'batch_size': result[3],
+                    'max_workers': result[4],
+                    'last_cleanup': result[5]
+                }
+        finally:
+            cur.close()
+
+def update_last_cleanup_time():
+    """Update the last cleanup timestamp"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                UPDATE cleanup_settings 
+                SET last_cleanup = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = (SELECT id FROM cleanup_settings ORDER BY created_at DESC LIMIT 1)
+            """)
+            conn.commit()
+        finally:
+            cur.close()
