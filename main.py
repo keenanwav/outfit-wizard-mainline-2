@@ -23,56 +23,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-def inject_custom_css():
-    """Inject custom CSS for price animations"""
-    st.markdown("""
-        <style>
-        .price-container {
-            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
-            opacity: 0;
-            transform: translateX(20px);
-        }
-        .price-container.visible {
-            opacity: 1;
-            transform: translateX(0);
-        }
-        .price-item {
-            padding: 10px;
-            margin: 5px 0;
-            background: #f0f2f6;
-            border-radius: 5px;
-            transition: all 0.3s ease;
-        }
-        .price-item:hover {
-            background: #e0e2e6;
-            transform: scale(1.02);
-        }
-        .total-price {
-            margin-top: 20px;
-            padding: 15px;
-            background: #4CAF50;
-            color: white;
-            border-radius: 5px;
-            transition: all 0.3s ease;
-        }
-        .total-price:hover {
-            transform: scale(1.05);
-            background: #45a049;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-def price_toggle_script():
-    """Create JavaScript for price toggling"""
-    return """
-    <script>
-    function togglePrices() {
-        const priceContainer = document.querySelector('.price-container');
-        priceContainer.classList.toggle('visible');
-    }
-    </script>
-    """
-
 st.set_page_config(
     page_title="Outfit Wizard",
     page_icon="👕",
@@ -120,15 +70,9 @@ def main_page():
     """Display main page with outfit generation"""
     st.title("Outfit Wizard")
     
-    # Inject custom CSS and JavaScript
-    inject_custom_css()
-    st.markdown(price_toggle_script(), unsafe_allow_html=True)
-    
-    # Initialize session state for current outfit and price visibility
+    # Initialize session state for current outfit
     if 'current_outfit' not in st.session_state:
         st.session_state.current_outfit = None
-    if 'show_prices' not in st.session_state:
-        st.session_state.show_prices = False
         
     # Load clothing items
     items_df = load_clothing_items()
@@ -158,7 +102,6 @@ def main_page():
                 # Generate the outfit
                 outfit, missing_items = generate_outfit(items_df, size, style, gender)
                 st.session_state.current_outfit = outfit
-                st.session_state.show_prices = False  # Reset price visibility on new generation
         
         # Display current outfit details if available
         if st.session_state.current_outfit:
@@ -172,39 +115,23 @@ def main_page():
                 if missing_items:
                     st.warning(f"Missing items: {', '.join(missing_items)}")
             
-            # Display prices in the right column with animation
+            # Display prices in the right column
             with price_col:
-                # Add toggle button for prices
-                if st.button("Toggle Prices", key="price_toggle"):
-                    st.session_state.show_prices = not st.session_state.show_prices
+                st.markdown("### Price Information")
                 
-                # Create animated price container
-                price_container = f"""
-                <div class="price-container {'visible' if st.session_state.show_prices else ''}">
-                    <h3>Price Information</h3>
-                """
-                
-                # Add individual prices
+                # Display individual prices
                 for item_type, item in outfit.items():
                     if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
-                        price_container += f"""
-                        <div class="price-item">
-                            <strong>{item_type.capitalize()}</strong><br>
-                            {'$' + f"{float(item['price']):.2f}" if item.get('price') else 'Price not available'}
-                        </div>
-                        """
+                        st.markdown(f"**{item_type.capitalize()}**")
+                        if item.get('price'):
+                            st.markdown(f"${float(item['price']):.2f}")
+                        else:
+                            st.markdown("Price not available")
                 
-                # Add total price
+                # Display total price
                 if 'total_price' in outfit:
-                    price_container += f"""
-                    <div class="total-price">
-                        <strong>Total Price</strong><br>
-                        ${outfit['total_price']:.2f}
-                    </div>
-                    """
-                
-                price_container += "</div>"
-                st.markdown(price_container, unsafe_allow_html=True)
+                    st.markdown("---")
+                    st.markdown(f"### Total Price\n${outfit['total_price']:.2f}")
             
             # Add shopping and color information below the outfit display
             st.markdown("### Shop Items")
