@@ -74,9 +74,6 @@ def main_page():
     if 'current_outfit' not in st.session_state:
         st.session_state.current_outfit = None
         
-    if 'show_price' not in st.session_state:
-        st.session_state.show_price = False
-    
     # Load clothing items
     items_df = load_clothing_items()
     
@@ -97,48 +94,46 @@ def main_page():
         with col2:
             gender = st.selectbox("Gender", ["Male", "Female", "Unisex"])
         
-        # Create a container for the outfit display
-        outfit_container = st.empty()
+        # Create two columns for outfit display and price information
+        outfit_col, price_col = st.columns([0.7, 0.3])
         
         if st.button("Generate Outfit"):
             with st.spinner("🔮 Generating your perfect outfit..."):
                 # Generate the outfit
                 outfit, missing_items = generate_outfit(items_df, size, style, gender)
                 st.session_state.current_outfit = outfit
-                
-                # Display the outfit in the container
-                with outfit_container:
-                    if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
-                        st.image(outfit['merged_image_path'], use_column_width=True)
-                    
-                    if missing_items:
-                        st.warning(f"Missing items: {', '.join(missing_items)}")
         
         # Display current outfit details if available
         if st.session_state.current_outfit:
             outfit = st.session_state.current_outfit
             
-            # Create separate containers for prices
-            price_container = st.container()
+            # Display outfit image in the left column
+            with outfit_col:
+                if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
+                    st.image(outfit['merged_image_path'], use_column_width=True)
+                
+                if missing_items:
+                    st.warning(f"Missing items: {', '.join(missing_items)}")
             
-            if st.button("💰 Show Price"):
-                with price_container:
-                    # Display individual prices in columns
-                    st.markdown("### Item Prices")
-                    price_cols = st.columns(3)
-                    for idx, (item_type, item) in enumerate(outfit.items()):
-                        if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
-                            with price_cols[idx]:
-                                st.markdown(f"**{item_type.capitalize()}**")
-                                if item.get('price'):
-                                    st.markdown(f"**Price:** ${float(item['price']):.2f}")
-                    
-                    # Display total price in a separate section
-                    if 'total_price' in outfit:
-                        st.markdown("---")
-                        st.markdown(f"### Total Outfit Price: ${outfit['total_price']:.2f}")
+            # Display prices in the right column
+            with price_col:
+                st.markdown("### Price Information")
+                
+                # Display individual prices
+                for item_type, item in outfit.items():
+                    if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
+                        st.markdown(f"**{item_type.capitalize()}**")
+                        if item.get('price'):
+                            st.markdown(f"${float(item['price']):.2f}")
+                        else:
+                            st.markdown("Price not available")
+                
+                # Display total price
+                if 'total_price' in outfit:
+                    st.markdown("---")
+                    st.markdown(f"### Total Price\n${outfit['total_price']:.2f}")
             
-            # Add shopping buttons
+            # Add shopping and color information below the outfit display
             st.markdown("### Shop Items")
             shop_cols = st.columns(3)
             for idx, (item_type, item) in enumerate(outfit.items()):
@@ -164,7 +159,7 @@ def main_page():
                     st.success("Outfit saved successfully!")
                 else:
                     st.error("Error saving outfit")
-    
+
     with tab2:
         st.markdown("### 🤖 Smart Style Assistant")
         st.markdown("Get personalized style recommendations based on your wardrobe and preferences.")
