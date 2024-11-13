@@ -30,6 +30,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Load custom CSS
+def load_custom_css():
+    with open("static/style.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+# Initialize session state for price visibility
+if 'show_prices' not in st.session_state:
+    st.session_state.show_prices = True
+
 def show_first_visit_tips():
     """Show first-visit tips in the sidebar"""
     if 'show_tips' not in st.session_state:
@@ -68,6 +77,7 @@ def check_cleanup_needed():
 
 def main_page():
     """Display main page with outfit generation"""
+    load_custom_css()
     st.title("Outfit Wizard")
     
     # Initialize session state for current outfit
@@ -85,7 +95,7 @@ def main_page():
     tab1, tab2 = st.tabs(["📋 Generate Outfit", "🎯 Smart Style Assistant"])
     
     with tab1:
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns([2, 2, 1])
         
         with col1:
             size = st.selectbox("Size", ["S", "M", "L", "XL"])
@@ -93,6 +103,14 @@ def main_page():
         
         with col2:
             gender = st.selectbox("Gender", ["Male", "Female", "Unisex"])
+            
+        with col3:
+            st.write("")
+            st.write("")
+            # Toggle button for price visibility
+            if st.button("Toggle Prices" if st.session_state.show_prices else "Show Prices"):
+                st.session_state.show_prices = not st.session_state.show_prices
+                st.rerun()
         
         # Create two columns for outfit display and price information
         outfit_col, price_col = st.columns([0.7, 0.3])
@@ -115,23 +133,35 @@ def main_page():
                 if missing_items:
                     st.warning(f"Missing items: {', '.join(missing_items)}")
             
-            # Display prices in the right column
+            # Display prices in the right column with animation
             with price_col:
-                st.markdown("### Price Information")
+                price_container_class = "" if st.session_state.show_prices else "hidden"
+                st.markdown(f"""
+                    <div class="price-container {price_container_class}">
+                        <h3>Price Information</h3>
+                """, unsafe_allow_html=True)
                 
-                # Display individual prices
+                # Display individual prices with animation
                 for item_type, item in outfit.items():
                     if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
-                        st.markdown(f"**{item_type.capitalize()}**")
-                        if item.get('price'):
-                            st.markdown(f"${float(item['price']):.2f}")
-                        else:
-                            st.markdown("Price not available")
+                        st.markdown(f"""
+                            <div class="price-item">
+                                <strong>{item_type.capitalize()}</strong><br>
+                                {'$' + f"{float(item['price']):.2f}" if item.get('price') else 'Price not available'}
+                            </div>
+                        """, unsafe_allow_html=True)
                 
-                # Display total price
+                # Display total price with animation
                 if 'total_price' in outfit:
-                    st.markdown("---")
-                    st.markdown(f"### Total Price\n${outfit['total_price']:.2f}")
+                    st.markdown("""<hr>""", unsafe_allow_html=True)
+                    st.markdown(f"""
+                        <div class="total-price">
+                            <h3>Total Price</h3>
+                            ${outfit['total_price']:.2f}
+                        </div>
+                    """, unsafe_allow_html=True)
+                
+                st.markdown("</div>", unsafe_allow_html=True)
             
             # Add shopping and color information below the outfit display
             st.markdown("### Shop Items")
