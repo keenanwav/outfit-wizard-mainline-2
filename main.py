@@ -87,6 +87,9 @@ def main_page():
     # Load clothing items
     items_df = load_clothing_items()
     
+    # Initialize missing_items
+    missing_items = []
+    
     if items_df.empty:
         st.warning("Please add some clothing items in the 'My Items' section first!")
         return
