@@ -198,13 +198,13 @@ def main_page():
         
         # Input fields for style assistant
         occasion = st.text_input("What's the occasion?", 
-                               placeholder="E.g., job interview, casual dinner, wedding")
+                                placeholder="E.g., job interview, casual dinner, wedding")
         
         weather = st.text_input("Weather conditions?", 
-                              placeholder="E.g., sunny and warm, cold and rainy")
+                               placeholder="E.g., sunny and warm, cold and rainy")
         
         preferences = st.text_area("Additional preferences or requirements?",
-                                 placeholder="E.g., prefer dark colors, need to look professional")
+                                  placeholder="E.g., prefer dark colors, need to look professional")
         
         if st.button("Get Style Advice"):
             with st.spinner("🎨 Analyzing your wardrobe and generating recommendations..."):
@@ -314,24 +314,26 @@ def personal_wardrobe_page():
                                     st.session_state.editing_item = item
                             
                             with change_img_col:
-                                new_image = st.file_uploader(
-                                    "Change Image", 
-                                    type=['png', 'jpg', 'jpeg'],
-                                    key=f"change_image_{idx}"
-                                )
-                                if new_image:
-                                    temp_path = f"temp_update_{new_image.name}"
-                                    with open(temp_path, "wb") as f:
-                                        f.write(new_image.getvalue())
-                                    
-                                    success, message = update_item_image(int(item['id']), temp_path)
-                                    if success:
-                                        st.success(message)
-                                        os.remove(temp_path)
-                                        st.rerun()
-                                    else:
-                                        st.error(message)
-                                        os.remove(temp_path)
+                                # Add camera icon button
+                                if st.button("📷", key=f"camera_icon_{idx}", help="Change Image"):
+                                    new_image = st.file_uploader(
+                                        "Upload new image",
+                                        type=['png', 'jpg', 'jpeg'],
+                                        key=f"change_image_{idx}"
+                                    )
+                                    if new_image:
+                                        temp_path = f"temp_update_{new_image.name}"
+                                        with open(temp_path, "wb") as f:
+                                            f.write(new_image.getvalue())
+                                        
+                                        success, message = update_item_image(int(item['id']), temp_path)
+                                        if success:
+                                            st.success(message)
+                                            os.remove(temp_path)
+                                            st.rerun()
+                                        else:
+                                            st.error(message)
+                                            os.remove(temp_path)
                             
                             with del_col:
                                 if st.button(f"🗑️ {idx}"):
@@ -362,44 +364,21 @@ def personal_wardrobe_page():
                             season = st.selectbox(
                                 f"Season {idx}",
                                 ["", "Spring", "Summer", "Fall", "Winter"],
-                                index=["", "Spring", "Summer", "Fall", "Winter"].index(current_season) if current_season else 0
+                                index=["", "Spring", "Summer", "Fall", "Winter"].index(current_season) if current_season in ["", "Spring", "Summer", "Fall", "Winter"] else 0
                             )
                             
-                            notes = st.text_area(
-                                f"Notes {idx}", 
-                                value=str(item['notes']) if pd.notna(item['notes']) else "",
-                                help="Add notes about this item"
-                            )
-                            
-                            if st.button(f"Save Details {idx}"):
-                                # Update item details
-                                if new_tags != ','.join(tags) if tags else "":
-                                    tags = [tag.strip() for tag in new_tags.split(',') if tag.strip()]
-                                    update_item_details(item['id'], tags=tags)
-                                
-                                if season != current_season:
-                                    update_item_details(item['id'], season=season if season else None)
-                                
-                                if notes != str(item['notes']) if pd.notna(item['notes']) else "":
-                                    update_item_details(item['id'], notes=notes)
-                                
-                                st.success("Details updated successfully!")
-                                st.rerun()
-                            
-                            # Add price history display
-                            if st.button(f"Show Price History {idx}"):
-                                price_history = get_price_history(item['id'])
-                                if price_history:
-                                    st.markdown("#### Price History")
-                                    history_df = pd.DataFrame(price_history, columns=['Price', 'Date'])
-                                    history_df['Date'] = pd.to_datetime(history_df['Date']).dt.strftime('%Y-%m-%d')
-                                    st.dataframe(history_df, use_container_width=True)
-                                    
-                                    # Create a line chart for price trends
-                                    if len(history_df) > 1:
-                                        st.line_chart(history_df.set_index('Date')['Price'])
+                            # Update tags and season if changed
+                            if (new_tags != ','.join(tags) if tags else "") or (season != current_season):
+                                success, message = update_item_details(
+                                    int(item['id']),
+                                    tags=new_tags.split(',') if new_tags else None,
+                                    season=season if season else None
+                                )
+                                if success:
+                                    st.success(message)
+                                    st.rerun()
                                 else:
-                                    st.info("No price history available for this item.")
+                                    st.error(message)
 
 def saved_outfits_page():
     """Display saved outfits page"""
