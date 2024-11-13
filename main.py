@@ -114,25 +114,15 @@ def main_page():
             if st.button("Toggle Prices" if st.session_state.show_prices else "Show Prices"):
                 st.session_state.show_prices = not st.session_state.show_prices
                 st.rerun()
-
-        # Generate and Save buttons in a row
-        btn_col1, btn_col2 = st.columns([1, 1])
-        with btn_col1:
-            if st.button("Generate Outfit"):
-                with st.spinner("🔮 Generating your perfect outfit..."):
-                    outfit, missing_items = generate_outfit(items_df, size, style, gender)
-                    st.session_state.current_outfit = outfit
-
-        with btn_col2:
-            if st.button("Save Outfit") and st.session_state.current_outfit:
-                saved_path = save_outfit(st.session_state.current_outfit)
-                if saved_path:
-                    st.success("Outfit saved successfully!")
-                else:
-                    st.error("Error saving outfit")
         
         # Create two columns for outfit display and price information
         outfit_col, price_col = st.columns([0.7, 0.3])
+        
+        if st.button("Generate Outfit"):
+            with st.spinner("🔮 Generating your perfect outfit..."):
+                # Generate the outfit
+                outfit, missing_items = generate_outfit(items_df, size, style, gender)
+                st.session_state.current_outfit = outfit
         
         # Display current outfit details if available
         if st.session_state.current_outfit:
@@ -192,6 +182,14 @@ def main_page():
                     with shop_cols[idx]:
                         if item.get('hyperlink'):
                             st.link_button(f"Shop {item_type.capitalize()}", item['hyperlink'])
+            
+            # Save outfit option
+            if st.button("Save Outfit"):
+                saved_path = save_outfit(outfit)
+                if saved_path:
+                    st.success("Outfit saved successfully!")
+                else:
+                    st.error("Error saving outfit")
 
     with tab2:
         st.markdown("### 🤖 Smart Style Assistant")
@@ -199,13 +197,13 @@ def main_page():
         
         # Input fields for style assistant
         occasion = st.text_input("What's the occasion?", 
-                                placeholder="E.g., job interview, casual dinner, wedding")
+                               placeholder="E.g., job interview, casual dinner, wedding")
         
         weather = st.text_input("Weather conditions?", 
-                               placeholder="E.g., sunny and warm, cold and rainy")
+                              placeholder="E.g., sunny and warm, cold and rainy")
         
         preferences = st.text_area("Additional preferences or requirements?",
-                                  placeholder="E.g., prefer dark colors, need to look professional")
+                                 placeholder="E.g., prefer dark colors, need to look professional")
         
         if st.button("Get Style Advice"):
             with st.spinner("🎨 Analyzing your wardrobe and generating recommendations..."):
