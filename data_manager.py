@@ -568,3 +568,48 @@ def update_last_cleanup_time():
             return False
         finally:
             cur.close()
+
+@retry_on_error()
+def get_cleanup_statistics():
+    """Get cleanup statistics from the database"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            # Get cleanup settings
+            cur.execute("""
+                SELECT max_age_hours, cleanup_interval_hours, batch_size, 
+                       max_workers, last_cleanup 
+                FROM cleanup_settings 
+                ORDER BY created_at DESC 
+                LIMIT 1
+            """)
+            settings = cur.fetchone()
+            
+            if not settings:
+                return None
+                
+            # Get total files in merged_outfits
+            total_files = 0
+            if os.path.exists('merged_outfits'):
+                total_files = len(os.listdir('merged_outfits'))
+            
+            # Get saved outfits count
+            cur.execute("SELECT COUNT(*) FROM saved_outfits")
+            saved_count = cur.fetchone()[0]
+            
+            return {
+                'settings': {
+                    'max_age_hours': settings[0],
+                    'cleanup_interval_hours': settings[1],
+                    'batch_size': settings[2],
+                    'max_workers': settings[3],
+                    'last_cleanup': settings[4]
+                },
+                'statistics': {
+                    'total_files': total_files,
+                    'saved_outfits': saved_count,
+                    'temporary_files': max(0, total_files - saved_count)
+                }
+            }
+        finally:
+            cur.close()

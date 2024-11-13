@@ -378,20 +378,81 @@ def saved_outfits_page():
                         else:
                             st.error(message)
 
-# Initialize app
-show_first_visit_tips()
-check_cleanup_needed()
+def cleanup_status_dashboard():
+    """Display cleanup status dashboard"""
+    st.title("Cleanup Status Dashboard")
+    
+    from data_manager import get_cleanup_statistics
+    stats = get_cleanup_statistics()
+    
+    if not stats:
+        st.warning("No cleanup settings found. Please configure cleanup settings first.")
+        return
+    
+    # Display current settings
+    st.header("📊 Cleanup Settings")
+    settings = stats['settings']
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Maximum File Age", f"{settings['max_age_hours']} hours")
+        st.metric("Cleanup Interval", f"{settings['cleanup_interval_hours']} hours")
+    
+    with col2:
+        st.metric("Batch Size", str(settings['batch_size']))
+        st.metric("Max Workers", str(settings['max_workers']))
+    
+    # Display last cleanup time
+    st.header("⏱️ Last Cleanup")
+    if settings['last_cleanup']:
+        last_cleanup = settings['last_cleanup']
+        time_since = datetime.now() - last_cleanup
+        hours_since = time_since.total_seconds() / 3600
+        
+        status_color = "🟢" if hours_since < settings['cleanup_interval_hours'] else "🔴"
+        st.write(f"{status_color} Last cleanup: {last_cleanup.strftime('%Y-%m-%d %H:%M:%S')}")
+        st.write(f"Time since last cleanup: {int(hours_since)} hours")
+        
+        # Next scheduled cleanup
+        next_cleanup = last_cleanup + timedelta(hours=settings['cleanup_interval_hours'])
+        st.write(f"Next scheduled cleanup: {next_cleanup.strftime('%Y-%m-%d %H:%M:%S')}")
+    else:
+        st.warning("No cleanup has been performed yet")
+    
+    # Display file statistics
+    st.header("📁 File Statistics")
+    statistics = stats['statistics']
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Files", statistics['total_files'])
+    with col2:
+        st.metric("Saved Outfits", statistics['saved_outfits'])
+    with col3:
+        st.metric("Temporary Files", statistics['temporary_files'])
+    
+    # Add manual cleanup button
+    st.header("🧹 Manual Cleanup")
+    if st.button("Run Cleanup Now"):
+        with st.spinner("Running cleanup..."):
+            cleaned_count = cleanup_merged_outfits()
+            st.success(f"Cleanup completed. {cleaned_count} files removed.")
+            st.rerun()
 
-# Create database tables if they don't exist
-create_user_items_table()
-
-# Navigation in sidebar
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits"])
-
-if page == "Home":
-    main_page()
-elif page == "My Items":
-    personal_wardrobe_page()
-else:
-    saved_outfits_page()
+# Update the main sidebar menu to include the new dashboard
+if __name__ == "__main__":
+    create_user_items_table()
+    show_first_visit_tips()
+    check_cleanup_needed()
+    
+    st.sidebar.title("Navigation")
+    page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits", "Cleanup Status"])
+    
+    if page == "Home":
+        main_page()
+    elif page == "My Items":
+        personal_wardrobe_page()
+    elif page == "Saved Outfits":
+        saved_outfits_page()
+    elif page == "Cleanup Status":
+        cleanup_status_dashboard()
