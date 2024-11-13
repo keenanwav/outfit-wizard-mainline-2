@@ -52,15 +52,19 @@ def show_first_visit_tips():
                 st.rerun()
 
 def check_cleanup_needed():
-    """Check if cleanup is needed and perform it"""
-    if 'last_cleanup' not in st.session_state:
-        st.session_state.last_cleanup = datetime.now()
-        cleanup_merged_outfits()
-    else:
-        time_since_cleanup = datetime.now() - st.session_state.last_cleanup
-        if time_since_cleanup.total_seconds() > 3600:  # Check every hour
+    """Check if cleanup is needed based on configured interval"""
+    try:
+        from data_manager import get_cleanup_settings
+        settings = get_cleanup_settings()
+        
+        if not settings or not settings['last_cleanup']:
             cleanup_merged_outfits()
-            st.session_state.last_cleanup = datetime.now()
+        else:
+            time_since_cleanup = datetime.now() - settings['last_cleanup']
+            if time_since_cleanup.total_seconds() > (settings['cleanup_interval_hours'] * 3600):
+                cleanup_merged_outfits()
+    except Exception as e:
+        logging.error(f"Error checking cleanup status: {str(e)}")
 
 def main_page():
     """Display main page with outfit generation"""

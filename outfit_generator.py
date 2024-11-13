@@ -27,14 +27,30 @@ def delete_file_batch(file_batch: List[str]) -> Tuple[int, List[str]]:
     
     return success_count, errors
 
-def cleanup_merged_outfits(max_age_hours=24, batch_size=50, max_workers=4):
-    """Clean up old unsaved outfit files from merged_outfits folder with batch processing"""
+def cleanup_merged_outfits():
+    """Clean up old unsaved outfit files from merged_outfits folder with configurable settings"""
     try:
         if not os.path.exists('merged_outfits'):
             logging.info("Merged outfits directory does not exist. No cleanup needed.")
             return
             
+        # Get cleanup settings from database
+        from data_manager import get_cleanup_settings, update_last_cleanup_time
+        
+        settings = get_cleanup_settings()
+        if not settings:
+            logging.error("Failed to get cleanup settings from database")
+            return
+            
         current_time = datetime.now()
+        last_cleanup = settings['last_cleanup']
+        cleanup_interval = timedelta(hours=settings['cleanup_interval_hours'])
+        
+        # Check if cleanup is needed based on interval
+        if last_cleanup and (current_time - last_cleanup) < cleanup_interval:
+            logging.info(f"Cleanup not needed yet. Next cleanup in {cleanup_interval - (current_time - last_cleanup)}")
+            return
+            
         stats = {
             'total_files': 0,
             'cleaned_count': 0,
@@ -73,7 +89,7 @@ def cleanup_merged_outfits(max_age_hours=24, batch_size=50, max_workers=4):
                 file_time = datetime.fromtimestamp(os.path.getctime(file_path))
                 age = current_time - file_time
                 
-                if age > timedelta(hours=max_age_hours):
+                if age > timedelta(hours=settings['max_age_hours']):
                     files_to_delete.append(file_path)
                     logging.debug(f"Marking file for deletion: {filename} (Age: {age})")
                 else:
@@ -86,10 +102,10 @@ def cleanup_merged_outfits(max_age_hours=24, batch_size=50, max_workers=4):
         
         # Process files in batches using thread pool
         if files_to_delete:
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            with ThreadPoolExecutor(max_workers=settings['max_workers']) as executor:
                 # Split files into batches
-                batches = [files_to_delete[i:i + batch_size] 
-                          for i in range(0, len(files_to_delete), batch_size)]
+                batches = [files_to_delete[i:i + settings['batch_size']] 
+                          for i in range(0, len(files_to_delete), settings['batch_size'])]
                 
                 # Submit batch jobs
                 future_to_batch = {
@@ -114,6 +130,9 @@ def cleanup_merged_outfits(max_age_hours=24, batch_size=50, max_workers=4):
                     except Exception as e:
                         logging.error(f"Batch processing error: {str(e)}")
                         stats['error_count'] += len(batch)
+        
+        # Update last cleanup time
+        update_last_cleanup_time()
         
         # Log final cleanup statistics
         logging.info(

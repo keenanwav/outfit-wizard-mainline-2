@@ -136,6 +136,19 @@ def create_user_items_table():
             cur.execute('CREATE INDEX IF NOT EXISTS idx_outfit_id ON saved_outfits(outfit_id)')
             cur.execute('CREATE INDEX IF NOT EXISTS idx_outfit_tags ON saved_outfits USING gin(tags)')
             
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS cleanup_settings (
+                    id SERIAL PRIMARY KEY,
+                    max_age_hours INT,
+                    cleanup_interval_hours INT,
+                    batch_size INT,
+                    max_workers INT,
+                    last_cleanup TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
             conn.commit()
         finally:
             cur.close()
@@ -463,5 +476,95 @@ def delete_saved_outfit(outfit_id):
                 
                 return True, f"Outfit {outfit_id} deleted successfully"
             return False, f"Outfit {outfit_id} not found"
+        finally:
+            cur.close()
+
+
+@retry_on_error()
+def get_cleanup_settings():
+    """Get cleanup configuration settings"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT max_age_hours, cleanup_interval_hours, batch_size, max_workers, last_cleanup
+                FROM cleanup_settings
+                ORDER BY created_at DESC
+                LIMIT 1
+            """)
+            result = cur.fetchone()
+            if result:
+                return {
+                    'max_age_hours': result[0],
+                    'cleanup_interval_hours': result[1],
+                    'batch_size': result[2],
+                    'max_workers': result[3],
+                    'last_cleanup': result[4]
+                }
+            return None
+        finally:
+            cur.close()
+
+@retry_on_error()
+def update_cleanup_settings(max_age_hours=None, cleanup_interval_hours=None, 
+                          batch_size=None, max_workers=None):
+    """Update cleanup configuration settings"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            update_fields = []
+            params = []
+            
+            if max_age_hours is not None:
+                update_fields.append("max_age_hours = %s")
+                params.append(max_age_hours)
+            
+            if cleanup_interval_hours is not None:
+                update_fields.append("cleanup_interval_hours = %s")
+                params.append(cleanup_interval_hours)
+            
+            if batch_size is not None:
+                update_fields.append("batch_size = %s")
+                params.append(batch_size)
+            
+            if max_workers is not None:
+                update_fields.append("max_workers = %s")
+                params.append(max_workers)
+            
+            if update_fields:
+                update_fields.append("updated_at = CURRENT_TIMESTAMP")
+                query = f"""
+                    UPDATE cleanup_settings 
+                    SET {', '.join(update_fields)}
+                    WHERE id = (SELECT id FROM cleanup_settings ORDER BY created_at DESC LIMIT 1)
+                    RETURNING id
+                """
+                cur.execute(query, params)
+                
+                if cur.fetchone():
+                    conn.commit()
+                    return True, "Cleanup settings updated successfully"
+                return False, "Failed to update cleanup settings"
+        finally:
+            cur.close()
+
+@retry_on_error()
+def update_last_cleanup_time():
+    """Update the last cleanup timestamp"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                UPDATE cleanup_settings 
+                SET last_cleanup = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = (SELECT id FROM cleanup_settings ORDER BY created_at DESC LIMIT 1)
+                RETURNING id
+            """)
+            
+            if cur.fetchone():
+                conn.commit()
+                return True
+            return False
         finally:
             cur.close()
