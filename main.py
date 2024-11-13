@@ -118,20 +118,25 @@ def main_page():
         if st.session_state.current_outfit:
             outfit = st.session_state.current_outfit
             
-            # Add price display button and layout
+            # Create separate containers for prices
+            price_container = st.container()
+            
             if st.button("💰 Show Price"):
-                # Display prices in columns next to items
-                price_cols = st.columns(3)
-                for idx, (item_type, item) in enumerate(outfit.items()):
-                    if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
-                        with price_cols[idx]:
-                            st.markdown(f"**{item_type.capitalize()}**")
-                            if item.get('price'):
-                                st.markdown(f"**Price:** ${float(item['price']):.2f}")
-                
-                # Display total price
-                if 'total_price' in outfit:
-                    st.markdown(f"### Total Outfit Price: ${outfit['total_price']:.2f}")
+                with price_container:
+                    # Display individual prices in columns
+                    st.markdown("### Item Prices")
+                    price_cols = st.columns(3)
+                    for idx, (item_type, item) in enumerate(outfit.items()):
+                        if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
+                            with price_cols[idx]:
+                                st.markdown(f"**{item_type.capitalize()}**")
+                                if item.get('price'):
+                                    st.markdown(f"**Price:** ${float(item['price']):.2f}")
+                    
+                    # Display total price in a separate section
+                    if 'total_price' in outfit:
+                        st.markdown("---")
+                        st.markdown(f"### Total Outfit Price: ${outfit['total_price']:.2f}")
             
             # Add shopping buttons
             st.markdown("### Shop Items")
