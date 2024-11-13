@@ -165,7 +165,7 @@ def main_page():
                     """, unsafe_allow_html=True)
                 
                 # Display individual item colors within price_col
-                st.markdown("### Item Colors")
+                st.markdown("### Color Palette")
                 for item_type, item in outfit.items():
                     if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
                         st.markdown(f"**{item_type.capitalize()}**")
