@@ -147,7 +147,7 @@ def main_page():
                     with cols[idx]:
                         color = parse_color_string(str(item['color']))
                         st.markdown(f"**{item_type.capitalize()}**")
-                        display_color_palette([color])
+                        display_color_palette([color], background_color=(174, 162, 150))
             
             # Save outfit option
             if st.button("Save Outfit"):
@@ -204,7 +204,7 @@ def main_page():
                                 
                                 # Display item color
                                 color = parse_color_string(str(item['color']))
-                                display_color_palette([color])
+                                display_color_palette([color], background_color=(174, 162, 150))
 
 def personal_wardrobe_page():
     """Display and manage personal wardrobe items"""
