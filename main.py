@@ -30,10 +30,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-def toggle_price():
-    """Toggle price visibility in session state"""
-    st.session_state.show_price = not st.session_state.show_price
-
 def show_first_visit_tips():
     """Show first-visit tips in the sidebar"""
     if 'show_tips' not in st.session_state:
@@ -74,17 +70,12 @@ def main_page():
     """Display main page with outfit generation"""
     st.title("Outfit Wizard")
     
-    # Initialize session state for current outfit and price visibility
+    # Initialize session state for current outfit
     if 'current_outfit' not in st.session_state:
         st.session_state.current_outfit = None
         
     if 'show_price' not in st.session_state:
         st.session_state.show_price = False
-    
-    # Create persistent containers
-    outfit_container = st.empty()
-    price_container = st.container()
-    details_container = st.container()
     
     # Load clothing items
     items_df = load_clothing_items()
@@ -106,64 +97,65 @@ def main_page():
         with col2:
             gender = st.selectbox("Gender", ["Male", "Female", "Unisex"])
         
+        # Create a container for the outfit display
+        outfit_container = st.empty()
+        
         if st.button("Generate Outfit"):
             with st.spinner("🔮 Generating your perfect outfit..."):
                 # Generate the outfit
                 outfit, missing_items = generate_outfit(items_df, size, style, gender)
                 st.session_state.current_outfit = outfit
+                
+                # Display the outfit in the container
+                with outfit_container:
+                    if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
+                        st.image(outfit['merged_image_path'], use_column_width=True)
+                    
+                    if missing_items:
+                        st.warning(f"Missing items: {', '.join(missing_items)}")
         
         # Display current outfit details if available
         if st.session_state.current_outfit:
             outfit = st.session_state.current_outfit
             
-            # Display outfit image
-            with outfit_container:
-                if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
-                    st.image(outfit['merged_image_path'], use_column_width=True)
-                
-                if missing_items:
-                    st.warning(f"Missing items: {', '.join(missing_items)}")
+            # Add price toggle and display
+            price_col1, price_col2 = st.columns([1, 3])
+            with price_col1:
+                if st.button("💰 Toggle Price"):
+                    st.session_state.show_price = not st.session_state.show_price
             
-            # Price toggle and display in separate container
-            with price_container:
-                price_col1, price_col2 = st.columns([1, 3])
-                with price_col1:
-                    st.button("💰 Toggle Price", on_click=toggle_price)
-                
-                with price_col2:
-                    if st.session_state.show_price and 'total_price' in outfit:
-                        st.markdown(f"### Total Price: ${outfit['total_price']:.2f}")
+            with price_col2:
+                if st.session_state.show_price and 'total_price' in outfit:
+                    st.markdown(f"### Total Price: ${outfit['total_price']:.2f}")
             
-            # Additional details in separate container
-            with details_container:
-                # Add shopping buttons
-                st.markdown("### Shop Items")
-                shop_cols = st.columns(3)
-                for idx, (item_type, item) in enumerate(outfit.items()):
-                    if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
-                        with shop_cols[idx]:
-                            if item.get('hyperlink'):
-                                st.link_button(f"Shop {item_type.capitalize()}", item['hyperlink'])
-                            if st.session_state.show_price and item.get('price'):
-                                st.markdown(f"**Price:** ${float(item['price']):.2f}")
-                
-                # Display individual item colors
-                st.markdown("### Item Colors")
-                cols = st.columns(3)
-                for idx, (item_type, item) in enumerate(outfit.items()):
-                    if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
-                        with cols[idx]:
-                            color = parse_color_string(str(item['color']))
-                            st.markdown(f"**{item_type.capitalize()}**")
-                            display_color_palette([color])
-                
-                # Save outfit option
-                if st.button("Save Outfit"):
-                    saved_path = save_outfit(outfit)
-                    if saved_path:
-                        st.success("Outfit saved successfully!")
-                    else:
-                        st.error("Error saving outfit")
+            # Add shopping buttons
+            st.markdown("### Shop Items")
+            shop_cols = st.columns(3)
+            for idx, (item_type, item) in enumerate(outfit.items()):
+                if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
+                    with shop_cols[idx]:
+                        if item.get('hyperlink'):
+                            st.link_button(f"Shop {item_type.capitalize()}", item['hyperlink'])
+                        if st.session_state.show_price and item.get('price'):
+                            st.markdown(f"**Price:** ${float(item['price']):.2f}")
+            
+            # Display individual item colors
+            st.markdown("### Item Colors")
+            cols = st.columns(3)
+            for idx, (item_type, item) in enumerate(outfit.items()):
+                if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
+                    with cols[idx]:
+                        color = parse_color_string(str(item['color']))
+                        st.markdown(f"**{item_type.capitalize()}**")
+                        display_color_palette([color])
+            
+            # Save outfit option
+            if st.button("Save Outfit"):
+                saved_path = save_outfit(outfit)
+                if saved_path:
+                    st.success("Outfit saved successfully!")
+                else:
+                    st.error("Error saving outfit")
     
     with tab2:
         st.markdown("### 🤖 Smart Style Assistant")
@@ -171,7 +163,7 @@ def main_page():
         
         # Input fields for style assistant
         occasion = st.text_input("What's the occasion?", 
-                                placeholder="E.g., job interview, casual dinner, wedding")
+                               placeholder="E.g., job interview, casual dinner, wedding")
         
         weather = st.text_input("Weather conditions?", 
                               placeholder="E.g., sunny and warm, cold and rainy")
