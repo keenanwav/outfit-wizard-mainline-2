@@ -121,7 +121,7 @@ def main_page():
             # Add price toggle and display
             price_col1, price_col2 = st.columns([1, 3])
             with price_col1:
-                if st.button("💰 Toggle Price"):
+                if st.button("💰 Show Price"):
                     st.session_state.show_price = not st.session_state.show_price
             
             with price_col2:
