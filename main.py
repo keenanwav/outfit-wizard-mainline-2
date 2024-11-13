@@ -136,7 +136,7 @@ def main_page():
                 if missing_items:
                     st.warning(f"Missing items: {', '.join(missing_items)}")
             
-            # Display prices in the right column with animation
+            # Display prices and colors in the right column with animation
             with price_col:
                 price_container_class = "" if st.session_state.show_prices else "hidden"
                 st.markdown(f"""
@@ -164,9 +164,17 @@ def main_page():
                         </div>
                     """, unsafe_allow_html=True)
                 
+                # Display individual item colors within price_col
+                st.markdown("### Item Colors")
+                for item_type, item in outfit.items():
+                    if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
+                        st.markdown(f"**{item_type.capitalize()}**")
+                        color = parse_color_string(str(item['color']))
+                        display_color_palette([color])
+                
                 st.markdown("</div>", unsafe_allow_html=True)
             
-            # Add shopping and color information below the outfit display
+            # Add shopping information below the outfit display
             st.markdown("### Shop Items")
             shop_cols = st.columns(3)
             for idx, (item_type, item) in enumerate(outfit.items()):
@@ -174,16 +182,6 @@ def main_page():
                     with shop_cols[idx]:
                         if item.get('hyperlink'):
                             st.link_button(f"Shop {item_type.capitalize()}", item['hyperlink'])
-            
-            # Display individual item colors
-            st.markdown("### Item Colors")
-            cols = st.columns(3)
-            for idx, (item_type, item) in enumerate(outfit.items()):
-                if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
-                    with cols[idx]:
-                        color = parse_color_string(str(item['color']))
-                        st.markdown(f"**{item_type.capitalize()}**")
-                        display_color_palette([color])
             
             # Save outfit option
             if st.button("Save Outfit"):
@@ -354,29 +352,20 @@ def personal_wardrobe_page():
                                 help="Add notes about this item"
                             )
                             
-                            # Add price input for editing
-                            current_price = float(item['price']) if pd.notna(item['price']) else 0.0
-                            edit_price = st.number_input(f"Price ($) {idx}", 
-                                                       value=current_price,
-                                                       min_value=0.0,
-                                                       step=0.01,
-                                                       format="%.2f")
-                            
                             if st.button(f"Save Details {idx}"):
-                                success, message = edit_clothing_item(
-                                    int(item['id']),
-                                    parse_color_string(str(item['color'])),
-                                    item['style'].split(','),
-                                    item['gender'].split(','),
-                                    item['size'].split(','),
-                                    item['hyperlink'],
-                                    edit_price if edit_price > 0 else None
-                                )
-                                if success:
-                                    st.success(message)
-                                    st.rerun()
-                                else:
-                                    st.error(message)
+                                # Update item details
+                                if new_tags != ','.join(tags) if tags else "":
+                                    tags = [tag.strip() for tag in new_tags.split(',') if tag.strip()]
+                                    update_item_details(item['id'], tags=tags)
+                                
+                                if season != current_season:
+                                    update_item_details(item['id'], season=season if season else None)
+                                
+                                if notes != str(item['notes']) if pd.notna(item['notes']) else "":
+                                    update_item_details(item['id'], notes=notes if notes.strip() else None)
+                                
+                                st.success("Item details updated successfully!")
+                                st.rerun()
 
 def saved_outfits_page():
     """Display saved outfits page"""
