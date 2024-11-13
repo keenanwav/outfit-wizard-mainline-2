@@ -121,16 +121,13 @@ def rgb_to_hex(rgb):
     """Convert RGB color to hex format"""
     return '#{:02x}{:02x}{:02x}'.format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
 
-def display_color_palette(colors, background_color=(174, 162, 150)):
-    """Create a streamlit color palette display with specified background color"""
+def display_color_palette(colors):
+    """Create a streamlit color palette display"""
     if colors is None or len(colors) == 0:
         return
     
     # Create columns for each color
     cols = st.columns(len(colors))
-    
-    # Convert background color to hex
-    bg_hex = rgb_to_hex(background_color)
     
     # Display each color with its hex value
     for idx, color in enumerate(colors):
@@ -139,19 +136,13 @@ def display_color_palette(colors, background_color=(174, 162, 150)):
             st.markdown(
                 f"""
                 <div style="
-                    background-color: {bg_hex};
-                    padding: 8px;
-                    border-radius: 12px;
-                ">
-                    <div style="
-                        background-color: {hex_color};
-                        width: 2rem;
-                        aspect-ratio: 1;
-                        border-radius: 8px;
-                        margin: 0 auto 8px auto;
-                    "></div>
-                    <p style="text-align: center; font-size: 12px; margin: 0 auto; color: #000000;">{hex_color}</p>
-                </div>
+                    background-color: {hex_color};
+                    width: 2rem;
+                    aspect-ratio: 1;
+                    border-radius: 8px;
+                    margin: 0 auto 8px auto;
+                "></div>
+                <p style="text-align: center; font-size: 12px; margin: 0 auto;">{hex_color}</p>
                 """,
                 unsafe_allow_html=True
             )
