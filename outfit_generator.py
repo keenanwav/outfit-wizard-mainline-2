@@ -12,10 +12,13 @@ def cleanup_merged_outfits(max_age_hours=24):
     """Clean up old unsaved outfit files from merged_outfits folder with improved connection handling"""
     try:
         if not os.path.exists('merged_outfits'):
+            logging.info("Merged outfits directory does not exist. No cleanup needed.")
             return
             
         current_time = datetime.now()
         cleaned_count = 0
+        total_files = 0
+        skipped_files = 0
         
         # Get list of saved outfits from database to avoid deleting them
         from data_manager import get_db_connection
@@ -26,16 +29,20 @@ def cleanup_merged_outfits(max_age_hours=24):
                 # Use prepared statement for better performance
                 cur.execute("SELECT image_path FROM saved_outfits WHERE image_path IS NOT NULL")
                 saved_paths = set(path[0] for path in cur.fetchall())
+                logging.info(f"Found {len(saved_paths)} saved outfits to preserve")
             finally:
                 cur.close()
         
         # Get all files to delete
         files_to_delete = []
         for filename in os.listdir('merged_outfits'):
+            total_files += 1
             file_path = os.path.join('merged_outfits', filename)
             
             # Skip if file is in saved outfits
             if file_path in saved_paths:
+                skipped_files += 1
+                logging.debug(f"Skipping saved outfit file: {filename}")
                 continue
                 
             # Check file age
@@ -45,6 +52,10 @@ def cleanup_merged_outfits(max_age_hours=24):
                 
                 if age > timedelta(hours=max_age_hours):
                     files_to_delete.append(file_path)
+                    logging.debug(f"Marking file for deletion: {filename} (Age: {age})")
+                else:
+                    skipped_files += 1
+                    logging.debug(f"File {filename} is not old enough for cleanup (Age: {age})")
             except OSError as e:
                 logging.error(f"Error checking file age for {file_path}: {str(e)}")
                 continue
@@ -54,11 +65,12 @@ def cleanup_merged_outfits(max_age_hours=24):
             try:
                 os.remove(file_path)
                 cleaned_count += 1
+                logging.info(f"Successfully deleted old outfit file: {os.path.basename(file_path)}")
             except Exception as e:
                 logging.error(f"Error removing old outfit file {file_path}: {str(e)}")
                 continue
                     
-        logging.info(f"Cleaned up {cleaned_count} old outfit files")
+        logging.info(f"Cleanup Summary: Total files: {total_files}, Cleaned: {cleaned_count}, Skipped: {skipped_files}")
         return cleaned_count
     except Exception as e:
         logging.error(f"Error during outfit cleanup: {str(e)}")
