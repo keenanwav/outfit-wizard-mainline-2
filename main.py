@@ -205,6 +205,8 @@ def personal_wardrobe_page():
             item_type = st.selectbox("Type", ["Shirt", "Pants", "Shoes"])
             styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"])
             sizes = st.multiselect("Size", ["S", "M", "L", "XL"])
+            # Add price input
+            price = st.number_input("Price ($)", min_value=0.0, step=0.01, format="%.2f")
         
         with col2:
             genders = st.multiselect("Gender", ["Male", "Female", "Unisex"])
@@ -225,7 +227,8 @@ def personal_wardrobe_page():
                 
                 if st.button("Add Item"):
                     success, message = add_user_clothing_item(
-                        item_type.lower(), colors[0], styles, genders, sizes, temp_path, hyperlink
+                        item_type.lower(), colors[0], styles, genders, sizes, 
+                        temp_path, hyperlink, price if price > 0 else None
                     )
                     if success:
                         st.success(message)
@@ -272,6 +275,9 @@ def personal_wardrobe_page():
                             # Display item details
                             st.markdown(f"**Style:** {item['style']}")
                             st.markdown(f"**Size:** {item['size']}")
+                            # Display price if available
+                            if pd.notna(item['price']):
+                                st.markdown(f"**Price:** ${item['price']:.2f}")
                             if pd.notna(item['hyperlink']):
                                 st.markdown(f"[Shop Link]({item['hyperlink']})")
                             
@@ -296,12 +302,23 @@ def personal_wardrobe_page():
                                 help="Add notes about this item"
                             )
                             
+                            # Add price input for editing
+                            current_price = float(item['price']) if pd.notna(item['price']) else 0.0
+                            edit_price = st.number_input(f"Price ($) {idx}", 
+                                                       value=current_price,
+                                                       min_value=0.0,
+                                                       step=0.01,
+                                                       format="%.2f")
+                            
                             if st.button(f"Save Details {idx}"):
-                                success, message = update_item_details(
+                                success, message = edit_clothing_item(
                                     int(item['id']),
-                                    tags=new_tags.split(',') if new_tags.strip() else None,
-                                    season=season if season else None,
-                                    notes=notes if notes.strip() else None
+                                    parse_color_string(str(item['color'])),
+                                    item['style'].split(','),
+                                    item['gender'].split(','),
+                                    item['size'].split(','),
+                                    item['hyperlink'],
+                                    edit_price if edit_price > 0 else None
                                 )
                                 if success:
                                     st.success(message)

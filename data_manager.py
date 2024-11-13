@@ -28,19 +28,19 @@ STATEMENT_TIMEOUT = 30000  # 30 seconds statement timeout
 PREPARED_STATEMENTS = {
     'insert_item': """
         INSERT INTO user_clothing_items 
-        (type, color, style, gender, size, image_path, hyperlink)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        (type, color, style, gender, size, image_path, hyperlink, price)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
     """,
     'update_item': """
         UPDATE user_clothing_items 
-        SET color = %s, style = %s, gender = %s, size = %s, hyperlink = %s
+        SET color = %s, style = %s, gender = %s, size = %s, hyperlink = %s, price = %s
         WHERE id = %s
         RETURNING id
     """,
     'delete_item': "DELETE FROM user_clothing_items WHERE id = %s",
     'select_items': """
-        SELECT id, type, color, style, gender, size, image_path, hyperlink, tags, season, notes
+        SELECT id, type, color, style, gender, size, image_path, hyperlink, tags, season, notes, price
         FROM user_clothing_items
         ORDER BY type, created_at DESC
     """
@@ -111,6 +111,7 @@ def create_user_items_table():
                     tags TEXT[],
                     season VARCHAR(10),
                     notes TEXT,
+                    price DECIMAL(10, 2),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
@@ -188,17 +189,21 @@ def load_clothing_items():
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
-            cur.execute(PREPARED_STATEMENTS['select_items'])
+            cur.execute("""
+                SELECT id, type, color, style, gender, size, image_path, hyperlink, tags, season, notes, price
+                FROM user_clothing_items
+                ORDER BY type, created_at DESC
+            """)
             user_items = cur.fetchall()
             
-            columns = ['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink', 'tags', 'season', 'notes']
+            columns = ['id', 'type', 'color', 'style', 'gender', 'size', 'image_path', 'hyperlink', 'tags', 'season', 'notes', 'price']
             items_df = pd.DataFrame.from_records(user_items, columns=columns)
             return items_df
         finally:
             cur.close()
 
 @retry_on_error()
-def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file, hyperlink=""):
+def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file, hyperlink="", price=None):
     """Add clothing item with prepared statement and improved color detection"""
     if not os.path.exists("user_images"):
         os.makedirs("user_images", exist_ok=True)
@@ -226,7 +231,8 @@ def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file,
                 ','.join(genders),
                 ','.join(sizes),
                 image_path,
-                hyperlink
+                hyperlink,
+                price
             ))
             new_id = cur.fetchone()[0]
             conn.commit()
@@ -340,7 +346,7 @@ def update_item_details(item_id, tags=None, season=None, notes=None):
             cur.close()
 
 @retry_on_error()
-def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink):
+def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink, price=None):
     """Edit clothing item with prepared statement"""
     with get_db_connection() as conn:
         cur = conn.cursor()
@@ -351,6 +357,7 @@ def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink):
                 ','.join(genders),
                 ','.join(sizes),
                 hyperlink,
+                price,
                 int(item_id) if hasattr(item_id, 'item') else item_id
             ))
             
