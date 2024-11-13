@@ -235,6 +235,14 @@ def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file,
                 price
             ))
             new_id = cur.fetchone()[0]
+            
+            # Record initial price if provided
+            if price is not None:
+                cur.execute("""
+                    INSERT INTO item_price_history (item_id, price)
+                    VALUES (%s, %s)
+                """, (new_id, price))
+            
             conn.commit()
             return True, f"New {item_type} added successfully with ID: {new_id}"
         except Exception as e:
@@ -347,10 +355,14 @@ def update_item_details(item_id, tags=None, season=None, notes=None):
 
 @retry_on_error()
 def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink, price=None):
-    """Edit clothing item with prepared statement"""
+    """Edit clothing item with prepared statement and price history tracking"""
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
+            # Record price change if price is provided and different
+            if price is not None:
+                record_price_change(item_id, price)
+            
             cur.execute(PREPARED_STATEMENTS['update_item'], (
                 f"{color[0]},{color[1]},{color[2]}",
                 ','.join(styles),
@@ -618,5 +630,121 @@ def get_cleanup_statistics():
                     'temporary_files': max(0, total_files - saved_count)
                 }
             }
+        finally:
+            cur.close()
+
+@retry_on_error()
+def get_price_history(item_id):
+    """Get price history for an item"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT price, changed_at 
+                FROM item_price_history 
+                WHERE item_id = %s 
+                ORDER BY changed_at DESC
+            """, (item_id,))
+            return cur.fetchall()
+        finally:
+            cur.close()
+
+@retry_on_error()
+def record_price_change(item_id, new_price):
+    """Record a price change in history"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            # Get the current price
+            cur.execute("SELECT price FROM user_clothing_items WHERE id = %s", (item_id,))
+            current_price = cur.fetchone()
+            
+            if current_price and current_price[0] != new_price:
+                # Record the new price in history
+                cur.execute("""
+                    INSERT INTO item_price_history (item_id, price)
+                    VALUES (%s, %s)
+                """, (item_id, new_price))
+                conn.commit()
+                return True
+            return False
+        finally:
+            cur.close()
+
+# Update the edit_clothing_item function to include price history
+@retry_on_error()
+def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink, price=None):
+    """Edit clothing item with prepared statement and price history tracking"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            # Record price change if price is provided and different
+            if price is not None:
+                record_price_change(item_id, price)
+            
+            cur.execute(PREPARED_STATEMENTS['update_item'], (
+                f"{color[0]},{color[1]},{color[2]}",
+                ','.join(styles),
+                ','.join(genders),
+                ','.join(sizes),
+                hyperlink,
+                price,
+                int(item_id) if hasattr(item_id, 'item') else item_id
+            ))
+            
+            if cur.fetchone():
+                conn.commit()
+                return True, f"Item with ID {item_id} updated successfully"
+            return False, f"Item with ID {item_id} not found"
+        finally:
+            cur.close()
+
+# Update add_user_clothing_item to include initial price history
+@retry_on_error()
+def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file, hyperlink="", price=None):
+    """Add clothing item with prepared statement and initial price history"""
+    if not os.path.exists("user_images"):
+        os.makedirs("user_images", exist_ok=True)
+    
+    image_filename = f"{item_type}_{uuid.uuid4()}.png"
+    image_path = os.path.join("user_images", image_filename)
+    
+    with Image.open(image_file) as img:
+        img.save(image_path)
+    
+    # Use item-specific color detection
+    if item_type == 'pants':
+        from color_utils import get_pants_colors
+        color = get_pants_colors(image_path)
+        if color is None:
+            return False, "Failed to detect pants color"
+    
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute(PREPARED_STATEMENTS['insert_item'], (
+                item_type, 
+                f"{color[0]},{color[1]},{color[2]}", 
+                ','.join(styles),
+                ','.join(genders),
+                ','.join(sizes),
+                image_path,
+                hyperlink,
+                price
+            ))
+            new_id = cur.fetchone()[0]
+            
+            # Record initial price if provided
+            if price is not None:
+                cur.execute("""
+                    INSERT INTO item_price_history (item_id, price)
+                    VALUES (%s, %s)
+                """, (new_id, price))
+            
+            conn.commit()
+            return True, f"New {item_type} added successfully with ID: {new_id}"
+        except Exception as e:
+            conn.rollback()
+            return False, str(e)
         finally:
             cur.close()

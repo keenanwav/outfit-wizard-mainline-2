@@ -8,7 +8,8 @@ from data_manager import (
     load_clothing_items, save_outfit, load_saved_outfits,
     edit_clothing_item, delete_clothing_item, create_user_items_table,
     add_user_clothing_item, update_outfit_details,
-    get_outfit_details, update_item_details, delete_saved_outfit
+    get_outfit_details, update_item_details, delete_saved_outfit,
+    get_price_history
 )
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
@@ -362,10 +363,25 @@ def personal_wardrobe_page():
                                     update_item_details(item['id'], season=season if season else None)
                                 
                                 if notes != str(item['notes']) if pd.notna(item['notes']) else "":
-                                    update_item_details(item['id'], notes=notes if notes.strip() else None)
+                                    update_item_details(item['id'], notes=notes)
                                 
-                                st.success("Item details updated successfully!")
+                                st.success("Details updated successfully!")
                                 st.rerun()
+                            
+                            # Add price history display
+                            if st.button(f"Show Price History {idx}"):
+                                price_history = get_price_history(item['id'])
+                                if price_history:
+                                    st.markdown("#### Price History")
+                                    history_df = pd.DataFrame(price_history, columns=['Price', 'Date'])
+                                    history_df['Date'] = pd.to_datetime(history_df['Date']).dt.strftime('%Y-%m-%d')
+                                    st.dataframe(history_df, use_container_width=True)
+                                    
+                                    # Create a line chart for price trends
+                                    if len(history_df) > 1:
+                                        st.line_chart(history_df.set_index('Date')['Price'])
+                                else:
+                                    st.info("No price history available for this item.")
 
 def saved_outfits_page():
     """Display saved outfits page"""
