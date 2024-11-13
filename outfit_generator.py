@@ -7,26 +7,49 @@ import logging
 from datetime import datetime, timedelta
 import time
 from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List, Tuple, Dict
+import psycopg2
 
-def cleanup_merged_outfits(max_age_hours=24):
-    """Clean up old unsaved outfit files from merged_outfits folder with improved connection handling"""
+def delete_file_batch(file_batch: List[str]) -> Tuple[int, List[str]]:
+    """Delete a batch of files and return success count and errors"""
+    success_count = 0
+    errors = []
+    
+    for file_path in file_batch:
+        try:
+            os.remove(file_path)
+            success_count += 1
+            logging.debug(f"Successfully deleted file: {os.path.basename(file_path)}")
+        except Exception as e:
+            errors.append(f"Error deleting {file_path}: {str(e)}")
+            logging.error(f"Failed to delete file {file_path}: {str(e)}")
+    
+    return success_count, errors
+
+def cleanup_merged_outfits(max_age_hours=24, batch_size=50, max_workers=4):
+    """Clean up old unsaved outfit files from merged_outfits folder with batch processing"""
     try:
         if not os.path.exists('merged_outfits'):
             logging.info("Merged outfits directory does not exist. No cleanup needed.")
             return
             
         current_time = datetime.now()
-        cleaned_count = 0
-        total_files = 0
-        skipped_files = 0
+        stats = {
+            'total_files': 0,
+            'cleaned_count': 0,
+            'skipped_files': 0,
+            'error_count': 0,
+            'batches_processed': 0
+        }
+        all_errors = []
         
         # Get list of saved outfits from database to avoid deleting them
         from data_manager import get_db_connection
         
-        with get_db_connection() as conn:  # Properly use context manager
+        with get_db_connection() as conn:
             cur = conn.cursor()
             try:
-                # Use prepared statement for better performance
                 cur.execute("SELECT image_path FROM saved_outfits WHERE image_path IS NOT NULL")
                 saved_paths = set(path[0] for path in cur.fetchall())
                 logging.info(f"Found {len(saved_paths)} saved outfits to preserve")
@@ -36,12 +59,12 @@ def cleanup_merged_outfits(max_age_hours=24):
         # Get all files to delete
         files_to_delete = []
         for filename in os.listdir('merged_outfits'):
-            total_files += 1
+            stats['total_files'] += 1
             file_path = os.path.join('merged_outfits', filename)
             
             # Skip if file is in saved outfits
             if file_path in saved_paths:
-                skipped_files += 1
+                stats['skipped_files'] += 1
                 logging.debug(f"Skipping saved outfit file: {filename}")
                 continue
                 
@@ -54,24 +77,58 @@ def cleanup_merged_outfits(max_age_hours=24):
                     files_to_delete.append(file_path)
                     logging.debug(f"Marking file for deletion: {filename} (Age: {age})")
                 else:
-                    skipped_files += 1
+                    stats['skipped_files'] += 1
                     logging.debug(f"File {filename} is not old enough for cleanup (Age: {age})")
             except OSError as e:
                 logging.error(f"Error checking file age for {file_path}: {str(e)}")
+                stats['error_count'] += 1
                 continue
         
-        # Batch delete files
-        for file_path in files_to_delete:
-            try:
-                os.remove(file_path)
-                cleaned_count += 1
-                logging.info(f"Successfully deleted old outfit file: {os.path.basename(file_path)}")
-            except Exception as e:
-                logging.error(f"Error removing old outfit file {file_path}: {str(e)}")
-                continue
-                    
-        logging.info(f"Cleanup Summary: Total files: {total_files}, Cleaned: {cleaned_count}, Skipped: {skipped_files}")
-        return cleaned_count
+        # Process files in batches using thread pool
+        if files_to_delete:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Split files into batches
+                batches = [files_to_delete[i:i + batch_size] 
+                          for i in range(0, len(files_to_delete), batch_size)]
+                
+                # Submit batch jobs
+                future_to_batch = {
+                    executor.submit(delete_file_batch, batch): batch 
+                    for batch in batches
+                }
+                
+                # Process completed batches
+                for future in as_completed(future_to_batch):
+                    batch = future_to_batch[future]
+                    try:
+                        success_count, errors = future.result()
+                        stats['cleaned_count'] += success_count
+                        stats['error_count'] += len(errors)
+                        all_errors.extend(errors)
+                        stats['batches_processed'] += 1
+                        
+                        # Log batch completion
+                        logging.info(f"Batch completed: {success_count}/{len(batch)} files deleted successfully")
+                        if errors:
+                            logging.warning(f"Batch errors: {len(errors)} errors occurred")
+                    except Exception as e:
+                        logging.error(f"Batch processing error: {str(e)}")
+                        stats['error_count'] += len(batch)
+        
+        # Log final cleanup statistics
+        logging.info(
+            f"Cleanup Summary: "
+            f"Total files: {stats['total_files']}, "
+            f"Cleaned: {stats['cleaned_count']}, "
+            f"Skipped: {stats['skipped_files']}, "
+            f"Errors: {stats['error_count']}, "
+            f"Batches: {stats['batches_processed']}"
+        )
+        
+        if all_errors:
+            logging.warning(f"Cleanup Errors:\n" + "\n".join(all_errors))
+        
+        return stats['cleaned_count']
     except Exception as e:
         logging.error(f"Error during outfit cleanup: {str(e)}")
         return 0
