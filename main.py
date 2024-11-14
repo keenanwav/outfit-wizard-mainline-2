@@ -393,92 +393,70 @@ def personal_wardrobe_page():
                                     st.markdown('<div class="preview-header">📸 Change Item Image</div>', unsafe_allow_html=True)
                                     
                                     # Upload new image
-                                    new_image = st.file_uploader(f"Change Image {idx}", 
-                                                               type=['png', 'jpg', 'jpeg'])
+                                    new_image = st.file_uploader(
+                                        "Choose new image",
+                                        type=['png', 'jpg', 'jpeg'],
+                                        key=f"change_image_{idx}"
+                                    )
                                     
                                     if new_image:
-                                        # Create a preview container
-                                        st.markdown('<div class="preview-container">', unsafe_allow_html=True)
-                                        st.markdown('<div class="preview-header">📸 Change Item Image</div>', 
-                                                  unsafe_allow_html=True)
-                                        
-                                        # Show side-by-side preview with cropping
+                                        # Create columns for side-by-side comparison
                                         st.markdown('<div class="preview-images">', unsafe_allow_html=True)
                                         
-                                        # Create columns for side-by-side comparison
-                                        col1, col2 = st.columns(2)
+                                        # Current image preview
+                                        st.markdown("""
+                                            <div class="preview-image-box">
+                                                <h4>Current Image</h4>
+                                            </div>
+                                        """, unsafe_allow_html=True)
+                                        st.image(item['image_path'], use_column_width=True)
                                         
-                                        # Current image with cropping
-                                        with col1:
-                                            st.markdown("<h4>Current Image</h4>", unsafe_allow_html=True)
-                                            realtime_update = st.checkbox('Update preview in realtime', value=True, key=f'realtime_{idx}_current')
-                                            aspect_choice = st.radio('Aspect Ratio',
-                                                                   options=['1:1', '16:9', '4:3', 'Free'],
-                                                                   horizontal=True,
-                                                                   key=f'aspect_{idx}_current')
-                                            
-                                            aspect_dict = {
-                                                "1:1": (1, 1),
-                                                "16:9": (16, 9),
-                                                "4:3": (4, 3),
-                                                "Free": None
-                                            }
-                                            
-                                            aspect_ratio = aspect_dict[aspect_choice]
-                                            
-                                            cropped_current = st_cropper(
-                                                Image.open(item['image_path']),
-                                                realtime_update=realtime_update,
-                                                box_color='#0000FF',
-                                                aspect_ratio=aspect_ratio,
-                                                return_type='image',
-                                                key=f'current_{idx}'
-                                            )
+                                        # New image preview with cropping
+                                        st.markdown("""
+                                            <div class="preview-image-box">
+                                                <h4>New Image</h4>
+                                            </div>
+                                        """, unsafe_allow_html=True)
                                         
-                                        # New image with cropping
-                                        with col2:
-                                            st.markdown("<h4>New Image</h4>", unsafe_allow_html=True)
-                                            realtime_update_new = st.checkbox('Update preview in realtime', value=True, key=f'realtime_{idx}_new')
-                                            aspect_choice_new = st.radio('Aspect Ratio',
-                                                                       options=['1:1', '16:9', '4:3', 'Free'],
-                                                                       horizontal=True,
-                                                                       key=f'aspect_{idx}_new')
-                                            
-                                            aspect_ratio_new = aspect_dict[aspect_choice_new]
-                                            
-                                            cropped_new = st_cropper(
-                                                Image.open(new_image),
-                                                realtime_update=realtime_update_new,
-                                                box_color='#0000FF',
-                                                aspect_ratio=aspect_ratio_new,
-                                                return_type='image',
-                                                key=f'new_{idx}'
-                                            )
+                                        # Add cropping functionality
+                                        cropped_img = st_cropper(
+                                            Image.open(new_image),
+                                            realtime_update=True,
+                                            box_color='#0000FF',
+                                            aspect_ratio=None,
+                                            return_type='image'
+                                        )
                                         
                                         st.markdown('</div>', unsafe_allow_html=True)
                                         
                                         # Add confirmation buttons with enhanced styling
                                         st.markdown('<div class="preview-buttons">', unsafe_allow_html=True)
-                                        conf_col, cancel_col = st.columns(2)
                                         
-                                        with conf_col:
-                                            if st.button("✅ Confirm", key=f"confirm_change_{idx}",
-                                                       help="Confirm image changes",
-                                                       type="primary"):
-                                                # Update both current and new images
-                                                success, message = update_item_image(int(item['id']), cropped_new)
+                                        confirm_col, cancel_col = st.columns(2)
+                                        with confirm_col:
+                                            if st.button("✅ Confirm Change", key=f"confirm_{idx}"):
+                                                # Save cropped image
+                                                temp_path = f"temp_cropped_{new_image.name}"
+                                                cropped_img.save(temp_path)
+                                                
+                                                # Update image in database
+                                                success, message = update_item_image(item['id'], temp_path)
+                                                
                                                 if success:
-                                                    st.success("Images updated successfully!")
-                                                    time.sleep(1)
+                                                    st.success("Image updated successfully!")
+                                                    # Clean up temporary file
+                                                    os.remove(temp_path)
+                                                    # Refresh the page
                                                     st.rerun()
                                                 else:
-                                                    st.error(f"Failed to update images: {message}")
+                                                    st.error(f"Error updating image: {message}")
+                                                    if os.path.exists(temp_path):
+                                                        os.remove(temp_path)
                                         
                                         with cancel_col:
-                                            if st.button("❌ Cancel", key=f"cancel_change_{idx}",
-                                                       help="Cancel image changes"):
+                                            if st.button("❌ Cancel", key=f"cancel_{idx}"):
                                                 st.rerun()
-                                        
+                                                
                                         st.markdown('</div>', unsafe_allow_html=True)
                                     
                                     st.markdown('</div>', unsafe_allow_html=True)
