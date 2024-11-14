@@ -19,6 +19,7 @@ from outfit_generator import generate_outfit, cleanup_merged_outfits
 from datetime import datetime, timedelta
 from style_assistant import get_style_recommendation, format_clothing_items
 import time
+from streamlit_cropper import st_cropper
 
 logging.basicConfig(
     level=logging.INFO,
@@ -399,101 +400,84 @@ def personal_wardrobe_page():
                                     )
                                     
                                     if new_image:
-                                        # Show side-by-side preview
+                                        # Create columns for side-by-side comparison
                                         st.markdown('<div class="preview-images">', unsafe_allow_html=True)
                                         
                                         # Current image preview
-                                        st.markdown('<div class="preview-image-box">', unsafe_allow_html=True)
-                                        st.markdown("**Current Image**", unsafe_allow_html=True)
+                                        st.markdown("""
+                                            <div class="preview-image-box">
+                                                <h4>Current Image</h4>
+                                            </div>
+                                        """, unsafe_allow_html=True)
                                         st.image(item['image_path'], use_column_width=True)
+                                        
+                                        # New image preview with cropping
+                                        st.markdown("""
+                                            <div class="preview-image-box">
+                                                <h4>New Image</h4>
+                                            </div>
+                                        """, unsafe_allow_html=True)
+                                        
+                                        # Add cropping functionality
+                                        cropped_img = st_cropper(
+                                            Image.open(new_image),
+                                            realtime_update=True,
+                                            box_color='#0000FF',
+                                            aspect_ratio=None,
+                                            return_type='image'
+                                        )
+                                        
                                         st.markdown('</div>', unsafe_allow_html=True)
                                         
-                                        # New image preview
-                                        st.markdown('<div class="preview-image-box">', unsafe_allow_html=True)
-                                        st.markdown("**New Image Preview**", unsafe_allow_html=True)
-                                        st.image(new_image, use_column_width=True)
-                                        st.markdown('</div>', unsafe_allow_html=True)
-                                        
-                                        st.markdown('</div>', unsafe_allow_html=True)
-                                        
-                                        # Add confirm and cancel buttons with enhanced styling
+                                        # Add confirmation buttons with enhanced styling
                                         st.markdown('<div class="preview-buttons">', unsafe_allow_html=True)
-                                        conf_col, cancel_col = st.columns(2)
                                         
-                                        with conf_col:
-                                            if st.button("✅ Confirm", key=f"confirm_change_{idx}", 
-                                                       help="Confirm image change",
-                                                       type="primary"):
-                                                # Save the uploaded image temporarily
-                                                temp_path = f"temp_{new_image.name}"
-                                                with open(temp_path, "wb") as f:
-                                                    f.write(new_image.getvalue())
+                                        confirm_col, cancel_col = st.columns(2)
+                                        with confirm_col:
+                                            if st.button("✅ Confirm Change", key=f"confirm_{idx}"):
+                                                # Save cropped image
+                                                temp_path = f"temp_cropped_{new_image.name}"
+                                                cropped_img.save(temp_path)
                                                 
-                                                # Update the item's image
+                                                # Update image in database
                                                 success, message = update_item_image(item['id'], temp_path)
+                                                
                                                 if success:
                                                     st.success("Image updated successfully!")
-                                                    time.sleep(1)  # Short delay for better UX
+                                                    # Clean up temporary file
+                                                    os.remove(temp_path)
+                                                    # Refresh the page
                                                     st.rerun()
                                                 else:
-                                                    st.error(f"Failed to update image: {message}")
+                                                    st.error(f"Error updating image: {message}")
                                                     if os.path.exists(temp_path):
                                                         os.remove(temp_path)
                                         
                                         with cancel_col:
-                                            if st.button("❌ Cancel", key=f"cancel_change_{idx}",
-                                                       help="Cancel image change"):
+                                            if st.button("❌ Cancel", key=f"cancel_{idx}"):
                                                 st.rerun()
-                                        
+                                                
                                         st.markdown('</div>', unsafe_allow_html=True)
                                     
                                     st.markdown('</div>', unsafe_allow_html=True)
                             
                             with del_col:
-                                if st.button("🗑️", key=f"delete_{idx}"):
-                                    success, message = delete_clothing_item(item['id'])
-                                    if success:
-                                        st.success(message)
-                                        time.sleep(1)
+                                if st.button(f"🗑️ {idx}"):
+                                    if delete_clothing_item(item['id']):
+                                        st.success(f"Item {item['id']} deleted successfully!")
                                         st.rerun()
-                                    else:
-                                        st.error(message)
                             
                             # Display item details
-                            st.markdown(f"**Style:** {item['style']}")
-                            st.markdown(f"**Size:** {item['size']}")
-                            if pd.notna(item['price']):
-                                st.markdown(f"**Price:** ${item['price']:.2f}")
-                            if pd.notna(item['hyperlink']):
-                                st.markdown(f"[Shop Link]({item['hyperlink']})")
+                            st.write(f"Style: {item['style']}")
+                            if item.get('price'):
+                                st.write(f"Price: ${float(item['price']):.2f}")
                             
-                            # Organization features
-                            tags = item['tags'] if pd.notna(item['tags']) else []
-                            new_tags = st.text_input(
-                                f"Tags {idx}", 
-                                value=','.join(tags) if tags else "",
-                                help="Comma-separated tags"
-                            )
-                            
-                            current_season = str(item['season']) if pd.notna(item['season']) else ""
-                            season = st.selectbox(
-                                f"Season {idx}",
-                                ["", "Spring", "Summer", "Fall", "Winter"],
-                                index=["", "Spring", "Summer", "Fall", "Winter"].index(current_season) if current_season in ["", "Spring", "Summer", "Fall", "Winter"] else 0
-                            )
-                            
-                            # Update tags and season if changed
-                            if (new_tags != ','.join(tags) if tags else "") or (season != current_season):
-                                success, message = update_item_details(
-                                    int(item['id']),
-                                    tags=new_tags.split(',') if new_tags else None,
-                                    season=season if season else None
-                                )
-                                if success:
-                                    st.success(message)
-                                    st.rerun()
-                                else:
-                                    st.error(message)
+                            # Display color palette
+                            if item['color']:
+                                color = parse_color_string(str(item['color']))
+                                display_color_palette([color])
+    else:
+        st.info("Your wardrobe is empty. Start by adding some items!")
 
 def saved_outfits_page():
     """Display saved outfits page"""
