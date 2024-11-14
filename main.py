@@ -18,6 +18,7 @@ from color_utils import get_color_palette, display_color_palette, rgb_to_hex, pa
 from outfit_generator import generate_outfit, cleanup_merged_outfits
 from datetime import datetime, timedelta
 from style_assistant import get_style_recommendation, format_clothing_items
+import time
 
 logging.basicConfig(
     level=logging.INFO,
@@ -248,6 +249,76 @@ def personal_wardrobe_page():
     # Load existing items
     items_df = load_clothing_items()
     
+    # Add custom CSS for image preview with enhanced styling
+    st.markdown("""
+        <style>
+        .preview-container {
+            border: 2px solid #e0e0e0;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 10px;
+            background-color: #f8f9fa;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .preview-header {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .preview-images {
+            display: flex;
+            justify-content: space-between;
+            gap: 30px;
+            margin: 20px 0;
+            align-items: center;
+        }
+        .preview-image-box {
+            border: 2px solid #e0e0e0;
+            padding: 15px;
+            border-radius: 10px;
+            background-color: white;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+        }
+        .preview-image-box:hover {
+            transform: translateY(-2px);
+        }
+        .preview-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+        }
+        .preview-button {
+            padding: 8px 20px;
+            border-radius: 20px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+        .confirm-button {
+            background-color: #28a745;
+            color: white;
+        }
+        .cancel-button {
+            background-color: #dc3545;
+            color: white;
+        }
+        .confirm-button:hover, .cancel-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
     # Upload new item form
     with st.expander("Upload New Item", expanded=False):
         col1, col2 = st.columns(2)
@@ -316,70 +387,74 @@ def personal_wardrobe_page():
                             with change_img_col:
                                 # Add camera icon button for image change
                                 if st.button("📷", key=f"camera_icon_{idx}", help="Change Image"):
-                                    st.markdown("""
-                                        <style>
-                                        .preview-container {
-                                            border: 1px solid #ccc;
-                                            padding: 10px;
-                                            margin: 10px 0;
-                                            border-radius: 5px;
-                                        }
-                                        </style>
-                                    """, unsafe_allow_html=True)
-                                    
                                     # Create a preview container
-                                    with st.container():
-                                        st.markdown('<div class="preview-container">', unsafe_allow_html=True)
+                                    st.markdown('<div class="preview-container">', unsafe_allow_html=True)
+                                    st.markdown('<div class="preview-header">📸 Change Item Image</div>', unsafe_allow_html=True)
+                                    
+                                    # Upload new image
+                                    new_image = st.file_uploader(
+                                        "Choose new image",
+                                        type=['png', 'jpg', 'jpeg'],
+                                        key=f"change_image_{idx}"
+                                    )
+                                    
+                                    if new_image:
+                                        # Show side-by-side preview
+                                        st.markdown('<div class="preview-images">', unsafe_allow_html=True)
                                         
-                                        # Show current image
-                                        st.write("Current Image:")
+                                        # Current image preview
+                                        st.markdown('<div class="preview-image-box">', unsafe_allow_html=True)
+                                        st.markdown("**Current Image**", unsafe_allow_html=True)
                                         st.image(item['image_path'], use_column_width=True)
+                                        st.markdown('</div>', unsafe_allow_html=True)
                                         
-                                        # Upload new image
-                                        new_image = st.file_uploader(
-                                            "Upload new image",
-                                            type=['png', 'jpg', 'jpeg'],
-                                            key=f"change_image_{idx}"
-                                        )
-                                        
-                                        if new_image:
-                                            # Show side-by-side preview
-                                            col1, col2 = st.columns(2)
-                                            with col1:
-                                                st.write("Current:")
-                                                st.image(item['image_path'], use_column_width=True)
-                                            with col2:
-                                                st.write("New Preview:")
-                                                st.image(new_image, use_column_width=True)
-                                            
-                                            # Add confirm and cancel buttons
-                                            conf_col, cancel_col = st.columns(2)
-                                            with conf_col:
-                                                if st.button("Confirm Change", key=f"confirm_change_{idx}"):
-                                                    temp_path = f"temp_update_{new_image.name}"
-                                                    with open(temp_path, "wb") as f:
-                                                        f.write(new_image.getvalue())
-                                                    
-                                                    success, message = update_item_image(int(item['id']), temp_path)
-                                                    if success:
-                                                        st.success(message)
-                                                        os.remove(temp_path)
-                                                        st.rerun()
-                                                    else:
-                                                        st.error(message)
-                                                        os.remove(temp_path)
-                                            
-                                            with cancel_col:
-                                                if st.button("Cancel", key=f"cancel_change_{idx}"):
-                                                    st.rerun()
+                                        # New image preview
+                                        st.markdown('<div class="preview-image-box">', unsafe_allow_html=True)
+                                        st.markdown("**New Image Preview**", unsafe_allow_html=True)
+                                        st.image(new_image, use_column_width=True)
+                                        st.markdown('</div>', unsafe_allow_html=True)
                                         
                                         st.markdown('</div>', unsafe_allow_html=True)
+                                        
+                                        # Add confirm and cancel buttons with enhanced styling
+                                        st.markdown('<div class="preview-buttons">', unsafe_allow_html=True)
+                                        conf_col, cancel_col = st.columns(2)
+                                        
+                                        with conf_col:
+                                            if st.button("✅ Confirm", key=f"confirm_change_{idx}", 
+                                                       help="Confirm image change",
+                                                       type="primary"):
+                                                # Save the uploaded image temporarily
+                                                temp_path = f"temp_{new_image.name}"
+                                                with open(temp_path, "wb") as f:
+                                                    f.write(new_image.getvalue())
+                                                
+                                                # Update the item's image
+                                                success, message = update_item_image(item['id'], temp_path)
+                                                if success:
+                                                    st.success("Image updated successfully!")
+                                                    time.sleep(1)  # Short delay for better UX
+                                                    st.rerun()
+                                                else:
+                                                    st.error(f"Failed to update image: {message}")
+                                                    if os.path.exists(temp_path):
+                                                        os.remove(temp_path)
+                                        
+                                        with cancel_col:
+                                            if st.button("❌ Cancel", key=f"cancel_change_{idx}",
+                                                       help="Cancel image change"):
+                                                st.rerun()
+                                        
+                                        st.markdown('</div>', unsafe_allow_html=True)
+                                    
+                                    st.markdown('</div>', unsafe_allow_html=True)
                             
                             with del_col:
-                                if st.button(f"🗑️ {idx}"):
-                                    success, message = delete_clothing_item(int(item['id']))
+                                if st.button("🗑️", key=f"delete_{idx}"):
+                                    success, message = delete_clothing_item(item['id'])
                                     if success:
                                         st.success(message)
+                                        time.sleep(1)
                                         st.rerun()
                                     else:
                                         st.error(message)
