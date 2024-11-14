@@ -32,6 +32,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Initialize session state for various UI states
+if 'show_prices' not in st.session_state:
+    st.session_state.show_prices = True
+if 'editing_color' not in st.session_state:
+    st.session_state.editing_color = None
+if 'color_preview' not in st.session_state:
+    st.session_state.color_preview = None
+
 # Load custom CSS
 def load_custom_css():
     with open("static/style.css") as f:
@@ -249,7 +257,7 @@ def personal_wardrobe_page():
     # Load existing items
     items_df = load_clothing_items()
     
-    # Add custom CSS for image preview with enhanced styling
+    # Add custom CSS for image preview and color editing
     st.markdown("""
         <style>
         .preview-container {
@@ -269,53 +277,18 @@ def personal_wardrobe_page():
             padding-bottom: 10px;
             border-bottom: 1px solid #dee2e6;
         }
-        .preview-images {
-            display: flex;
-            justify-content: space-between;
-            gap: 30px;
-            margin: 20px 0;
-            align-items: center;
-        }
-        .preview-image-box {
-            flex: 1;
+        .color-preview {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            margin: 10px auto;
             border: 2px solid #e0e0e0;
-            padding: 15px;
-            border-radius: 10px;
-            background-color: white;
-            text-align: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            transition: transform 0.2s ease;
         }
-        .preview-image-box:hover {
-            transform: translateY(-2px);
-        }
-        .preview-buttons {
+        .color-buttons {
             display: flex;
             justify-content: center;
-            gap: 30px;
-            margin-top: 20px;
-            padding-top: 15px;
-            border-top: 1px solid #dee2e6;
-        }
-        .preview-button {
-            padding: 8px 20px;
-            border-radius: 20px;
-            border: none;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: bold;
-        }
-        .confirm-button {
-            background-color: #28a745;
-            color: white;
-        }
-        .cancel-button {
-            background-color: #dc3545;
-            color: white;
-        }
-        .confirm-button:hover, .cancel-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            gap: 10px;
+            margin-top: 10px;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -378,95 +351,78 @@ def personal_wardrobe_page():
                         if os.path.exists(item['image_path']):
                             st.image(item['image_path'], use_column_width=True)
                             
-                            # Edit/Delete buttons
-                            edit_col, change_img_col, del_col = st.columns([2, 2, 1])
+                            # Show current color
+                            current_color = parse_color_string(item['color'])
+                            st.markdown("**Current Color:**")
+                            display_color_palette([current_color])
+                            
+                            # Edit/Delete/Color buttons
+                            edit_col, change_img_col, color_col, del_col = st.columns([2, 2, 2, 1])
                             
                             with edit_col:
                                 if st.button(f"Edit Details {idx}"):
                                     st.session_state.editing_item = item
                             
                             with change_img_col:
-                                # Add camera icon button for image change
                                 if st.button("📷", key=f"camera_icon_{idx}", help="Change Image"):
-                                    # Create a preview container
-                                    st.markdown('<div class="preview-container">', unsafe_allow_html=True)
-                                    st.markdown('<div class="preview-header">📸 Change Item Image</div>', unsafe_allow_html=True)
-                                    
-                                    # Upload new image
-                                    new_image = st.file_uploader("Choose new image", 
-                                                               type=['png', 'jpg', 'jpeg'], 
-                                                               key=f"change_image_{idx}")
-                                    
-                                    if new_image:
-                                        # Show side-by-side preview
-                                        st.markdown('<div class="preview-images">', unsafe_allow_html=True)
-                                        
-                                        # Current image preview
-                                        st.markdown("""
-                                            <div class="preview-image-box">
-                                                <h4>Current Image</h4>
-                                            </div>
-                                        """, unsafe_allow_html=True)
-                                        st.image(item['image_path'], use_column_width=True)
-                                        
-                                        # New image preview
-                                        st.markdown("""
-                                            <div class="preview-image-box">
-                                                <h4>New Image</h4>
-                                            </div>
-                                        """, unsafe_allow_html=True)
-                                        st.image(new_image, use_column_width=True)
-                                        
-                                        st.markdown('</div>', unsafe_allow_html=True)
-                                        
-                                        # Add confirm and cancel buttons
-                                        st.markdown('<div class="preview-buttons">', unsafe_allow_html=True)
-                                        
-                                        confirm_col, cancel_col = st.columns(2)
-                                        with confirm_col:
-                                            if st.button("✅ Confirm Change", key=f"confirm_{idx}"):
-                                                # Save uploaded image
-                                                temp_path = f"temp_{new_image.name}"
-                                                with open(temp_path, "wb") as f:
-                                                    f.write(new_image.getvalue())
-                                                
-                                                # Update image in database
-                                                success, message = update_item_image(item['id'], temp_path)
-                                                
-                                                if success:
-                                                    st.success("Image updated successfully!")
-                                                    # Clean up temporary file
-                                                    os.remove(temp_path)
-                                                    # Refresh the page
-                                                    st.rerun()
-                                                else:
-                                                    st.error(f"Error updating image: {message}")
-                                                    if os.path.exists(temp_path):
-                                                        os.remove(temp_path)
-                                        
-                                        with cancel_col:
-                                            if st.button("❌ Cancel", key=f"cancel_{idx}"):
-                                                st.rerun()
-                                                
-                                        st.markdown('</div>', unsafe_allow_html=True)
-                                    
-                                    st.markdown('</div>', unsafe_allow_html=True)
+                                    st.session_state.editing_image = item
+                            
+                            with color_col:
+                                if st.button("🎨", key=f"color_icon_{idx}", help="Edit Color"):
+                                    st.session_state.editing_color = item
                             
                             with del_col:
-                                if st.button(f"🗑️ {idx}"):
+                                if st.button("🗑️", key=f"delete_{idx}"):
                                     if delete_clothing_item(item['id']):
-                                        st.success(f"Item {item['id']} deleted successfully!")
+                                        st.success(f"Item deleted successfully!")
                                         st.rerun()
-                            
-                            # Display item details
-                            st.write(f"Style: {item['style']}")
-                            if item.get('price'):
-                                st.write(f"Price: ${float(item['price']):.2f}")
-                            
-                            # Display color palette
-                            if item['color']:
-                                color = parse_color_string(str(item['color']))
-                                display_color_palette([color])
+                                        
+                            # Color editing interface
+                            if st.session_state.editing_color is not None and st.session_state.editing_color['id'] == item['id']:
+                                st.markdown('<div class="preview-container">', unsafe_allow_html=True)
+                                st.markdown('<div class="preview-header">🎨 Edit Item Color</div>', unsafe_allow_html=True)
+                                
+                                # Color input
+                                new_color = st.color_picker("Choose new color", rgb_to_hex(current_color))
+                                
+                                # Convert hex to RGB
+                                r = int(new_color[1:3], 16)
+                                g = int(new_color[3:5], 16)
+                                b = int(new_color[5:7], 16)
+                                new_color_rgb = [r, g, b]
+                                
+                                # Preview
+                                st.markdown("**Color Preview:**")
+                                display_color_palette([new_color_rgb])
+                                
+                                # Confirm/Cancel buttons
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    if st.button("Confirm", key=f"confirm_color_{idx}"):
+                                        # Update color in database
+                                        success, message = edit_clothing_item(
+                                            item['id'],
+                                            new_color_rgb,
+                                            item['style'].split(','),
+                                            item['gender'].split(','),
+                                            item['size'].split(','),
+                                            item['hyperlink'],
+                                            item['price']
+                                        )
+                                        if success:
+                                            st.success("Color updated successfully!")
+                                            st.session_state.editing_color = None
+                                            st.rerun()
+                                        else:
+                                            st.error(f"Error updating color: {message}")
+                                
+                                with col2:
+                                    if st.button("Cancel", key=f"cancel_color_{idx}"):
+                                        st.session_state.editing_color = None
+                                        st.rerun()
+                                
+                                st.markdown('</div>', unsafe_allow_html=True)
+
     else:
         st.info("Your wardrobe is empty. Start by adding some items!")
 
