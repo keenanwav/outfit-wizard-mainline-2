@@ -314,26 +314,66 @@ def personal_wardrobe_page():
                                     st.session_state.editing_item = item
                             
                             with change_img_col:
-                                # Add camera icon button
+                                # Add camera icon button for image change
                                 if st.button("📷", key=f"camera_icon_{idx}", help="Change Image"):
-                                    new_image = st.file_uploader(
-                                        "Upload new image",
-                                        type=['png', 'jpg', 'jpeg'],
-                                        key=f"change_image_{idx}"
-                                    )
-                                    if new_image:
-                                        temp_path = f"temp_update_{new_image.name}"
-                                        with open(temp_path, "wb") as f:
-                                            f.write(new_image.getvalue())
+                                    st.markdown("""
+                                        <style>
+                                        .preview-container {
+                                            border: 1px solid #ccc;
+                                            padding: 10px;
+                                            margin: 10px 0;
+                                            border-radius: 5px;
+                                        }
+                                        </style>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    # Create a preview container
+                                    with st.container():
+                                        st.markdown('<div class="preview-container">', unsafe_allow_html=True)
                                         
-                                        success, message = update_item_image(int(item['id']), temp_path)
-                                        if success:
-                                            st.success(message)
-                                            os.remove(temp_path)
-                                            st.rerun()
-                                        else:
-                                            st.error(message)
-                                            os.remove(temp_path)
+                                        # Show current image
+                                        st.write("Current Image:")
+                                        st.image(item['image_path'], use_column_width=True)
+                                        
+                                        # Upload new image
+                                        new_image = st.file_uploader(
+                                            "Upload new image",
+                                            type=['png', 'jpg', 'jpeg'],
+                                            key=f"change_image_{idx}"
+                                        )
+                                        
+                                        if new_image:
+                                            # Show side-by-side preview
+                                            col1, col2 = st.columns(2)
+                                            with col1:
+                                                st.write("Current:")
+                                                st.image(item['image_path'], use_column_width=True)
+                                            with col2:
+                                                st.write("New Preview:")
+                                                st.image(new_image, use_column_width=True)
+                                            
+                                            # Add confirm and cancel buttons
+                                            conf_col, cancel_col = st.columns(2)
+                                            with conf_col:
+                                                if st.button("Confirm Change", key=f"confirm_change_{idx}"):
+                                                    temp_path = f"temp_update_{new_image.name}"
+                                                    with open(temp_path, "wb") as f:
+                                                        f.write(new_image.getvalue())
+                                                    
+                                                    success, message = update_item_image(int(item['id']), temp_path)
+                                                    if success:
+                                                        st.success(message)
+                                                        os.remove(temp_path)
+                                                        st.rerun()
+                                                    else:
+                                                        st.error(message)
+                                                        os.remove(temp_path)
+                                            
+                                            with cancel_col:
+                                                if st.button("Cancel", key=f"cancel_change_{idx}"):
+                                                    st.rerun()
+                                        
+                                        st.markdown('</div>', unsafe_allow_html=True)
                             
                             with del_col:
                                 if st.button(f"🗑️ {idx}"):

@@ -17,6 +17,7 @@ from psycopg2.extras import execute_values, execute_batch
 from contextlib import contextmanager
 import time
 from functools import wraps
+from typing import Tuple
 
 # Initialize connection pool
 MIN_CONNECTIONS = 1
@@ -751,65 +752,61 @@ def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file,
 
 # Add the new function after line 382
 @retry_on_error()
-def update_item_image(item_id, new_image_path):
+def update_item_image(item_id: int, new_image_path: str) -> Tuple[bool, str]:
     """Update the image of an existing clothing item"""
-    if not os.path.exists(new_image_path):
-        return False, "New image file does not exist"
-        
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            # Get current item details
-            cur.execute("""
-                SELECT type, image_path 
-                FROM user_clothing_items 
-                WHERE id = %s
-            """, (item_id,))
-            
-            result = cur.fetchone()
-            if not result:
-                return False, f"Item with ID {item_id} not found"
+    try:
+        # Get the current image path first
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "SELECT image_path FROM user_clothing_items WHERE id = %s",
+                    (item_id,)
+                )
+                result = cur.fetchone()
+                if not result:
+                    return False, f"Item with ID {item_id} not found"
                 
-            item_type, old_image_path = result
-            
-            # Create new image filename
-            image_filename = f"{item_type}_{uuid.uuid4()}.png"
-            new_path = os.path.join("user_images", image_filename)
-            
-            # Create user_images directory if it doesn't exist
-            if not os.path.exists("user_images"):
-                os.makedirs("user_images")
-            
-            # Copy new image to user_images directory
-            with Image.open(new_image_path) as img:
-                img.save(new_path)
-            
-            # Update database with new image path
-            cur.execute("""
-                UPDATE user_clothing_items 
-                SET image_path = %s
-                WHERE id = %s
-                RETURNING id
-            """, (new_path, item_id))
-            
-            if cur.fetchone():
-                # Delete old image if it exists
+                old_image_path = result[0]
+                
+                # Generate new image path
+                new_filename = f"updated_{uuid.uuid4()}.png"
+                final_image_path = os.path.join("user_images", new_filename)
+                
+                # Save the new image
+                with Image.open(new_image_path) as img:
+                    img.save(final_image_path)
+                
+                # Update the database with new image path
+                cur.execute(
+                    "UPDATE user_clothing_items SET image_path = %s WHERE id = %s",
+                    (final_image_path, item_id)
+                )
+                
+                conn.commit()
+                
+                # Delete the old image if it exists
                 if old_image_path and os.path.exists(old_image_path):
                     try:
                         os.remove(old_image_path)
                     except Exception as e:
-                        logging.error(f"Error deleting old image {old_image_path}: {str(e)}")
+                        logging.warning(f"Failed to delete old image {old_image_path}: {str(e)}")
                 
-                conn.commit()
+                # Delete the temporary uploaded image
+                if os.path.exists(new_image_path):
+                    try:
+                        os.remove(new_image_path)
+                    except Exception as e:
+                        logging.warning(f"Failed to delete temporary image {new_image_path}: {str(e)}")
+                
                 return True, "Image updated successfully"
-            
-            return False, "Failed to update image in database"
-            
-        except Exception as e:
-            conn.rollback()
-            return False, f"Error updating image: {str(e)}"
-        finally:
-            cur.close()
+                
+            finally:
+                cur.close()
+                
+    except Exception as e:
+        logging.error(f"Error updating item image: {str(e)}")
+        return False, f"Failed to update image: {str(e)}"
 
 def get_price_history(item_id):
     """Get price history for an item"""
