@@ -9,7 +9,7 @@ from data_manager import (
     edit_clothing_item, delete_clothing_item, create_user_items_table,
     add_user_clothing_item, update_outfit_details,
     get_outfit_details, update_item_details, delete_saved_outfit,
-    get_price_history, update_item_image, bulk_update_item_images
+    get_price_history, update_item_image
 )
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
