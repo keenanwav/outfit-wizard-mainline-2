@@ -9,7 +9,7 @@ from data_manager import (
     edit_clothing_item, delete_clothing_item, create_user_items_table,
     add_user_clothing_item, update_outfit_details,
     get_outfit_details, update_item_details, delete_saved_outfit,
-    get_price_history, update_item_image
+    get_price_history, update_item_image, bulk_update_item_images
 )
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
@@ -19,6 +19,7 @@ from outfit_generator import generate_outfit, cleanup_merged_outfits
 from datetime import datetime, timedelta
 from style_assistant import get_style_recommendation, format_clothing_items
 import time
+import uuid
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,7 +33,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Load custom CSS
 def load_custom_css():
     with open("static/style.css") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
@@ -363,6 +363,83 @@ def personal_wardrobe_page():
     if not items_df.empty:
         st.markdown("### Your Items")
         
+        # Add bulk image update section
+        with st.expander("🔄 Bulk Image Update", expanded=False):
+            st.markdown("""
+                ### Bulk Image Update
+                Select multiple items to update their images simultaneously.
+            """)
+            
+            # Create a dictionary to store selected items for bulk update
+            if 'bulk_update_selections' not in st.session_state:
+                st.session_state.bulk_update_selections = {}
+            
+            # Create columns for the grid layout
+            cols = st.columns(3)
+            for idx, (_, item) in enumerate(items_df.iterrows()):
+                col = cols[idx % 3]
+                with col:
+                    if os.path.exists(item['image_path']):
+                        st.image(item['image_path'], use_column_width=True)
+                        # Add checkbox for selection
+                        item_key = f"bulk_select_{item['id']}"
+                        if st.checkbox("Select", key=item_key):
+                            st.session_state.bulk_update_selections[item['id']] = item
+                        st.write(f"ID: {item['id']} - {item['type'].capitalize()}")
+            
+            # Show bulk update interface if items are selected
+            if st.session_state.bulk_update_selections:
+                st.markdown(f"Selected {len(st.session_state.bulk_update_selections)} items")
+                
+                # File uploader for bulk images
+                uploaded_files = st.file_uploader(
+                    "Upload new images (in order of selection)",
+                    type=['png', 'jpg', 'jpeg'],
+                    accept_multiple_files=True,
+                    key="bulk_update_files"
+                )
+                
+                if uploaded_files:
+                    if len(uploaded_files) != len(st.session_state.bulk_update_selections):
+                        st.warning("Number of uploaded files must match number of selected items")
+                    else:
+                        if st.button("Update Selected Items"):
+                            with st.spinner("Updating images..."):
+                                success_count = 0
+                                for (item_id, item), new_image in zip(
+                                    st.session_state.bulk_update_selections.items(),
+                                    uploaded_files
+                                ):
+                                    # Save the new image
+                                    new_image_filename = f"{item['type']}_{uuid.uuid4()}.png"
+                                    new_image_path = os.path.join("user_images", new_image_filename)
+                                    
+                                    # Ensure directory exists
+                                    os.makedirs("user_images", exist_ok=True)
+                                    
+                                    # Save and update the image
+                                    img = Image.open(new_image)
+                                    img.save(new_image_path)
+                                    
+                                    success, message = update_item_image(int(item_id), new_image_path)
+                                    if success:
+                                        success_count += 1
+                                    else:
+                                        st.error(f"Failed to update item {item_id}: {message}")
+                                
+                                if success_count == len(st.session_state.bulk_update_selections):
+                                    st.success("All images updated successfully!")
+                                    # Clear selections and refresh
+                                    st.session_state.bulk_update_selections = {}
+                                    time.sleep(1)
+                                    st.rerun()
+                                else:
+                                    st.warning(f"Updated {success_count} out of {len(st.session_state.bulk_update_selections)} images")
+            
+            if st.button("Clear Selections"):
+                st.session_state.bulk_update_selections = {}
+                st.rerun()
+        
         # Group items by type
         for item_type in ["shirt", "pants", "shoes"]:
             type_items = items_df[items_df['type'] == item_type]
@@ -387,77 +464,42 @@ def personal_wardrobe_page():
                             with change_img_col:
                                 # Add camera icon button for image change
                                 if st.button("📷", key=f"camera_icon_{idx}", help="Change Image"):
-                                    # Create a preview container
-                                    st.markdown('<div class="preview-container">', unsafe_allow_html=True)
-                                    st.markdown('<div class="preview-header">📸 Change Item Image</div>', unsafe_allow_html=True)
-                                    
-                                    # Upload new image
                                     new_image = st.file_uploader(
                                         "Choose new image",
                                         type=['png', 'jpg', 'jpeg'],
-                                        key=f"change_image_{idx}"
+                                        key=f"update_{idx}"
                                     )
                                     
                                     if new_image:
-                                        # Create a preview container
-                                        st.markdown('<div class="preview-container">', unsafe_allow_html=True)
+                                        # Save the new image
+                                        new_image_filename = f"{item['type']}_{uuid.uuid4()}.png"
+                                        new_image_path = os.path.join("user_images", new_image_filename)
                                         
-                                        # Show side-by-side preview
-                                        st.markdown('<div class="preview-images">', unsafe_allow_html=True)
+                                        # Ensure directory exists
+                                        os.makedirs("user_images", exist_ok=True)
                                         
-                                        # Current image preview
-                                        st.markdown("""
-                                            <div class="preview-image-box">
-                                                <h4>Current Image</h4>
-                                            </div>
-                                        """, unsafe_allow_html=True)
-                                        st.image(item['image_path'], use_column_width=True)
+                                        # Save and update the image
+                                        img = Image.open(new_image)
+                                        img.save(new_image_path)
                                         
-                                        # New image preview
-                                        st.markdown("""
-                                            <div class="preview-image-box">
-                                                <h4>New Image Preview</h4>
-                                            </div>
-                                        """, unsafe_allow_html=True)
-                                        st.image(new_image, use_column_width=True)
-                                        
-                                        st.markdown('</div>', unsafe_allow_html=True)
-                                        
-                                        # Add confirmation buttons with enhanced styling
-                                        st.markdown('<div class="preview-buttons">', unsafe_allow_html=True)
-                                        confirm_col, cancel_col = st.columns(2)
-                                        
-                                        with confirm_col:
-                                            if st.button("✅ Confirm Change", key=f"confirm_{idx}"):
-                                                # Save the new image temporarily
-                                                temp_path = f"temp_{new_image.name}"
-                                                with open(temp_path, "wb") as f:
-                                                    f.write(new_image.getvalue())
-                                                
-                                                # Update image in database
-                                                success, message = update_item_image(int(item['id']), temp_path)
-                                                if success:
-                                                    st.success("Image updated successfully!")
-                                                    time.sleep(1)
-                                                    st.rerun()
-                                                else:
-                                                    st.error(f"Failed to update image: {message}")
-                                                    if os.path.exists(temp_path):
-                                                        os.remove(temp_path)
-                                        
-                                        with cancel_col:
-                                            if st.button("❌ Cancel", key=f"cancel_{idx}"):
-                                                st.rerun()
-                                        
-                                        st.markdown('</div>', unsafe_allow_html=True)
-                                        
-                                        st.markdown('</div>', unsafe_allow_html=True)
+                                        # Update the image in database
+                                        success, message = update_item_image(int(item['id']), new_image_path)
+                                        if success:
+                                            st.success("Image updated successfully!")
+                                            time.sleep(1)
+                                            st.rerun()
+                                        else:
+                                            st.error(f"Failed to update image: {message}")
                             
                             with del_col:
                                 if st.button(f"🗑️ {idx}"):
-                                    if delete_clothing_item(item['id']):
-                                        st.success(f"Item {item['id']} deleted successfully!")
+                                    success, message = delete_clothing_item(item['id'])
+                                    if success:
+                                        st.success(message)
+                                        time.sleep(1)
                                         st.rerun()
+                                    else:
+                                        st.error(message)
                             
                             # Display item details
                             st.write(f"Style: {item['style']}")
@@ -601,20 +643,21 @@ def cleanup_status_dashboard():
             st.success(f"Cleanup completed. {cleaned_count} files removed.")
             st.rerun()
 
-# Update the main sidebar menu to include the new dashboard
-if __name__ == "__main__":
+def main():
+    """Main function to handle page routing"""
     create_user_items_table()
-    show_first_visit_tips()
     check_cleanup_needed()
+    show_first_visit_tips()
     
-    st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits", "Cleanup Status"])
+    pages = {
+        "Generate Outfit": main_page,
+        "My Items": personal_wardrobe_page
+    }
     
-    if page == "Home":
-        main_page()
-    elif page == "My Items":
-        personal_wardrobe_page()
-    elif page == "Saved Outfits":
-        saved_outfits_page()
-    elif page == "Cleanup Status":
-        cleanup_status_dashboard()
+    with st.sidebar:
+        page = st.radio("Navigation", list(pages.keys()))
+    
+    pages[page]()
+
+if __name__ == "__main__":
+    main()
