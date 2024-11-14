@@ -753,8 +753,8 @@ def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file,
 
 # Add the new function after line 382
 @retry_on_error()
-def update_item_image(item_id: int, cropped_image) -> Tuple[bool, str]:
-    """Update item's image with cropped version"""
+def update_item_image(item_id: int, new_image_path: str) -> Tuple[bool, str]:
+    """Update the image of an existing clothing item"""
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
@@ -775,12 +775,9 @@ def update_item_image(item_id: int, cropped_image) -> Tuple[bool, str]:
                 new_filename = f"updated_{os.path.basename(current_path)}"
                 new_path = os.path.join("user_images", new_filename)
                 
-                # Save cropped image
-                if isinstance(cropped_image, Image.Image):
-                    cropped_image.save(new_path, format='PNG')
-                else:
-                    # If it's binary data, convert to PIL Image first
-                    Image.open(io.BytesIO(cropped_image)).save(new_path, format='PNG')
+                # Save the new image
+                with Image.open(new_image_path) as img:
+                    img.save(new_path, format='PNG')
                 
                 # Update database with new path
                 cur.execute("""
@@ -790,9 +787,13 @@ def update_item_image(item_id: int, cropped_image) -> Tuple[bool, str]:
                     RETURNING id
                 """, (new_path, item_id))
                 
-                # Delete old image if it exists and is different from new path
+                # Delete old image if it exists and is different
                 if os.path.exists(current_path) and current_path != new_path:
                     os.remove(current_path)
+                
+                # Delete temporary file
+                if os.path.exists(new_image_path):
+                    os.remove(new_image_path)
                 
                 conn.commit()
                 return True, "Image updated successfully"
@@ -803,6 +804,7 @@ def update_item_image(item_id: int, cropped_image) -> Tuple[bool, str]:
                 return False, f"Error updating image: {str(e)}"
             finally:
                 cur.close()
+                
     except Exception as e:
         logging.error(f"Database connection error: {str(e)}")
         return False, f"Database connection error: {str(e)}"
