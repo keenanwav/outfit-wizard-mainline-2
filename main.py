@@ -19,7 +19,6 @@ from outfit_generator import generate_outfit, cleanup_merged_outfits
 from datetime import datetime, timedelta
 from style_assistant import get_style_recommendation, format_clothing_items
 import time
-from streamlit_cropper import st_cropper
 
 logging.basicConfig(
     level=logging.INFO,
@@ -278,6 +277,7 @@ def personal_wardrobe_page():
             align-items: center;
         }
         .preview-image-box {
+            flex: 1;
             border: 2px solid #e0e0e0;
             padding: 15px;
             border-radius: 10px;
@@ -393,14 +393,12 @@ def personal_wardrobe_page():
                                     st.markdown('<div class="preview-header">📸 Change Item Image</div>', unsafe_allow_html=True)
                                     
                                     # Upload new image
-                                    new_image = st.file_uploader(
-                                        "Choose new image",
-                                        type=['png', 'jpg', 'jpeg'],
-                                        key=f"change_image_{idx}"
-                                    )
+                                    new_image = st.file_uploader("Choose new image", 
+                                                               type=['png', 'jpg', 'jpeg'], 
+                                                               key=f"change_image_{idx}")
                                     
                                     if new_image:
-                                        # Create columns for side-by-side comparison
+                                        # Show side-by-side preview
                                         st.markdown('<div class="preview-images">', unsafe_allow_html=True)
                                         
                                         # Current image preview
@@ -411,33 +409,26 @@ def personal_wardrobe_page():
                                         """, unsafe_allow_html=True)
                                         st.image(item['image_path'], use_column_width=True)
                                         
-                                        # New image preview with cropping
+                                        # New image preview
                                         st.markdown("""
                                             <div class="preview-image-box">
                                                 <h4>New Image</h4>
                                             </div>
                                         """, unsafe_allow_html=True)
-                                        
-                                        # Add cropping functionality
-                                        cropped_img = st_cropper(
-                                            Image.open(new_image),
-                                            realtime_update=True,
-                                            box_color='#0000FF',
-                                            aspect_ratio=None,
-                                            return_type='image'
-                                        )
+                                        st.image(new_image, use_column_width=True)
                                         
                                         st.markdown('</div>', unsafe_allow_html=True)
                                         
-                                        # Add confirmation buttons with enhanced styling
+                                        # Add confirm and cancel buttons
                                         st.markdown('<div class="preview-buttons">', unsafe_allow_html=True)
                                         
                                         confirm_col, cancel_col = st.columns(2)
                                         with confirm_col:
                                             if st.button("✅ Confirm Change", key=f"confirm_{idx}"):
-                                                # Save cropped image
-                                                temp_path = f"temp_cropped_{new_image.name}"
-                                                cropped_img.save(temp_path)
+                                                # Save uploaded image
+                                                temp_path = f"temp_{new_image.name}"
+                                                with open(temp_path, "wb") as f:
+                                                    f.write(new_image.getvalue())
                                                 
                                                 # Update image in database
                                                 success, message = update_item_image(item['id'], temp_path)
