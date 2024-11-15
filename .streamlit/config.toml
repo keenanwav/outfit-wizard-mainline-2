@@ -5,16 +5,10 @@ port = 8501
 enableXsrfProtection = false
 enableCORS = true
 baseUrlPath = ""
-maxUploadSize = 200
-enableWebsocketCompression = true
-enableStaticServing = true
-runOnSave = true
-fileWatcherType = "poll"
 
 [browser]
 serverAddress = "outfitwiz.site"
 gatherUsageStats = false
-serverPort = 8501
 
 [theme]
 primaryColor = "#FF4B4B"
@@ -22,26 +16,3 @@ backgroundColor = "#0E1117"
 secondaryBackgroundColor = "#262730"
 textColor = "#FAFAFA"
 font = "sans serif"
-
-[logger]
-level = "info"
-messageFormat = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-
-[client]
-toolbarMode = "minimal"
-showErrorDetails = true
-
-[runner]
-fastReruns = true
-handleWebsocketReconnect = true
-
-[global]
-developmentMode = false
-
-[server.headersTimeout]
-read = 300
-write = 300
-
-[server.websocket]
-# Removed invalid configuration options: maxMessageSize and pingTimeout
-pingInterval = 5
