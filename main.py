@@ -11,26 +11,95 @@ from data_manager import (
     get_outfit_details, update_item_details, delete_saved_outfit,
     get_price_history, update_item_image
 )
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics.pairwise import cosine_similarity
 import logging
-from color_utils import get_color_palette, display_color_palette, rgb_to_hex, parse_color_string
-from outfit_generator import generate_outfit, cleanup_merged_outfits
 from datetime import datetime, timedelta
 from style_assistant import get_style_recommendation, format_clothing_items
 import time
+from error_pages import show_404_page, show_500_page, show_websocket_error, handle_error, show_asset_404_error
 
+# Configure logging with more detailed formatting
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('app.log')
+    ]
 )
 
-st.set_page_config(
-    page_title="Outfit Wizard",
-    page_icon="👕",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+logger = logging.getLogger(__name__)
+
+# Initialize WebSocket connection state
+if 'websocket_retry_count' not in st.session_state:
+    st.session_state.websocket_retry_count = 0
+if 'last_websocket_error' not in st.session_state:
+    st.session_state.last_websocket_error = None
+if 'connection_healthy' not in st.session_state:
+    st.session_state.connection_healthy = True
+if 'fallback_mode' not in st.session_state:
+    st.session_state.fallback_mode = False
+
+def handle_websocket_error():
+    """Enhanced WebSocket error handler with fallback mode"""
+    if not st.session_state.connection_healthy:
+        current_time = time.time()
+        
+        # Reset retry count if last error was more than 5 minutes ago
+        if (st.session_state.last_websocket_error and 
+            current_time - st.session_state.last_websocket_error > 300):
+            st.session_state.websocket_retry_count = 0
+            st.session_state.connection_healthy = True
+            st.session_state.fallback_mode = False
+        
+        st.session_state.websocket_retry_count += 1
+        st.session_state.last_websocket_error = current_time
+        
+        # Implement exponential backoff with max retries
+        if st.session_state.websocket_retry_count <= 3:
+            logger.info(f"Attempting WebSocket reconnection (attempt {st.session_state.websocket_retry_count}/3)")
+            backoff_time = min(2 ** st.session_state.websocket_retry_count, 8)  # Max 8 seconds
+            time.sleep(backoff_time)
+            st.rerun()
+        else:
+            logger.error("WebSocket connection failed after 3 attempts, switching to fallback mode")
+            st.session_state.fallback_mode = True
+            st.session_state.websocket_retry_count = 0
+            st.session_state.connection_healthy = True
+            show_websocket_error()
+
+# Enhanced error handling decorator
+def error_handler(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except FileNotFoundError as e:
+            logger.error(f"File not found error in {func.__name__}: {str(e)}")
+            return handle_error('asset_404', str(e))
+        except ConnectionError as e:
+            logger.error(f"WebSocket error in {func.__name__}: {str(e)}")
+            handle_websocket_error()
+            return False
+        except Exception as e:
+            logger.error(f"Error in {func.__name__}: {str(e)}")
+            return handle_error(500, str(e))
+    return wrapper
+
+# Configure page settings with enhanced error handling
+try:
+    st.set_page_config(
+        page_title="Outfit Wizard",
+        page_icon="👕",
+        layout="wide",
+        initial_sidebar_state="expanded",
+        menu_items={
+            'Get Help': None,
+            'Report a bug': None,
+            'About': "Outfit Wizard - Your Personal Style Assistant"
+        }
+    )
+except Exception as e:
+    logger.error(f"Error in page configuration: {str(e)}")
+    handle_error(500, str(e))
 
 # Initialize session state for various UI states
 if 'show_prices' not in st.session_state:
@@ -85,6 +154,7 @@ def check_cleanup_needed():
     except Exception as e:
         logging.error(f"Error checking cleanup status: {str(e)}")
 
+@error_handler
 def main_page():
     """Display main page with outfit generation"""
     load_custom_css()
@@ -250,6 +320,7 @@ def main_page():
                                 color = parse_color_string(str(item['color']))
                                 display_color_palette([color])
 
+@error_handler
 def personal_wardrobe_page():
     """Display and manage personal wardrobe items"""
     st.title("My Items")
@@ -583,18 +654,26 @@ def cleanup_status_dashboard():
 
 # Update the main sidebar menu to include the new dashboard
 if __name__ == "__main__":
-    create_user_items_table()
-    show_first_visit_tips()
-    check_cleanup_needed()
-    
-    st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits", "Cleanup Status"])
-    
-    if page == "Home":
-        main_page()
-    elif page == "My Items":
-        personal_wardrobe_page()
-    elif page == "Saved Outfits":
-        saved_outfits_page()
-    elif page == "Cleanup Status":
-        cleanup_status_dashboard()
+    try:
+        # Initialize database tables
+        create_user_items_table()
+        
+        # Show first visit tips
+        show_first_visit_tips()
+        
+        # Check for cleanup
+        check_cleanup_needed()
+        
+        # Navigation
+        page = st.sidebar.selectbox("Navigation", ["Home", "My Items", "Cleanup Status"])
+        
+        if page == "Home":
+            main_page()
+        elif page == "My Items":
+            personal_wardrobe_page()
+        elif page == "Cleanup Status":
+            cleanup_status_dashboard()
+            
+    except Exception as e:
+        logging.error(f"Application error: {str(e)}")
+        handle_error(500)
