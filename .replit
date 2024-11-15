@@ -34,17 +34,9 @@ waitForPort = 8501
 run = ["sh", "-c", "streamlit run main.py --server.address=0.0.0.0 --server.port=8501 --server.baseUrlPath='' --browser.serverAddress=outfitwiz.site"]
 
 [[ports]]
-localPort = 80
-externalPort = 3000
-
-[[ports]]
 localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 8080
-externalPort = 8080
-
-[[ports]]
 localPort = 8501
-externalPort = 3001
+externalPort = 3000
