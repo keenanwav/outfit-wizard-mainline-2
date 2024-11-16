@@ -27,11 +27,11 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run main.py --server.address=0.0.0.0 --server.port=8501 --server.baseUrlPath='' --browser.serverAddress=outfitwiz.site"
+args = "streamlit run main.py --server.address=0.0.0.0 --server.port=8501"
 waitForPort = 8501
 
 [deployment]
-run = ["sh", "-c", "streamlit run main.py --server.address=0.0.0.0 --server.port=8501 --server.baseUrlPath='' --browser.serverAddress=outfitwiz.site"]
+run = ["sh", "-c", "streamlit run main.py --server.address=0.0.0.0 --server.port=8501"]
 
 [[ports]]
 localPort = 80
@@ -43,7 +43,6 @@ externalPort = 80
 
 [[ports]]
 localPort = 8080
-externalPort = 8080
 
 [[ports]]
 localPort = 8501
