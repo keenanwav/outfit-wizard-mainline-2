@@ -1,0 +1,10 @@
+2024-11-16 07:27:36,257 - __main__ - ERROR - Application error: name 'show_first_visit_tips' is not defined
+2024-11-16 07:27:36,788 - __main__ - ERROR - Application error: name 'show_first_visit_tips' is not defined
+2024-11-16 07:27:36,852 - __main__ - ERROR - Application error: name 'show_first_visit_tips' is not defined
+2024-11-16 07:27:50,763 - __main__ - ERROR - Application error: name 'show_first_visit_tips' is not defined
+2024-11-16 07:27:51,246 - __main__ - ERROR - Application error: name 'show_first_visit_tips' is not defined
+2024-11-16 07:27:51,314 - __main__ - ERROR - Application error: name 'show_first_visit_tips' is not defined
+2024-11-16 07:43:25,007 - root - INFO - Found 12 saved outfits to preserve
+2024-11-16 07:43:25,092 - root - INFO - Batch completed: 23/23 files deleted successfully
+2024-11-16 07:43:25,297 - root - INFO - Cleanup Summary: Total files: 52, Cleaned: 23, Skipped: 29, Errors: 0, Batches: 1
+2024-11-16 08:17:19,483 - root - INFO - Cleanup not needed yet. Next cleanup in 0:26:05.648290

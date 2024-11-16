@@ -42,7 +42,7 @@ def load_custom_css():
         logger.error(f"Error loading custom CSS: {str(e)}")
 
 def initialize_app():
-    """Initialize the application with proper error handling"""
+    """Initialize the application with improved WebSocket error handling"""
     try:
         if 'initialized' not in st.session_state:
             st.session_state.initialized = True
@@ -52,11 +52,79 @@ def initialize_app():
             # Initialize error state
             if 'error_type' not in st.session_state:
                 st.session_state.error_type = None
-                
+            
+            # Add improved WebSocket error handling with exponential backoff
+            st.markdown("""
+                <script>
+                    const MAX_RETRIES = 5;
+                    const BASE_DELAY = 1000;
+                    const MAX_DELAY = 16000;
+                    let retryCount = 0;
+                    let wsConnection = null;
+
+                    function initializeWebSocket() {
+                        if (!window._stcore) {
+                            setTimeout(initializeWebSocket, 100);
+                            return;
+                        }
+
+                        wsConnection = window._stcore.WebsocketConnection;
+                        if (wsConnection) {
+                            wsConnection.addEventListener('open', handleOpen);
+                            wsConnection.addEventListener('error', handleError);
+                            wsConnection.addEventListener('close', handleClose);
+                            wsConnection.addEventListener('message', handleMessage);
+                        }
+                    }
+
+                    function handleOpen() {
+                        console.log('WebSocket connected');
+                        retryCount = 0;
+                    }
+
+                    function handleError(event) {
+                        console.error('WebSocket error:', event);
+                        attemptReconnection();
+                    }
+
+                    function handleClose() {
+                        console.log('WebSocket closed');
+                        attemptReconnection();
+                    }
+
+                    function handleMessage() {
+                        // Reset retry count on successful message
+                        retryCount = 0;
+                    }
+
+                    function attemptReconnection() {
+                        if (retryCount >= MAX_RETRIES) {
+                            console.error('Max retries reached');
+                            window.location.href = '/?error=websocket';
+                            return;
+                        }
+
+                        const delay = Math.min(BASE_DELAY * Math.pow(2, retryCount), MAX_DELAY);
+                        console.log(`Attempting reconnection in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+
+                        setTimeout(() => {
+                            retryCount++;
+                            if (wsConnection) {
+                                // Force reconnection by reloading the page
+                                window.location.reload();
+                            }
+                        }, delay);
+                    }
+
+                    // Initialize WebSocket handling
+                    window.addEventListener('load', initializeWebSocket);
+                </script>
+            """, unsafe_allow_html=True)
+            
             # Check for error parameters in URL
-            query_params = st.experimental_get_query_params()
-            if 'error' in query_params:
-                handle_error(query_params['error'][0])
+            params = st.query_params
+            if 'error' in params:
+                handle_error(params['error'])
                 return False
         return True
     except Exception as e:
@@ -91,43 +159,6 @@ st.set_page_config(
 # Initialize the application
 if initialize_app():
     try:
-        # Add WebSocket error handling script
-        st.markdown("""
-            <script>
-                window.addEventListener('load', function() {
-                    let wsConnection = window._stcore.WebsocketConnection;
-                    if (wsConnection) {
-                        wsConnection.addEventListener('error', function(event) {
-                            console.error('WebSocket error:', event);
-                            if (!document.getElementById('websocket-error-handler')) {
-                                const errorDiv = document.createElement('div');
-                                errorDiv.id = 'websocket-error-handler';
-                                document.body.appendChild(errorDiv);
-                                
-                                // Implement retry logic
-                                let retryCount = 0;
-                                const maxRetries = 3;
-                                
-                                function attemptReconnection() {
-                                    if (retryCount < maxRetries) {
-                                        retryCount++;
-                                        console.log(`Attempting reconnection: ${retryCount}/${maxRetries}`);
-                                        setTimeout(() => {
-                                            window.location.reload();
-                                        }, 2000 * retryCount);
-                                    } else {
-                                        window.location.href = '/?error=websocket';
-                                    }
-                                }
-                                
-                                attemptReconnection();
-                            }
-                        });
-                    }
-                });
-            </script>
-        """, unsafe_allow_html=True)
-        
         # Initialize session states
         if 'show_prices' not in st.session_state:
             st.session_state.show_prices = True
@@ -587,8 +618,8 @@ if initialize_app():
         # Update the main sidebar menu to include the new dashboard
         if __name__ == "__main__":
             create_user_items_table()
-            show_first_visit_tips()
-            check_cleanup_needed()
+            #show_first_visit_tips()
+            #check_cleanup_needed()
             
             st.sidebar.title("Navigation")
             page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits", "Cleanup Status"])
