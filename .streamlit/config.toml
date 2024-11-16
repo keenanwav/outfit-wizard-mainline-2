@@ -4,11 +4,16 @@ address = "0.0.0.0"
 port = 8501
 enableXsrfProtection = false
 enableCORS = true
+enableWebsocketCompression = true
+maxMessageSize = 200
+maxUploadSize = 200
+runOnSave = true
 baseUrlPath = ""
 
 [browser]
-serverAddress = "outfitwiz.site"
 gatherUsageStats = false
+serverAddress = "0.0.0.0"
+serverPort = 8501
 
 [theme]
 primaryColor = "#FF4B4B"
@@ -16,3 +21,20 @@ backgroundColor = "#0E1117"
 secondaryBackgroundColor = "#262730"
 textColor = "#FAFAFA"
 font = "sans serif"
+
+[logger]
+level = "info"
+messageFormat = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+[global]
+developmentMode = false
+showWarningOnDirectExecution = false
+
+[client]
+toolbarMode = "minimal"
+showErrorDetails = true
+
+[server.websocket]
+maxMessageSize = 1000
+port = 8501
+origins = ["*"]
