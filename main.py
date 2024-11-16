@@ -187,8 +187,8 @@ if initialize_app():
                 st.warning("Please add some clothing items in the 'My Items' section first!")
                 return
             
-            # Add tabs for different features, including the new My Tips tab
-            tab1, tab2, tab3 = st.tabs(["📋 Generate Outfit", "🎯 Smart Style Assistant", "💡 My Tips"])
+            # Add tabs for different features
+            tab1, tab2 = st.tabs(["📋 Generate Outfit", "🎯 Smart Style Assistant"])
             
             with tab1:
                 col1, col2, col3 = st.columns([2, 2, 1])
