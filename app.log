@@ -8,3 +8,6 @@
 2024-11-16 07:43:25,092 - root - INFO - Batch completed: 23/23 files deleted successfully
 2024-11-16 07:43:25,297 - root - INFO - Cleanup Summary: Total files: 52, Cleaned: 23, Skipped: 29, Errors: 0, Batches: 1
 2024-11-16 08:17:19,483 - root - INFO - Cleanup not needed yet. Next cleanup in 0:26:05.648290
+2024-11-16 15:50:47,888 - root - INFO - Found 12 saved outfits to preserve
+2024-11-16 15:50:48,146 - root - INFO - Cleanup Summary: Total files: 31, Cleaned: 0, Skipped: 31, Errors: 0, Batches: 0
+2024-11-16 15:51:34,753 - root - INFO - Cleanup not needed yet. Next cleanup in 0:59:13.236542
