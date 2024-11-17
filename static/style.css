@@ -1,74 +1,23 @@
-/* Tutorial bubble styles */
-.tutorial-bubble {
-    background-color: #FF4B4B;
-    color: white;
-    padding: 20px;
-    border-radius: 12px;
-    margin: 10px 0;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    opacity: 0;
-    transform: translateY(-10px);
-    transition: all 0.3s ease;
-    position: relative;
-    z-index: 1000;
-}
-
-.tutorial-bubble.visible {
+/* Price animation effects */
+.price-container {
+    transition: all 0.3s ease-in-out;
     opacity: 1;
-    transform: translateY(0);
-    animation: bubbleIn 0.5s ease-out;
+    transform: translateX(0);
 }
 
-.tutorial-content {
-    position: relative;
-    padding: 15px;
+.price-container.hidden {
+    opacity: 0;
+    transform: translateX(20px);
 }
 
-.tutorial-content h3 {
-    margin: 0 0 15px 0;
-    font-size: 18px;
-    font-weight: 600;
-    color: white;
+.price-item {
+    animation: slideIn 0.3s ease-in-out;
 }
 
-.tutorial-text {
-    font-size: 14px;
-    line-height: 1.6;
-    margin-bottom: 15px;
-}
-
-.tutorial-text ul {
-    margin: 10px 0;
-    padding-left: 20px;
-    list-style-type: none;
-}
-
-.tutorial-text li {
-    margin: 8px 0;
-    position: relative;
-    padding-left: 20px;
-}
-
-.tutorial-text li:before {
-    content: "•";
-    position: absolute;
-    left: 0;
-    color: rgba(255, 255, 255, 0.8);
-}
-
-button[data-baseweb="button"] {
-    margin: 5px;
-    transition: transform 0.2s ease;
-}
-
-button[data-baseweb="button"]:hover {
-    transform: translateY(-1px);
-}
-
-@keyframes bubbleIn {
+@keyframes slideIn {
     from {
         opacity: 0;
-        transform: translateY(-20px);
+        transform: translateY(10px);
     }
     to {
         opacity: 1;
@@ -76,53 +25,15 @@ button[data-baseweb="button"]:hover {
     }
 }
 
-/* Ensure proper z-index stacking */
-.stApp > header {
-    z-index: 999;
+.total-price {
+    animation: fadeIn 0.5s ease-in-out;
 }
 
-.main .block-container {
-    z-index: 998;
-}
-
-/* Navigation styling */
-.stRadio > label {
-    font-weight: 500;
-    margin-bottom: 10px;
-}
-
-.stRadio > div {
-    margin-left: 10px;
-}
-
-/* Separator styling */
-hr {
-    margin: 20px 0;
-    border: 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* WebSocket connection status */
-.websocket-status {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    padding: 8px 12px;
-    border-radius: 4px;
-    font-size: 12px;
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    z-index: 1001;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.websocket-status.connected {
-    background-color: rgba(0, 255, 0, 0.2);
-    opacity: 1;
-}
-
-.websocket-status.disconnected {
-    background-color: rgba(255, 0, 0, 0.2);
-    opacity: 1;
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }

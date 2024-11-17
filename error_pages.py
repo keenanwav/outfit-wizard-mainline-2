@@ -2,7 +2,6 @@ import streamlit as st
 import os
 
 def render_404_page():
-    """Render 404 error page"""
     st.markdown("""
     <style>
     .error-container {
@@ -28,17 +27,39 @@ def render_404_page():
     .error-action {
         margin-top: 20px;
     }
-    .error-action a {
+    .error-action a, .error-action button {
         color: var(--primary-color);
         text-decoration: none;
         padding: 10px 20px;
         border: 2px solid var(--primary-color);
         border-radius: 5px;
         transition: all 0.3s ease;
+        cursor: pointer;
+        background: none;
+        font-size: 16px;
     }
-    .error-action a:hover {
+    .error-action a:hover, .error-action button:hover {
         background-color: var(--primary-color);
         color: white;
+    }
+    .error-description {
+        color: var(--text-color);
+        opacity: 0.8;
+        max-width: 400px;
+        margin: 0 auto 20px;
+        line-height: 1.5;
+    }
+    .error-suggestions {
+        text-align: left;
+        max-width: 400px;
+        margin: 20px auto;
+        padding: 15px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 5px;
+    }
+    .error-suggestions ul {
+        margin: 10px 0;
+        padding-left: 20px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -47,6 +68,17 @@ def render_404_page():
     <div class="error-container">
         <div class="error-code">404</div>
         <div class="error-message">Page Not Found</div>
+        <div class="error-description">
+            The page you're looking for doesn't exist or has been moved.
+        </div>
+        <div class="error-suggestions">
+            <strong>You might want to:</strong>
+            <ul>
+                <li>Check the URL for typos</li>
+                <li>Return to the homepage</li>
+                <li>Browse your wardrobe</li>
+            </ul>
+        </div>
         <div class="error-action">
             <a href="/" target="_self">Return to Home</a>
         </div>
@@ -173,12 +205,7 @@ def render_websocket_error():
             
             async function checkServerHealth() {
                 try {
-                    const protocol = window.location.protocol;
-                    const hostname = window.location.hostname;
-                    const port = '8501';
-                    const basePath = window._stcore.basePathname || '';
-                    const healthUrl = `${protocol}//${hostname}:${port}${basePath}/_stcore/health`;
-                    const response = await fetch(healthUrl);
+                    const response = await fetch(window.location.origin + '/_stcore/health');
                     return response.ok;
                 } catch (e) {
                     return false;
@@ -221,29 +248,18 @@ def render_websocket_error():
             
             // Setup WebSocket monitoring
             window.addEventListener('load', function() {
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const hostname = window.location.hostname;
-                const port = '8501';
-                const basePath = window._stcore.basePathname || '';
-                const wsUrl = `${protocol}//${hostname}:${port}${basePath}/_stcore/stream`;
-                
-                let wsConnection = new WebSocket(wsUrl);
-                
-                wsConnection.addEventListener('open', function() {
-                    updateStatus('Connected');
-                    updateProgressBar(100);
-                });
-                
-                wsConnection.addEventListener('close', function() {
-                    resetReconnection();
-                    attemptReconnection();
-                });
-                
-                wsConnection.addEventListener('error', function(event) {
-                    console.error('WebSocket error:', event);
-                    resetReconnection();
-                    attemptReconnection();
-                });
+                let wsConnection = window._stcore.WebsocketConnection;
+                if (wsConnection) {
+                    wsConnection.addEventListener('open', function() {
+                        updateStatus('Connected');
+                        updateProgressBar(100);
+                    });
+                    
+                    wsConnection.addEventListener('close', function() {
+                        resetReconnection();
+                        attemptReconnection();
+                    });
+                }
             });
         </script>
     </div>
@@ -254,111 +270,54 @@ def init_error_handling():
     if 'error_state' not in st.session_state:
         st.session_state.error_state = None
         
+    # Add error handling middleware to detect connection issues
     st.markdown("""
         <script>
-            let ws = null;
-            let reconnectTimeout = null;
-            let reconnectAttempts = 0;
-            const MAX_RECONNECT_ATTEMPTS = 5;
-            const INITIAL_RETRY_DELAY = 1000;
-            const MAX_RETRY_DELAY = 16000;
+            let connectionTimeout = null;
+            const TIMEOUT_DURATION = 30000; // 30 seconds timeout
             
-            function connect() {
-                if (ws) {
-                    ws.close();
-                }
-                
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const hostname = window.location.hostname;
-                const port = '8501';  // Use the specific port
-                const basePath = window._stcore.basePathname || '';
-                const wsUrl = `${protocol}//${hostname}:${port}${basePath}/_stcore/stream`;
-                
-                console.log('Attempting WebSocket connection to:', wsUrl);
-                
-                ws = new WebSocket(wsUrl);
-                
-                ws.onopen = function() {
-                    console.log('WebSocket Connected Successfully');
-                    reconnectAttempts = 0;
-                    if (reconnectTimeout) {
-                        clearTimeout(reconnectTimeout);
-                        reconnectTimeout = null;
-                    }
-                };
-                
-                ws.onclose = function(event) {
-                    console.log('WebSocket Closed:', event.code, event.reason);
-                    scheduleReconnect();
-                };
-                
-                ws.onerror = function(error) {
-                    console.error('WebSocket Error:', error);
-                    if (ws.readyState === WebSocket.OPEN) {
-                        ws.close();
-                    }
-                };
-                
-                ws.onmessage = function(event) {
-                    reconnectAttempts = 0;
-                    if (reconnectTimeout) {
-                        clearTimeout(reconnectTimeout);
-                        reconnectTimeout = null;
-                    }
-                };
-            }
-            
-            function scheduleReconnect() {
-                if (reconnectTimeout) {
-                    clearTimeout(reconnectTimeout);
-                }
-                
-                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                    const delay = Math.min(INITIAL_RETRY_DELAY * Math.pow(2, reconnectAttempts), MAX_RETRY_DELAY);
-                    console.log(`Scheduling reconnect attempt ${reconnectAttempts + 1} in ${delay}ms`);
+            function initializeWebSocketHandling() {
+                let wsConnection = window._stcore.WebsocketConnection;
+                if (wsConnection) {
+                    // Reset connection timeout on successful message
+                    wsConnection.addEventListener('message', function() {
+                        if (connectionTimeout) {
+                            clearTimeout(connectionTimeout);
+                        }
+                        connectionTimeout = setTimeout(handleConnectionTimeout, TIMEOUT_DURATION);
+                    });
                     
-                    reconnectTimeout = setTimeout(() => {
-                        reconnectAttempts++;
-                        connect();
-                    }, delay);
-                } else {
-                    console.log('Max reconnection attempts reached');
-                    // Reset attempts after a longer delay
-                    setTimeout(() => {
-                        reconnectAttempts = 0;
-                        connect();
-                    }, MAX_RETRY_DELAY * 2);
+                    // Handle connection errors
+                    wsConnection.addEventListener('error', function(event) {
+                        console.error('WebSocket error:', event);
+                        handleConnectionError();
+                    });
+                    
+                    // Handle connection close
+                    wsConnection.addEventListener('close', function() {
+                        handleConnectionError();
+                    });
+                    
+                    // Initialize connection timeout
+                    connectionTimeout = setTimeout(handleConnectionTimeout, TIMEOUT_DURATION);
                 }
             }
             
-            // Initialize connection when the page loads
-            window.addEventListener('load', connect);
+            function handleConnectionTimeout() {
+                console.error('WebSocket connection timed out');
+                handleConnectionError();
+            }
             
-            // Cleanup on page unload
-            window.addEventListener('unload', () => {
-                if (ws) {
-                    ws.close();
+            function handleConnectionError() {
+                if (!document.getElementById('websocket-error-handler')) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.id = 'websocket-error-handler';
+                    document.body.appendChild(errorDiv);
+                    window.location.href = '/?error=websocket';
                 }
-                if (reconnectTimeout) {
-                    clearTimeout(reconnectTimeout);
-                }
-            });
+            }
             
-            // Handle visibility change to reconnect when tab becomes visible
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') {
-                    if (!ws || ws.readyState !== WebSocket.OPEN) {
-                        reconnectAttempts = 0;  // Reset attempts on visibility change
-                        connect();
-                    }
-                }
-            });
-
-            // Handle network status changes
-            window.addEventListener('online', () => {
-                console.log('Network connection restored');
-                reconnectAttempts = 0;
-                connect();
-            });
+            // Initialize WebSocket handling on page load
+            window.addEventListener('load', initializeWebSocketHandling);
         </script>
     """, unsafe_allow_html=True)
