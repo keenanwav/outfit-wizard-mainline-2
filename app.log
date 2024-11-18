@@ -8,35 +8,3 @@
 2024-11-16 07:43:25,092 - root - INFO - Batch completed: 23/23 files deleted successfully
 2024-11-16 07:43:25,297 - root - INFO - Cleanup Summary: Total files: 52, Cleaned: 23, Skipped: 29, Errors: 0, Batches: 1
 2024-11-16 08:17:19,483 - root - INFO - Cleanup not needed yet. Next cleanup in 0:26:05.648290
-2024-11-17 00:44:48,039 - root - ERROR - Database connection timeout: SSL connection has been closed unexpectedly
-
-2024-11-17 00:44:48,039 - __main__ - ERROR - Application error: SSL connection has been closed unexpectedly
-
-2024-11-17 11:38:22,041 - root - INFO - Found 12 saved outfits to preserve
-2024-11-17 11:38:22,207 - root - INFO - Batch completed: 31/31 files deleted successfully
-2024-11-17 11:38:22,382 - root - INFO - Cleanup Summary: Total files: 31, Cleaned: 31, Skipped: 0, Errors: 0, Batches: 1
-2024-11-17 11:38:31,718 - root - INFO - Cleanup not needed yet. Next cleanup in 0:59:50.519425
-2024-11-17 13:30:58,779 - root - INFO - Found 12 saved outfits to preserve
-2024-11-17 13:30:59,009 - root - INFO - Cleanup Summary: Total files: 2, Cleaned: 0, Skipped: 2, Errors: 0, Batches: 0
-2024-11-17 18:52:59,256 - root - INFO - Found 12 saved outfits to preserve
-2024-11-17 18:52:59,484 - root - INFO - Cleanup Summary: Total files: 3, Cleaned: 0, Skipped: 3, Errors: 0, Batches: 0
-2024-11-17 18:53:46,476 - root - INFO - Cleanup not needed yet. Next cleanup in 0:59:12.860840
-2024-11-17 21:28:04,326 - root - INFO - Found 13 saved outfits to preserve
-2024-11-17 21:28:04,557 - root - INFO - Cleanup Summary: Total files: 5, Cleaned: 0, Skipped: 5, Errors: 0, Batches: 0
-2024-11-17 21:28:12,310 - root - INFO - Cleanup not needed yet. Next cleanup in 0:59:52.103562
-2024-11-17 21:28:18,994 - root - INFO - Cleanup not needed yet. Next cleanup in 0:59:45.419865
-2024-11-17 21:28:29,252 - root - INFO - Cleanup not needed yet. Next cleanup in 0:59:35.161536
-2024-11-17 21:28:34,984 - root - INFO - Cleanup not needed yet. Next cleanup in 0:59:29.429518
-2024-11-17 21:29:19,974 - root - INFO - Cleanup not needed yet. Next cleanup in 0:58:44.439357
-2024-11-17 21:29:25,068 - root - INFO - Cleanup not needed yet. Next cleanup in 0:58:39.345605
-2024-11-17 21:29:33,486 - root - INFO - Cleanup not needed yet. Next cleanup in 0:58:30.927237
-2024-11-17 21:29:39,204 - root - INFO - Cleanup not needed yet. Next cleanup in 0:58:25.209561
-2024-11-17 21:30:06,236 - root - INFO - Cleanup not needed yet. Next cleanup in 0:57:58.177080
-2024-11-17 21:30:12,351 - root - INFO - Cleanup not needed yet. Next cleanup in 0:57:52.062869
-2024-11-17 21:30:19,636 - root - INFO - Cleanup not needed yet. Next cleanup in 0:57:44.777288
-2024-11-17 21:30:30,235 - root - INFO - Cleanup not needed yet. Next cleanup in 0:57:34.178325
-2024-11-17 21:30:43,482 - root - INFO - Cleanup not needed yet. Next cleanup in 0:57:20.931227
-2024-11-18 03:35:04,852 - root - ERROR - Database connection timeout: SSL connection has been closed unexpectedly
-
-2024-11-18 03:35:04,858 - __main__ - ERROR - Error initializing application: SSL connection has been closed unexpectedly
-
