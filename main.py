@@ -47,6 +47,7 @@ def initialize_app():
         if 'initialized' not in st.session_state:
             st.session_state.initialized = True
             init_error_handling()
+            create_user_items_table()
             load_custom_css()
             
             # Initialize error state
@@ -166,11 +167,11 @@ if initialize_app():
             st.session_state.editing_color = None
         if 'color_preview' not in st.session_state:
             st.session_state.color_preview = None
-
-        # Continue with the rest of the application code
+        if 'editing_item' not in st.session_state:
+            st.session_state.editing_item = None
+            
         def main_page():
             """Display main page with outfit generation"""
-            load_custom_css()
             st.title("Outfit Wizard")
             
             # Initialize session state for current outfit
@@ -179,9 +180,6 @@ if initialize_app():
                 
             # Load clothing items
             items_df = load_clothing_items()
-            
-            # Initialize missing_items
-            missing_items = []
             
             if items_df.empty:
                 st.warning("Please add some clothing items in the 'My Items' section first!")
@@ -203,78 +201,33 @@ if initialize_app():
                 with col3:
                     st.write("")
                     st.write("")
-                    # Toggle button for price visibility
                     if st.button("Toggle Prices" if st.session_state.show_prices else "Show Prices"):
                         st.session_state.show_prices = not st.session_state.show_prices
                         st.rerun()
                 
-                # Create two columns for outfit display and price information
-                outfit_col, price_col = st.columns([0.7, 0.3])
-                
+                # Generate outfit button
                 if st.button("Generate Outfit"):
                     with st.spinner("🔮 Generating your perfect outfit..."):
-                        # Generate the outfit
                         outfit, missing_items = generate_outfit(items_df, size, style, gender)
                         st.session_state.current_outfit = outfit
                 
-                # Display current outfit details if available
+                # Display current outfit if available
                 if st.session_state.current_outfit:
                     outfit = st.session_state.current_outfit
+                    if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
+                        st.image(outfit['merged_image_path'], use_column_width=True)
                     
-                    # Display outfit image in the left column
-                    with outfit_col:
-                        if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
-                            st.image(outfit['merged_image_path'], use_column_width=True)
-                        
-                        if missing_items:
-                            st.warning(f"Missing items: {', '.join(missing_items)}")
-                    
-                    # Display prices and colors in the right column with animation
-                    with price_col:
-                        price_container_class = "" if st.session_state.show_prices else "hidden"
-                        st.markdown(f"""
-                            <div class="price-container {price_container_class}">
-                                <h3>Price Information</h3>
-                        """, unsafe_allow_html=True)
-                        
-                        # Display individual prices with animation
+                    # Display prices if enabled
+                    if st.session_state.show_prices:
+                        st.markdown("### Price Information")
+                        total_price = 0
                         for item_type, item in outfit.items():
-                            if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
-                                st.markdown(f"""
-                                    <div class="price-item">
-                                        <strong>{item_type.capitalize()}</strong><br>
-                                        {'$' + f"{float(item['price']):.2f}" if item.get('price') else 'Price not available'}
-                                    </div>
-                                """, unsafe_allow_html=True)
-                        
-                        # Display total price with animation
-                        if 'total_price' in outfit:
-                            st.markdown("""<hr>""", unsafe_allow_html=True)
-                            st.markdown(f"""
-                                <div class="total-price">
-                                    <h3>Total Price</h3>
-                                    ${outfit['total_price']:.2f}
-                                </div>
-                            """, unsafe_allow_html=True)
-                        
-                        # Display individual item colors within price_col
-                        st.markdown("### Color Palette")
-                        for item_type, item in outfit.items():
-                            if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
-                                st.markdown(f"**{item_type.capitalize()}**")
-                                color = parse_color_string(str(item['color']))
-                                display_color_palette([color])
-                        
-                        st.markdown("</div>", unsafe_allow_html=True)
-                    
-                    # Add shopping information below the outfit display
-                    st.markdown("### Shop Items")
-                    shop_cols = st.columns(3)
-                    for idx, (item_type, item) in enumerate(outfit.items()):
-                        if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
-                            with shop_cols[idx]:
-                                if item.get('hyperlink'):
-                                    st.link_button(f"Shop {item_type.capitalize()}", item['hyperlink'])
+                            if item_type not in ['merged_image_path']:
+                                if 'price' in item and item['price']:
+                                    price = float(item['price'])
+                                    st.write(f"{item_type.capitalize()}: ${price:.2f}")
+                                    total_price += price
+                        st.markdown(f"**Total: ${total_price:.2f}**")
                     
                     # Save outfit option
                     if st.button("Save Outfit"):
@@ -288,351 +241,179 @@ if initialize_app():
             """Display and manage personal wardrobe items"""
             st.title("My Items")
             
-            # Load existing items
-            items_df = load_clothing_items()
-            
-            # Add custom CSS for image preview and color editing
-            st.markdown("""
-                <style>
-                .preview-container {
-                    border: 2px solid #e0e0e0;
-                    padding: 20px;
-                    margin: 15px 0;
-                    border-radius: 10px;
-                    background-color: #f8f9fa;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                }
-                .preview-header {
-                    font-size: 20px;
-                    font-weight: bold;
-                    margin-bottom: 15px;
-                    color: #333;
-                    text-align: center;
-                    padding-bottom: 10px;
-                    border-bottom: 1px solid #dee2e6;
-                }
-                .color-preview {
-                    width: 50px;
-                    height: 50px;
-                    border-radius: 8px;
-                    margin: 10px auto;
-                    border: 2px solid #e0e0e0;
-                }
-                .color-buttons {
-                    display: flex;
-                    justify-content: center;
-                    gap: 10px;
-                    margin-top: 10px;
-                }
-                </style>
-            """, unsafe_allow_html=True)
-            
-            # Upload new item form
-            with st.expander("Upload New Item", expanded=False):
-                col1, col2 = st.columns(2)
+            try:
+                # Load existing items
+                items_df = load_clothing_items()
                 
-                with col1:
-                    item_type = st.selectbox("Type", ["Shirt", "Pants", "Shoes"])
-                    styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"])
-                    sizes = st.multiselect("Size", ["S", "M", "L", "XL"])
-                    price = st.number_input("Price ($)", min_value=0.0, step=0.01, format="%.2f")
-                
-                with col2:
-                    genders = st.multiselect("Gender", ["Male", "Female", "Unisex"])
-                    uploaded_file = st.file_uploader("Upload Image", type=['png', 'jpg', 'jpeg'], key="new_item_upload")
-                    hyperlink = st.text_input("Shopping Link (optional)", 
-                                            help="Add a link to where this item can be purchased")
-                
-                if uploaded_file and styles and sizes and genders:
-                    # Extract color after image upload
-                    temp_path = f"temp_{uploaded_file.name}"
-                    with open(temp_path, "wb") as f:
-                        f.write(uploaded_file.getvalue())
+                # Add new item form
+                with st.expander("Add New Item", expanded=False):
+                    col1, col2 = st.columns(2)
                     
-                    colors = get_color_palette(temp_path)
-                    if colors is not None:
-                        st.write("Extracted Color:")
-                        display_color_palette(colors)
-                        
-                        if st.button("Add Item"):
-                            success, message = add_user_clothing_item(
-                                item_type.lower(), colors[0], styles, genders, sizes, 
-                                temp_path, hyperlink, price if price > 0 else None
-                            )
-                            if success:
-                                st.success(message)
-                                st.rerun()
-                            else:
-                                st.error(message)
+                    with col1:
+                        item_type = st.selectbox("Type", ["shirt", "pants", "shoes"])
+                        styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"])
+                        sizes = st.multiselect("Size", ["S", "M", "L", "XL"])
+                        price = st.number_input("Price ($)", min_value=0.0, step=0.01, format="%.2f")
                     
-                    os.remove(temp_path)
-            
-            # Display existing items in grid
-            if not items_df.empty:
-                st.markdown("### Your Items")
+                    with col2:
+                        genders = st.multiselect("Gender", ["Male", "Female", "Unisex"])
+                        uploaded_file = st.file_uploader("Upload Image", type=['png', 'jpg', 'jpeg'])
+                        hyperlink = st.text_input("Shopping Link (optional)", 
+                                                help="Add a link to where this item can be purchased")
+                    
+                    if uploaded_file and styles and sizes and genders:
+                        success, message = add_user_clothing_item(
+                            item_type, None, styles, genders, sizes, uploaded_file, hyperlink, price
+                        )
+                        if success:
+                            st.success(message)
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error(message)
                 
-                # Group items by type
-                for item_type in ["shirt", "pants", "shoes"]:
-                    type_items = items_df[items_df['type'] == item_type]
-                    if not type_items.empty:
-                        st.markdown(f"#### {item_type.capitalize()}s")
-                        
-                        # Create grid layout (3 items per row)
-                        cols = st.columns(3)
-                        for idx, item in type_items.iterrows():
-                            col = cols[int(idx) % 3]
-                            with col:
-                                if os.path.exists(item['image_path']):
-                                    st.image(item['image_path'], use_column_width=True)
+                # Display existing items in a grid layout
+                if not items_df.empty:
+                    st.markdown("### Your Items")
+                    for index, row in items_df.iterrows():
+                        with st.container():
+                            col1, col2 = st.columns([3, 1])
+                            
+                            with col1:
+                                # Display item image and details
+                                image_path = str(row['image_path'])
+                                if os.path.exists(image_path):
+                                    st.image(image_path, width=200)
+                                
+                                # Display item details
+                                st.write(f"**Type:** {str(row['type']).title()}")
+                                
+                                # Handle style display
+                                styles = str(row['style']).split(',') if isinstance(row['style'], str) else []
+                                st.write(f"**Style:** {', '.join(styles)}")
+                                
+                                # Handle size display
+                                sizes = str(row['size']).split(',') if isinstance(row['size'], str) else []
+                                st.write(f"**Size:** {', '.join(sizes)}")
+                                
+                                # Display price if available
+                                price = row.get('price')
+                                if price is not None and pd.notna(price):
+                                    st.write(f"**Price:** ${float(price):.2f}")
+                            
+                            with col2:
+                                # Edit and Delete buttons
+                                if st.button("Edit", key=f"edit_{index}"):
+                                    st.session_state.editing_item = row.to_dict()
+                                    st.session_state.editing_item['id'] = row['id']
+                                
+                                if st.button("Delete", key=f"delete_{index}"):
+                                    success, message = delete_clothing_item(row['id'])
+                                    if success:
+                                        st.success(message)
+                                        time.sleep(1)
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+                            
+                            # Show edit form if this item is being edited
+                            if (st.session_state.editing_item is not None and 
+                                st.session_state.editing_item.get('id') == row['id']):
+                                with st.form(key=f"edit_form_{index}"):
+                                    st.write("### Edit Item")
                                     
-                                    # Show current color
-                                    current_color = parse_color_string(item['color'])
-                                    st.markdown("**Current Color:**")
-                                    display_color_palette([current_color])
+                                    # Convert stored strings to lists for multiselect
+                                    current_styles = str(row['style']).split(',') if isinstance(row['style'], str) else []
+                                    current_sizes = str(row['size']).split(',') if isinstance(row['size'], str) else []
+                                    current_genders = str(row['gender']).split(',') if isinstance(row['gender'], str) else []
                                     
-                                    # Edit/Delete/Color buttons
-                                    edit_col, change_img_col, color_col, del_col = st.columns([2, 2, 2, 1])
+                                    # Edit fields
+                                    new_styles = st.multiselect(
+                                        "Style", 
+                                        ["Casual", "Formal", "Sport", "Beach"],
+                                        default=current_styles
+                                    )
+                                    new_sizes = st.multiselect(
+                                        "Size",
+                                        ["S", "M", "L", "XL"],
+                                        default=current_sizes
+                                    )
+                                    new_genders = st.multiselect(
+                                        "Gender",
+                                        ["Male", "Female", "Unisex"],
+                                        default=current_genders
+                                    )
+                                    new_hyperlink = st.text_input(
+                                        "Shopping Link",
+                                        value=str(row['hyperlink']) if isinstance(row['hyperlink'], str) else ""
+                                    )
+                                    new_price = st.number_input(
+                                        "Price ($)",
+                                        value=float(row['price']) if pd.notna(row['price']) else 0.0,
+                                        min_value=0.0,
+                                        step=0.01,
+                                        format="%.2f"
+                                    )
                                     
-                                    with edit_col:
-                                        if st.button(f"Edit Details {idx}"):
-                                            st.session_state.editing_item = item
+                                    # Add image upload option for updating the image
+                                    new_image = st.file_uploader(
+                                        "Update Image (optional)",
+                                        type=['png', 'jpg', 'jpeg'],
+                                        key=f"edit_image_{index}"
+                                    )
                                     
-                                    with change_img_col:
-                                        if st.button("📷", key=f"camera_icon_{idx}", help="Change Image"):
-                                            st.session_state.editing_image = item
-                                    
-                                    with color_col:
-                                        if st.button("🎨", key=f"color_icon_{idx}", help="Edit Color"):
-                                            st.session_state.editing_color = item
-                                    
-                                    with del_col:
-                                        if st.button("🗑️", key=f"delete_{idx}"):
-                                            if delete_clothing_item(item['id']):
-                                                st.success(f"Item deleted successfully!")
+                                    # Submit button
+                                    if st.form_submit_button("Save Changes"):
+                                        try:
+                                            # Get the current color from the image
+                                            current_color = parse_color_string(row['color']) if row['color'] else (0, 0, 0)
+                                            
+                                            # Update the item details
+                                            success, message = edit_clothing_item(
+                                                row['id'],
+                                                current_color,
+                                                new_styles,
+                                                new_genders,
+                                                new_sizes,
+                                                new_hyperlink,
+                                                new_price
+                                            )
+                                            
+                                            # If image was uploaded, update it
+                                            if new_image:
+                                                success = update_item_image(row['id'], new_image)
+                                                if not success:
+                                                    st.error("Failed to update item image")
+                                                    return
+                                            
+                                            if success:
+                                                st.success("Item updated successfully!")
+                                                st.session_state.editing_item = None
+                                                time.sleep(1)
                                                 st.rerun()
-                                                
-                                    # Color editing interface
-                                    if st.session_state.editing_color is not None and st.session_state.editing_color['id'] == item['id']:
-                                        st.markdown('<div class="preview-container">', unsafe_allow_html=True)
-                                        st.markdown('<div class="preview-header">🎨 Edit Item Color</div>', unsafe_allow_html=True)
-                                        
-                                        # Color input with current color as default
-                                        current_color_hex = rgb_to_hex(current_color)
-                                        new_color = st.color_picker("Choose new color", current_color_hex)
-                                        
-                                        # Convert hex to RGB
-                                        r = int(new_color[1:3], 16)
-                                        g = int(new_color[3:5], 16)
-                                        b = int(new_color[5:7], 16)
-                                        new_color_rgb = [r, g, b]
-                                        
-                                        # Show color preview
-                                        st.markdown("""
-                                            <div style="display: flex; justify-content: space-around; margin: 20px 0;">
-                                                <div>
-                                                    <p style="text-align: center; margin-bottom: 10px;"><strong>Current Color</strong></p>
-                                                    <div style="width: 100px; height: 100px; border-radius: 10px; border: 2px solid #e0e0e0;" 
-                                                         class="color-preview-box"></div>
-                                                </div>
-                                                <div>
-                                                    <p style="text-align: center; margin-bottom: 10px;"><strong>New Color</strong></p>
-                                                    <div style="width: 100px; height: 100px; border-radius: 10px; border: 2px solid #e0e0e0;"
-                                                         class="color-preview-box"></div>
-                                                </div>
-                                            </div>
-                                        """, unsafe_allow_html=True)
-                                        
-                                        # Set the background colors for the preview boxes using st.markdown
-                                        st.markdown(f"""
-                                            <style>
-                                                .color-preview-box:nth-of-type(1) {{
-                                                    background-color: {current_color_hex};
-                                                }}
-                                                .color-preview-box:nth-of-type(2) {{
-                                                    background-color: {new_color};
-                                                }}
-                                            </style>
-                                        """, unsafe_allow_html=True)
-                                        
-                                        # Confirm/Cancel buttons
-                                        col1, col2 = st.columns(2)
-                                        with col1:
-                                            if st.button("✅ Confirm", key=f"confirm_color_{idx}"):
-                                                success, message = edit_clothing_item(
-                                                    item['id'],
-                                                    new_color_rgb,
-                                                    item['style'].split(','),
-                                                    item['gender'].split(','),
-                                                    item['size'].split(','),
-                                                    item['hyperlink'],
-                                                    item['price']
-                                                )
-                                                if success:
-                                                    st.success("Color updated successfully!")
-                                                    st.session_state.editing_color = None
-                                                    time.sleep(1)  # Short delay for better UX
-                                                    st.rerun()
-                                                else:
-                                                    st.error(f"Error updating color: {message}")
-                                        
-                                        with col2:
-                                            if st.button("❌ Cancel", key=f"cancel_color_{idx}"):
-                                                st.session_state.editing_color = None
-                                                st.rerun()
-                                        
-                                        st.markdown('</div>', unsafe_allow_html=True)
-
-            else:
-                st.info("Your wardrobe is empty. Start by adding some items!")
-
-        def saved_outfits_page():
-            """Display saved outfits page"""
-            st.title("Saved Outfits")
-            
-            outfits = load_saved_outfits()
-            
-            if not outfits:
-                st.info("No saved outfits yet. Generate and save some outfits first!")
-                return
-            
-            # Display outfits in grid layout
-            cols = st.columns(3)
-            for idx, outfit in enumerate(outfits):
-                col = cols[int(idx) % 3]
-                with col:
-                    image_path = str(outfit.get('image_path', ''))
-                    if os.path.exists(image_path):
-                        st.image(image_path, use_column_width=True)
-                        
-                        # Organization features
-                        tags = outfit.get('tags', [])
-                        new_tags = st.text_input(
-                            f"Tags ###{idx}", 
-                            value=','.join(tags) if tags else "",
-                            help="Comma-separated tags"
-                        )
-                        
-                        current_season = str(outfit.get('season', ''))
-                        season_options = ["", "Spring", "Summer", "Fall", "Winter"]
-                        season_index = season_options.index(current_season) if current_season in season_options else 0
-                        
-                        season = st.selectbox(
-                            f"Season ###{idx}",
-                            season_options,
-                            index=season_index
-                        )
-                        
-                        current_notes = str(outfit.get('notes', ''))
-                        notes = st.text_area(
-                            f"Notes ###{idx}", 
-                            value=current_notes,
-                            help="Add notes about this outfit"
-                        )
-                        
-                        # Save and Delete buttons
-                        save_col, del_col = st.columns([3, 1])
-                        with save_col:
-                            if st.button(f"Save Details ###{idx}"):
-                                success, message = update_outfit_details(
-                                    str(outfit['outfit_id']),
-                                    tags=new_tags.split(',') if new_tags.strip() else None,
-                                    season=season if season else None,
-                                    notes=notes if notes.strip() else None
-                                )
-                                if success:
-                                    st.success(message)
-                                    st.rerun()
-                                else:
-                                    st.error(message)
-                        
-                        with del_col:
-                            if st.button(f"🗑️ ###{idx}"):
-                                success, message = delete_saved_outfit(str(outfit['outfit_id']))
-                                if success:
-                                    st.success(message)
-                                    st.rerun()
-                                else:
-                                    st.error(message)
-
-        def cleanup_status_dashboard():
-            """Display cleanup status dashboard"""
-            st.title("Cleanup Status Dashboard")
-            
-            from data_manager import get_cleanup_statistics
-            stats = get_cleanup_statistics()
-            
-            if not stats:
-                st.warning("No cleanup settings found. Please configure cleanup settings first.")
-                return
-            
-            # Display current settings
-            st.header("📊 Cleanup Settings")
-            settings = stats['settings']
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Maximum File Age", f"{settings['max_age_hours']} hours")
-                st.metric("Cleanup Interval", f"{settings['cleanup_interval_hours']} hours")
-            
-            with col2:
-                st.metric("Batch Size", str(settings['batch_size']))
-                st.metric("Max Workers", str(settings['max_workers']))
-            
-            # Display last cleanup time
-            st.header("⏱️ Last Cleanup")
-            if settings['last_cleanup']:
-                last_cleanup = settings['last_cleanup']
-                time_since = datetime.now() - last_cleanup
-                hours_since = time_since.total_seconds() / 3600
+                                            else:
+                                                st.error(f"Failed to update item: {message}")
+                                        except Exception as e:
+                                            st.error(f"Error updating item: {str(e)}")
+                                    
+                                    # Cancel button
+                                    if st.form_submit_button("Cancel"):
+                                        st.session_state.editing_item = None
+                                        st.rerun()
                 
-                status_color = "🟢" if hours_since < settings['cleanup_interval_hours'] else "🔴"
-                st.write(f"{status_color} Last cleanup: {last_cleanup.strftime('%Y-%m-%d %H:%M:%S')}")
-                st.write(f"Time since last cleanup: {int(hours_since)} hours")
-                
-                # Next scheduled cleanup
-                next_cleanup = last_cleanup + timedelta(hours=settings['cleanup_interval_hours'])
-                st.write(f"Next scheduled cleanup: {next_cleanup.strftime('%Y-%m-%d %H:%M:%S')}")
-            else:
-                st.warning("No cleanup has been performed yet")
-            
-            # Display file statistics
-            st.header("📁 File Statistics")
-            statistics = stats['statistics']
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total Files", statistics['total_files'])
-            with col2:
-                st.metric("Saved Outfits", statistics['saved_outfits'])
-            with col3:
-                st.metric("Temporary Files", statistics['temporary_files'])
-            
-            # Add manual cleanup button
-            st.header("🧹 Manual Cleanup")
-            if st.button("Run Cleanup Now"):
-                with st.spinner("Running cleanup..."):
-                    cleaned_count = cleanup_merged_outfits()
-                    st.success(f"Cleanup completed. {cleaned_count} files removed.")
-                    st.rerun()
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
+                logger.error(f"Error in personal_wardrobe_page: {str(e)}")
 
-        # Update the main sidebar menu to include the new dashboard
-        if __name__ == "__main__":
-            create_user_items_table()
-            #show_first_visit_tips()
-            #check_cleanup_needed()
-            
-            st.sidebar.title("Navigation")
-            page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits", "Cleanup Status"])
-            
-            if page == "Home":
-                main_page()
-            elif page == "My Items":
-                personal_wardrobe_page()
-            elif page == "Saved Outfits":
-                saved_outfits_page()
-            elif page == "Cleanup Status":
-                cleanup_status_dashboard()
-    
+        # Create sidebar navigation
+        st.sidebar.title("Navigation")
+        page = st.sidebar.radio("Go to", ["Main", "My Items"])
+
+        if page == "Main":
+            main_page()
+        elif page == "My Items":
+            personal_wardrobe_page()
+
     except Exception as e:
         logger.error(f"Application error: {str(e)}")
-        handle_error('500')
+        st.error("An unexpected error occurred. Please try again later.")

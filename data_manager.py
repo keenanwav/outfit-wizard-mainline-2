@@ -752,53 +752,49 @@ def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file,
 
 # Add the new function after line 382
 @retry_on_error()
-def update_item_image(item_id: int, new_image_path: str) -> Tuple[bool, str]:
-    """Update the image of an existing clothing item"""
+def update_item_image(item_id: int, new_image) -> Tuple[bool, str]:
+    """Update the image of a clothing item"""
     try:
-        # Get the current image path first
         with get_db_connection() as conn:
             cur = conn.cursor()
             try:
+                # Get current image path
                 cur.execute(
                     "SELECT image_path FROM user_clothing_items WHERE id = %s",
                     (item_id,)
                 )
                 result = cur.fetchone()
+                
                 if not result:
                     return False, f"Item with ID {item_id} not found"
                 
                 old_image_path = result[0]
                 
-                # Generate new image path
-                new_filename = f"updated_{uuid.uuid4()}.png"
-                final_image_path = os.path.join("user_images", new_filename)
+                # Create new image path
+                if not os.path.exists("user_images"):
+                    os.makedirs("user_images", exist_ok=True)
                 
-                # Save the new image
-                with Image.open(new_image_path) as img:
-                    img.save(final_image_path)
+                new_filename = f"item_{item_id}_{uuid.uuid4()}.png"
+                new_image_path = os.path.join("user_images", new_filename)
                 
-                # Update the database with new image path
+                # Save new image
+                with Image.open(new_image) as img:
+                    img.save(new_image_path)
+                
+                # Update database with new image path
                 cur.execute(
                     "UPDATE user_clothing_items SET image_path = %s WHERE id = %s",
-                    (final_image_path, item_id)
+                    (new_image_path, item_id)
                 )
                 
-                conn.commit()
-                
-                # Delete the old image if it exists
+                # Delete old image if it exists
                 if old_image_path and os.path.exists(old_image_path):
                     try:
                         os.remove(old_image_path)
-                    except Exception as e:
+                    except OSError as e:
                         logging.warning(f"Failed to delete old image {old_image_path}: {str(e)}")
                 
-                # Delete the temporary uploaded image
-                if os.path.exists(new_image_path):
-                    try:
-                        os.remove(new_image_path)
-                    except Exception as e:
-                        logging.warning(f"Failed to delete temporary image {new_image_path}: {str(e)}")
-                
+                conn.commit()
                 return True, "Image updated successfully"
                 
             finally:
@@ -806,7 +802,7 @@ def update_item_image(item_id: int, new_image_path: str) -> Tuple[bool, str]:
                 
     except Exception as e:
         logging.error(f"Error updating item image: {str(e)}")
-        return False, f"Failed to update image: {str(e)}"
+        return False, str(e)
 
 def get_price_history(item_id):
     """Get price history for an item"""
