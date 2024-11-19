@@ -1,5 +1,9 @@
 {pkgs}: {
   deps = [
+    pkgs.chromium
+    pkgs.geckodriver
+    pkgs.libGLU
+    pkgs.libGL
     pkgs.xsimd
     pkgs.pkg-config
     pkgs.glibcLocales
