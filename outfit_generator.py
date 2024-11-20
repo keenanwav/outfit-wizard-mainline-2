@@ -192,19 +192,19 @@ def generate_outfit(clothing_items, size, style, gender):
             time.sleep(0.5)
             
             # Increase template dimensions for larger display
-            template_width = 1000  # Increased from 800
-            template_height = 1200  # Increased from 1000
+            template_width = 750  # Reduced by 25% from 1000
+            template_height = 900  # Reduced by 25% from 1200
             background_color = (174, 162, 150)  # HEX AEA296 in RGB
             template = Image.new('RGB', (template_width, template_height), background_color)
             
             # Adjust template height while maintaining proportions
-            new_template_height = int(template_height * 0.8)  # Increased from 0.7 for better vertical space usage
+            new_template_height = int(template_height * 0.8)  # Maintaining proportion while using new height
             template = template.resize((template_width, new_template_height))
             template_width, template_height = template.size
             
-            # Optimize vertical spacing
-            item_height = template_height // 4  # Increased from 5 for larger items
-            vertical_spacing = item_height // 6  # Adjusted for better distribution
+            # Optimize vertical spacing with adjusted dimensions
+            item_height = template_height // 4  # Adjusted for new template height
+            vertical_spacing = item_height // 6  # Maintained proportion
             
             # Create a new image using the template
             merged_image = template.copy()
@@ -214,13 +214,13 @@ def generate_outfit(clothing_items, size, style, gender):
                 try:
                     item_img = Image.open(selected_outfit[item_type]['image_path'])
                     
-                    # Calculate dimensions with improved scaling
+                    # Calculate dimensions with adjusted scaling
                     aspect_ratio = item_img.size[0] / item_img.size[1]
-                    new_height = int(item_height * 1.1)  # Increased from 0.9 for larger items
+                    new_height = int(item_height * 1.1)  # Maintained proportion
                     new_width = int(new_height * aspect_ratio)
                     
-                    # Ensure width doesn't exceed template width while maintaining good size
-                    if new_width > template_width * 0.9:  # Increased from 0.8 for larger items
+                    # Ensure width doesn't exceed template width while maintaining proportion
+                    if new_width > template_width * 0.9:
                         new_width = int(template_width * 0.9)
                         new_height = int(new_width / aspect_ratio)
                     
