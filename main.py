@@ -584,75 +584,68 @@ def personal_wardrobe_page():
         st.info("Your wardrobe is empty. Start by adding some items!")
 
 def saved_outfits_page():
-    """Display saved outfits page"""
+    """Display and manage saved outfits"""
     st.title("Saved Outfits")
     
-    outfits = load_saved_outfits()
+    # Load saved outfits
+    saved_outfits = load_saved_outfits()
     
-    if not outfits:
-        st.info("No saved outfits yet. Generate and save some outfits first!")
-        return
-    
-    # Display outfits in grid layout
-    cols = st.columns(3)
-    for idx, outfit in enumerate(outfits):
-        col = cols[int(idx) % 3]
-        with col:
-            image_path = str(outfit.get('image_path', ''))
-            if os.path.exists(image_path):
-                st.image(image_path, use_column_width=True)
-                
-                # Organization features
-                tags = outfit.get('tags', [])
-                new_tags = st.text_input(
-                    f"Tags ###{idx}", 
-                    value=','.join(tags) if tags else "",
-                    help="Comma-separated tags"
+    if not saved_outfits.empty:
+        for _, outfit in saved_outfits.iterrows():
+            col1, col2 = st.columns([0.7, 0.3])
+            
+            with col1:
+                if os.path.exists(outfit['image_path']):
+                    st.image(outfit['image_path'], use_column_width=True)
+            
+            with col2:
+                # Add custom name input field
+                custom_name = st.text_input(
+                    "Custom filename (optional)",
+                    placeholder="Enter a name for your outfit",
+                    key=f"outfit_filename_{outfit['outfit_id']}"
                 )
                 
-                current_season = str(outfit.get('season', ''))
-                season_options = ["", "Spring", "Summer", "Fall", "Winter"]
-                season_index = season_options.index(current_season) if current_season in season_options else 0
+                # Process the custom name or use default
+                if custom_name:
+                    # Remove any special characters and spaces
+                    safe_name = "".join(c for c in custom_name if c.isalnum() or c in ('-', '_'))
+                    filename = f"{safe_name}.png"
+                else:
+                    filename = f"outfit_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
                 
-                season = st.selectbox(
-                    f"Season ###{idx}",
-                    season_options,
-                    index=season_index
-                )
-                
-                current_notes = str(outfit.get('notes', ''))
-                notes = st.text_area(
-                    f"Notes ###{idx}", 
-                    value=current_notes,
-                    help="Add notes about this outfit"
-                )
-                
-                # Save and Delete buttons
-                save_col, del_col = st.columns([3, 1])
-                with save_col:
-                    if st.button(f"Save Details ###{idx}"):
-                        success, message = update_outfit_details(
-                            str(outfit['outfit_id']),
-                            tags=new_tags.split(',') if new_tags.strip() else None,
-                            season=season if season else None,
-                            notes=notes if notes.strip() else None
+                # Add download button
+                if os.path.exists(outfit['image_path']):
+                    with open(outfit['image_path'], 'rb') as file:
+                        st.download_button(
+                            label="Download Outfit",
+                            data=file,
+                            file_name=filename,
+                            mime="image/png",
+                            key=f"download_{outfit['outfit_id']}"
                         )
-                        if success:
-                            st.success(message)
-                            st.rerun()
-                        else:
-                            st.error(message)
                 
-                with del_col:
-                    if st.button(f"🗑️ ###{idx}"):
-                        success, message = delete_saved_outfit(str(outfit['outfit_id']))
-                        if success:
-                            st.success(message)
-                            st.rerun()
-                        else:
-                            st.error(message)
+                # Display outfit details
+                if outfit.get('tags'):
+                    st.write("Tags:", ", ".join(outfit['tags']))
+                if outfit.get('season'):
+                    st.write("Season:", outfit['season'])
+                if outfit.get('notes'):
+                    st.expander("Notes").write(outfit['notes'])
+                
+                # Add delete button
+                if st.button("Delete Outfit", key=f"delete_{outfit['outfit_id']}"):
+                    if delete_saved_outfit(outfit['outfit_id']):
+                        st.success("Outfit deleted successfully!")
+                        st.rerun()
+                    else:
+                        st.error("Error deleting outfit")
+            
+            st.markdown("---")
+    else:
+        st.info("No saved outfits yet. Generate and save some outfits first!")
 
-def cleanup_status_dashboard():
+def cleanup_status_page():
     """Display cleanup status dashboard"""
     st.title("Cleanup Status Dashboard")
     
@@ -788,4 +781,4 @@ if __name__ == "__main__":
     elif page == "Saved Outfits":
         saved_outfits_page()
     elif page == "Cleanup Status":
-        cleanup_status_dashboard()
+        cleanup_status_page()
