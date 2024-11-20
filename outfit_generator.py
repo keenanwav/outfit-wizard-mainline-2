@@ -192,19 +192,19 @@ def generate_outfit(clothing_items, size, style, gender):
             time.sleep(0.5)
             
             # Increase template dimensions for larger display
-            template_width = 1000  # Increased from 800
-            template_height = 1200  # Increased from 1000
+            template_width = 800  # Changed from 1000
+            template_height = 900  # Changed from 1200
             background_color = (174, 162, 150)  # HEX AEA296 in RGB
             template = Image.new('RGB', (template_width, template_height), background_color)
             
             # Adjust template height while maintaining proportions
-            new_template_height = int(template_height * 0.8)  # Increased from 0.7 for better vertical space usage
+            new_template_height = int(template_height * 0.75)  # Changed from 0.8
             template = template.resize((template_width, new_template_height))
             template_width, template_height = template.size
             
             # Optimize vertical spacing
-            item_height = template_height // 4  # Increased from 5 for larger items
-            vertical_spacing = item_height // 6  # Adjusted for better distribution
+            item_height = template_height // 3  # Changed from 4
+            vertical_spacing = item_height // 8  # Changed from 6
             
             # Create a new image using the template
             merged_image = template.copy()
