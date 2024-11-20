@@ -265,6 +265,12 @@ def personal_wardrobe_page():
         st.session_state.edit_success = False
     if 'form_errors' not in st.session_state:
         st.session_state.form_errors = {}
+    if 'edit_history' not in st.session_state:
+        st.session_state.edit_history = {}
+    if 'undo_stack' not in st.session_state:
+        st.session_state.undo_stack = {}
+    if 'redo_stack' not in st.session_state:
+        st.session_state.redo_stack = {}
     
     # Load existing items
     items_df = load_clothing_items()
@@ -302,6 +308,11 @@ def personal_wardrobe_page():
             padding: 0.375rem 0.75rem;
             border-radius: 0.25rem;
             background-color: rgba(25, 135, 84, 0.1);
+        }
+        .undo-redo-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -456,6 +467,15 @@ def personal_wardrobe_page():
                                         if success:
                                             st.session_state.edit_success = True
                                             st.success(message)
+                                            # Add edit to history
+                                            add_to_edit_history(item['id'], {
+                                                'color': color,
+                                                'style': new_styles,
+                                                'gender': new_genders,
+                                                'size': new_sizes,
+                                                'hyperlink': new_hyperlink,
+                                                'price': new_price
+                                            })
                                             st.rerun()
                                         else:
                                             st.error(message)
@@ -512,6 +532,26 @@ def personal_wardrobe_page():
                                             st.rerun()
                                         else:
                                             st.error(message)
+                                    
+                                    # Add undo/redo buttons
+                                    undo_col, redo_col = st.columns(2)
+                                    with undo_col:
+                                        if st.button(f"↩ Undo {idx}"):
+                                            success, message = undo_edit(item.id)
+                                            if success:
+                                                st.success(message)
+                                                st.rerun()
+                                            else:
+                                                st.warning(message)
+                                    
+                                    with redo_col:
+                                        if st.button(f"↪ Redo {idx}"):
+                                            success, message = redo_edit(item.id)
+                                            if success:
+                                                st.success(message)
+                                                st.rerun()
+                                            else:
+                                                st.warning(message)
 
     else:
         st.info("Your wardrobe is empty. Start by adding some items!")
@@ -645,6 +685,65 @@ def cleanup_status_dashboard():
             cleaned_count = cleanup_merged_outfits()
             st.success(f"Cleanup completed. {cleaned_count} files removed.")
             st.rerun()
+
+def add_to_edit_history(item_id, new_values):
+    """Adds a new edit to the edit history for the given item"""
+    if item_id not in st.session_state.edit_history:
+        st.session_state.edit_history[item_id] = []
+    
+    st.session_state.edit_history[item_id].append(new_values)
+
+def undo_edit(item_id):
+    """Undoes the last edit for the given item"""
+    if item_id in st.session_state.edit_history and st.session_state.edit_history[item_id]:
+        # Pop the last edit from the history
+        last_edit = st.session_state.edit_history[item_id].pop()
+        
+        # Push the last edit to the redo stack
+        if item_id not in st.session_state.redo_stack:
+            st.session_state.redo_stack[item_id] = []
+        st.session_state.redo_stack[item_id].append(last_edit)
+        
+        # Update the item details
+        success, message = edit_clothing_item(
+            item_id,
+            last_edit['color'],
+            last_edit['style'],
+            last_edit['gender'],
+            last_edit['size'],
+            last_edit['hyperlink'],
+            last_edit['price']
+        )
+        
+        return success, message
+    else:
+        return False, "No edits to undo"
+
+def redo_edit(item_id):
+    """Redoes the last undone edit for the given item"""
+    if item_id in st.session_state.redo_stack and st.session_state.redo_stack[item_id]:
+        # Pop the last undone edit from the redo stack
+        last_undone_edit = st.session_state.redo_stack[item_id].pop()
+        
+        # Push the undone edit to the edit history
+        if item_id not in st.session_state.edit_history:
+            st.session_state.edit_history[item_id] = []
+        st.session_state.edit_history[item_id].append(last_undone_edit)
+        
+        # Update the item details
+        success, message = edit_clothing_item(
+            item_id,
+            last_undone_edit['color'],
+            last_undone_edit['style'],
+            last_undone_edit['gender'],
+            last_undone_edit['size'],
+            last_undone_edit['hyperlink'],
+            last_undone_edit['price']
+        )
+        
+        return success, message
+    else:
+        return False, "No edits to redo"
 
 # Update the main sidebar menu to include the new dashboard
 if __name__ == "__main__":
