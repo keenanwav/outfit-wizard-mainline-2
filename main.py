@@ -196,7 +196,7 @@ def main_page():
             # Save and Download outfit options
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("Save Outfit"):
+                if st.button("💾 Save Outfit"):
                     saved_path = save_outfit(outfit)
                     if saved_path:
                         st.success("Outfit saved successfully!")
