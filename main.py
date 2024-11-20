@@ -205,10 +205,9 @@ def main_page():
             
             with col2:
                 if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
-                    # Allow custom naming with timestamp as fallback
-                    custom_name = st.text_input("Enter a name for your outfit (optional)", key="outfit_name")
+                    # Use timestamp-based naming
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    filename = f"{custom_name.strip() if custom_name.strip() else f'outfit_{timestamp}'}.png"
+                    filename = f"outfit_{timestamp}.png"
                     
                     with open(outfit['merged_image_path'], 'rb') as file:
                         btn = st.download_button(
