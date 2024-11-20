@@ -877,3 +877,26 @@ def update_last_cleanup_time():
             conn.commit()
         finally:
             cur.close()
+@retry_on_error()
+def load_saved_outfits():
+    """Load all saved outfits with their details"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT outfit_id, image_path, tags, season, notes, created_at
+                FROM saved_outfits
+                ORDER BY created_at DESC
+            """)
+            outfits = cur.fetchall()
+            
+            return [{
+                'outfit_id': outfit[0],
+                'image_path': outfit[1],
+                'tags': outfit[2] if outfit[2] else [],
+                'season': outfit[3],
+                'notes': outfit[4],
+                'date': outfit[5].strftime("%Y-%m-%d %H:%M:%S") if outfit[5] else None
+            } for outfit in outfits]
+        finally:
+            cur.close()
