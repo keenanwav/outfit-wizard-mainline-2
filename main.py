@@ -191,7 +191,10 @@ def main_page():
                 if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
                     with shop_cols[idx]:
                         if item.get('hyperlink'):
-                            st.link_button(f"Shop {item_type.capitalize()}", item['hyperlink'])
+                            if item_type == 'shirt':
+                                st.link_button(f"👕 Shop {item_type.capitalize()}", item['hyperlink'])
+                            else:
+                                st.link_button(f"Shop {item_type.capitalize()}", item['hyperlink'])
             
             # Save and Download outfit options
             col1, col2 = st.columns(2)
@@ -205,8 +208,14 @@ def main_page():
             
             with col2:
                 if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
+                    # Add custom filename input
+                    custom_name = st.text_input("Enter a name for your outfit (optional)", 
+                                             placeholder="e.g., summer_casual_outfit",
+                                             key="outfit_name")
+                    
+                    # Generate filename using custom name if provided, otherwise use timestamp
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    filename = f"outfit_{timestamp}.png"
+                    filename = f"{custom_name or f'outfit_{timestamp}'}.png"
                     
                     with open(outfit['merged_image_path'], 'rb') as file:
                         btn = st.download_button(
