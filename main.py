@@ -192,7 +192,7 @@ def main_page():
                     with shop_cols[idx]:
                         if item.get('hyperlink'):
                             if item_type == 'shirt':
-                                st.link_button(f"👕 Shop {item_type.capitalize()}", item['hyperlink'])
+                                st.link_button("👕", item['hyperlink'])
                             else:
                                 st.link_button(f"Shop {item_type.capitalize()}", item['hyperlink'])
             
