@@ -128,7 +128,7 @@ def main_page():
         # Create two columns for outfit display and price information
         outfit_col, price_col = st.columns([0.7, 0.3])
         
-        if st.button("Generate Outfit"):
+        if st.button("🔄 Generate Outfit"):
             with st.spinner("🔮 Generating your perfect outfit..."):
                 # Generate the outfit
                 outfit, missing_items = generate_outfit(items_df, size, style, gender)
@@ -205,8 +205,10 @@ def main_page():
             
             with col2:
                 if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
-                    # Use default timestamp-based filename
-                    filename = f"outfit_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                    # Allow custom naming with timestamp as fallback
+                    custom_name = st.text_input("Enter a name for your outfit (optional)", key="outfit_name")
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    filename = f"{custom_name.strip() if custom_name.strip() else f'outfit_{timestamp}'}.png"
                     
                     with open(outfit['merged_image_path'], 'rb') as file:
                         btn = st.download_button(
