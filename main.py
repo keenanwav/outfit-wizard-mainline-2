@@ -584,66 +584,57 @@ def personal_wardrobe_page():
         st.info("Your wardrobe is empty. Start by adding some items!")
 
 def saved_outfits_page():
-    """Display and manage saved outfits"""
+    """Display saved outfits with download functionality"""
     st.title("Saved Outfits")
     
     # Load saved outfits
     saved_outfits = load_saved_outfits()
     
-    if not saved_outfits.empty:
-        for _, outfit in saved_outfits.iterrows():
-            col1, col2 = st.columns([0.7, 0.3])
-            
-            with col1:
-                if os.path.exists(outfit['image_path']):
-                    st.image(outfit['image_path'], use_column_width=True)
-            
-            with col2:
-                # Add custom name input field
+    if not saved_outfits:  # Check if list is empty instead of DataFrame
+        st.info("No saved outfits yet. Generate and save some outfits first!")
+        return
+        
+    # Display saved outfits in a grid
+    cols = st.columns(3)
+    for idx, outfit in enumerate(saved_outfits):
+        with cols[idx % 3]:
+            if os.path.exists(outfit['image_path']):
+                st.image(outfit['image_path'], use_column_width=True)
+                
+                # Add custom filename input for each outfit
                 custom_name = st.text_input(
                     "Custom filename (optional)",
-                    placeholder="Enter a name for your outfit",
-                    key=f"outfit_filename_{outfit['outfit_id']}"
+                    key=f"filename_{outfit['outfit_id']}",
+                    placeholder="Enter a name for your outfit"
                 )
                 
-                # Process the custom name or use default
+                # Process custom name or use default
                 if custom_name:
                     # Remove any special characters and spaces
                     safe_name = "".join(c for c in custom_name if c.isalnum() or c in ('-', '_'))
                     filename = f"{safe_name}.png"
                 else:
-                    filename = f"outfit_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                    filename = f"outfit_{outfit['outfit_id']}.png"
                 
                 # Add download button
-                if os.path.exists(outfit['image_path']):
-                    with open(outfit['image_path'], 'rb') as file:
-                        st.download_button(
-                            label="Download Outfit",
-                            data=file,
-                            file_name=filename,
-                            mime="image/png",
-                            key=f"download_{outfit['outfit_id']}"
-                        )
+                with open(outfit['image_path'], 'rb') as file:
+                    st.download_button(
+                        label="Download Outfit",
+                        data=file,
+                        file_name=filename,
+                        mime="image/png",
+                        key=f"download_{outfit['outfit_id']}"
+                    )
                 
-                # Display outfit details
+                # Display additional outfit details if available
                 if outfit.get('tags'):
                     st.write("Tags:", ", ".join(outfit['tags']))
                 if outfit.get('season'):
                     st.write("Season:", outfit['season'])
                 if outfit.get('notes'):
-                    st.expander("Notes").write(outfit['notes'])
+                    st.write("Notes:", outfit['notes'])
                 
-                # Add delete button
-                if st.button("Delete Outfit", key=f"delete_{outfit['outfit_id']}"):
-                    if delete_saved_outfit(outfit['outfit_id']):
-                        st.success("Outfit deleted successfully!")
-                        st.rerun()
-                    else:
-                        st.error("Error deleting outfit")
-            
-            st.markdown("---")
-    else:
-        st.info("No saved outfits yet. Generate and save some outfits first!")
+                st.markdown("---")
 
 def cleanup_status_page():
     """Display cleanup status dashboard"""
