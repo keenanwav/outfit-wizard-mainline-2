@@ -263,11 +263,13 @@ def personal_wardrobe_page():
         st.session_state.editing_color = None
     if 'edit_success' not in st.session_state:
         st.session_state.edit_success = False
+    if 'form_errors' not in st.session_state:
+        st.session_state.form_errors = {}
     
     # Load existing items
     items_df = load_clothing_items()
     
-    # Add custom CSS for image preview and color editing
+    # Add custom CSS for styling
     st.markdown("""
         <style>
         .preview-container {
@@ -278,39 +280,28 @@ def personal_wardrobe_page():
             background-color: #f8f9fa;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .preview-header {
-            font-size: 20px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            color: #333;
-            text-align: center;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #dee2e6;
-        }
-        .color-preview {
-            width: 50px;
-            height: 50px;
-            border-radius: 8px;
-            margin: 10px auto;
-            border: 2px solid #e0e0e0;
-        }
-        .color-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        .validation-error {
-            color: red;
-            font-size: 0.9em;
-            margin-top: 5px;
-        }
         .edit-form {
             background-color: #f8f9fa;
             padding: 20px;
             border-radius: 10px;
             margin: 15px 0;
             border: 1px solid #dee2e6;
+        }
+        .validation-error {
+            color: #dc3545;
+            font-size: 0.875em;
+            margin-top: 0.25rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.25rem;
+            background-color: rgba(220, 53, 69, 0.1);
+        }
+        .success-message {
+            color: #198754;
+            font-size: 0.875em;
+            margin-top: 0.25rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.25rem;
+            background-color: rgba(25, 135, 84, 0.1);
         }
         </style>
     """, unsafe_allow_html=True)
@@ -396,20 +387,12 @@ def personal_wardrobe_page():
                             display_color_palette([current_color])
                             
                             # Edit/Delete/Color buttons
-                            edit_col, change_img_col, color_col, del_col = st.columns([2, 2, 2, 1])
+                            edit_col, del_col = st.columns([3, 1])
                             
                             with edit_col:
                                 if st.button(f"Edit Details {idx}"):
                                     st.session_state.editing_item = item
                                     st.session_state.edit_success = False
-                            
-                            with change_img_col:
-                                if st.button("📷", key=f"camera_icon_{idx}", help="Change Image"):
-                                    st.session_state.editing_image = item
-                            
-                            with color_col:
-                                if st.button("🎨", key=f"color_icon_{idx}", help="Edit Color"):
-                                    st.session_state.editing_color = item
                             
                             with del_col:
                                 if st.button("🗑️", key=f"delete_{idx}"):
