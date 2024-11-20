@@ -412,20 +412,34 @@ def cleanup_status_dashboard():
             st.success(f"Cleanup completed. {cleaned_count} files removed.")
             st.rerun()
 
+def show_first_visit_tips():
+    """Display helpful tips for first-time users"""
+    if 'shown_tips' not in st.session_state:
+        st.session_state.shown_tips = True
+        with st.sidebar:
+            st.markdown("### 👋 Welcome to Outfit Wizard!")
+            st.markdown("""
+            **Quick Tips:**
+            1. Start by adding items to your wardrobe in the "My Items" section
+            2. Use the Outfit Wizard to generate outfit combinations
+            3. Save your favorite outfits for later
+            4. Organize your wardrobe with tags and seasons
+            
+            Need help? Look for the "?" icons next to features for more information!
+            """)
+
 # Update the main sidebar menu to include the new dashboard
 if __name__ == "__main__":
     create_user_items_table()
-    show_first_visit_tips()
-    check_cleanup_needed()
-    
     st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits", "Cleanup Status"])
     
-    if page == "Home":
-        main_page()
-    elif page == "My Items":
-        personal_wardrobe_page()
-    elif page == "Saved Outfits":
-        saved_outfits_page()
-    elif page == "Cleanup Status":
-        cleanup_status_dashboard()
+    app_pages = {
+        "My Items": personal_wardrobe_page,
+        "Outfit Wizard": outfit_wizard_page,
+        "Saved Outfits": saved_outfits_page,
+        "Cleanup Status": cleanup_status_dashboard
+    }
+    
+    selected_page = st.sidebar.radio("Go to", list(app_pages.keys()))
+    show_first_visit_tips()
+    app_pages[selected_page]()
