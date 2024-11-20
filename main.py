@@ -193,8 +193,10 @@ def main_page():
                         if item.get('hyperlink'):
                             if item_type == 'shirt':
                                 st.link_button("👕", item['hyperlink'])
-                            else:
-                                st.link_button(f"Shop {item_type.capitalize()}", item['hyperlink'])
+                            elif item_type == 'pants':
+                                st.link_button("👖", item['hyperlink'])
+                            elif item_type == 'shoes':
+                                st.link_button("👞", item['hyperlink'])
             
             # Save and Download outfit options
             col1, col2 = st.columns(2)
