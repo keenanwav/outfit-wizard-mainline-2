@@ -193,13 +193,25 @@ def main_page():
                         if item.get('hyperlink'):
                             st.link_button(f"Shop {item_type.capitalize()}", item['hyperlink'])
             
-            # Save outfit option
-            if st.button("Save Outfit"):
-                saved_path = save_outfit(outfit)
-                if saved_path:
-                    st.success("Outfit saved successfully!")
-                else:
-                    st.error("Error saving outfit")
+            # Save and Download outfit options
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Save Outfit"):
+                    saved_path = save_outfit(outfit)
+                    if saved_path:
+                        st.success("Outfit saved successfully!")
+                    else:
+                        st.error("Error saving outfit")
+            
+            with col2:
+                if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
+                    with open(outfit['merged_image_path'], 'rb') as file:
+                        btn = st.download_button(
+                            label="Download Outfit",
+                            data=file,
+                            file_name=f"outfit_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+                            mime="image/png"
+                        )
 
     with tab2:
         st.markdown("### 🤖 Smart Style Assistant")
