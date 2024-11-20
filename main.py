@@ -380,71 +380,68 @@ def personal_wardrobe_page():
                             # Color editing interface
                             if st.session_state.editing_color is not None and st.session_state.editing_color['id'] == item['id']:
                                 st.markdown('<div class="preview-container">', unsafe_allow_html=True)
-                                st.markdown('<div class="preview-header">🎨 Edit Item Color</div>', unsafe_allow_html=True)
+                                st.markdown('<div class="preview-header">Edit Color</div>', unsafe_allow_html=True)
                                 
-                                # Color input with current color as default
-                                current_color_hex = rgb_to_hex(current_color)
-                                new_color = st.color_picker("Choose new color", current_color_hex)
+                                # Initialize color preview in session state if not exists
+                                if 'color_preview' not in st.session_state:
+                                    st.session_state.color_preview = None
                                 
-                                # Convert hex to RGB
+                                current_color = parse_color_string(item['color'])
+                                current_hex = rgb_to_hex(current_color)
+                                
+                                # Color picker
+                                new_color = st.color_picker(
+                                    "Pick a new color",
+                                    current_hex,
+                                    key=f"color_picker_{item['id']}"
+                                )
+                                
+                                # Convert hex to RGB for preview
                                 r = int(new_color[1:3], 16)
                                 g = int(new_color[3:5], 16)
                                 b = int(new_color[5:7], 16)
-                                new_color_rgb = [r, g, b]
                                 
                                 # Show color preview
-                                st.markdown("""
-                                    <div style="display: flex; justify-content: space-around; margin: 20px 0;">
+                                st.markdown(
+                                    f"""
+                                    <div style="display: flex; gap: 20px; margin: 10px 0;">
                                         <div>
-                                            <p style="text-align: center; margin-bottom: 10px;"><strong>Current Color</strong></p>
-                                            <div style="width: 100px; height: 100px; border-radius: 10px; border: 2px solid #e0e0e0;" 
-                                                 class="color-preview-box"></div>
+                                            <p style="margin-bottom: 5px;"><strong>Current Color:</strong></p>
+                                            <div style="width: 50px; height: 50px; background-color: {current_hex}; 
+                                                border: 2px solid #e0e0e0; border-radius: 8px;"></div>
                                         </div>
                                         <div>
-                                            <p style="text-align: center; margin-bottom: 10px;"><strong>New Color</strong></p>
-                                            <div style="width: 100px; height: 100px; border-radius: 10px; border: 2px solid #e0e0e0;"
-                                                 class="color-preview-box"></div>
+                                            <p style="margin-bottom: 5px;"><strong>New Color:</strong></p>
+                                            <div style="width: 50px; height: 50px; background-color: {new_color}; 
+                                                border: 2px solid #e0e0e0; border-radius: 8px;"></div>
                                         </div>
                                     </div>
-                                """, unsafe_allow_html=True)
+                                    """,
+                                    unsafe_allow_html=True
+                                )
                                 
-                                # Set the background colors for the preview boxes using st.markdown
-                                st.markdown(f"""
-                                    <style>
-                                        .color-preview-box:nth-of-type(1) {{
-                                            background-color: {current_color_hex};
-                                        }}
-                                        .color-preview-box:nth-of-type(2) {{
-                                            background-color: {new_color};
-                                        }}
-                                    </style>
-                                """, unsafe_allow_html=True)
-                                
-                                # Confirm/Cancel buttons
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    if st.button("✅ Confirm", key=f"confirm_color_{idx}"):
-                                        success, message = edit_clothing_item(
-                                            item['id'],
-                                            new_color_rgb,
-                                            item['style'].split(','),
-                                            item['gender'].split(','),
-                                            item['size'].split(','),
-                                            item['hyperlink'],
-                                            item['price']
-                                        )
-                                        if success:
-                                            st.success("Color updated successfully!")
-                                            st.session_state.editing_color = None
-                                            time.sleep(1)  # Short delay for better UX
-                                            st.rerun()
-                                        else:
-                                            st.error(f"Error updating color: {message}")
-                                
-                                with col2:
-                                    if st.button("❌ Cancel", key=f"cancel_color_{idx}"):
+                                # Update button
+                                if st.button("Update Color", key=f"update_color_{item['id']}"):
+                                    success, message = edit_clothing_item(
+                                        item['id'],
+                                        [r, g, b],
+                                        item['style'].split(','),
+                                        item['gender'].split(','),
+                                        item['size'].split(','),
+                                        item['hyperlink'],
+                                        item['price']
+                                    )
+                                    if success:
+                                        st.success("Color updated successfully!")
                                         st.session_state.editing_color = None
                                         st.rerun()
+                                    else:
+                                        st.error(f"Error updating color: {message}")
+                                
+                                # Cancel button
+                                if st.button("Cancel", key=f"cancel_color_{item['id']}"):
+                                    st.session_state.editing_color = None
+                                    st.rerun()
                                 
                                 st.markdown('</div>', unsafe_allow_html=True)
 
