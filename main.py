@@ -304,13 +304,25 @@ def personal_wardrobe_page():
     # Add custom CSS for styling
     st.markdown("""
         <style>
-        .preview-container {
-            border: 2px solid #e0e0e0;
+        .item-container {
+            border: 1px solid #e0e0e0;
             padding: 20px;
-            margin: 15px 0;
+            margin: 20px 0;
             border-radius: 10px;
             background-color: #f8f9fa;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .item-details {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #ffffff;
+            border-radius: 5px;
+        }
+        .item-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
         }
         .edit-form {
             background-color: #f8f9fa;
@@ -335,10 +347,9 @@ def personal_wardrobe_page():
             border-radius: 0.25rem;
             background-color: rgba(25, 135, 84, 0.1);
         }
-        .undo-redo-container {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
+        .separator {
+            margin: 30px 0;
+            border-top: 1px solid #dee2e6;
         }
         </style>
     """, unsafe_allow_html=True)
