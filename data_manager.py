@@ -760,59 +760,61 @@ def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file,
         if not os.path.exists(image_file):
             return False, f"Source image file not found: {image_file}"
             
-        try:
-            with Image.open(image_file) as img:
-                # Convert to RGB if necessary
-                if img.mode != 'RGB':
-                    img = img.convert('RGB')
-                # Save with error handling
-                img.save(image_path, format='PNG')
+        with Image.open(image_file) as img:
+            # Convert to RGB if necessary
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            # Save with error handling
+            img.save(image_path, format='PNG')
+            
+            # Verify the saved file exists
+            if not os.path.exists(image_path):
+                raise IOError(f"Failed to save image to {image_path}")
+        
+        # Use item-specific color detection
+        if item_type == 'pants':
+            from color_utils import get_pants_colors
+            color = get_pants_colors(image_path)
+            if color is None:
+                if os.path.exists(image_path):
+                    os.remove(image_path)
+                return False, "Failed to detect pants color"
+        
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute(PREPARED_STATEMENTS['insert_item'], (
+                    item_type, 
+                    f"{color[0]},{color[1]},{color[2]}", 
+                    ','.join(styles),
+                    ','.join(genders),
+                    ','.join(sizes),
+                    image_path,
+                    hyperlink,
+                    price
+                ))
+                new_id = cur.fetchone()[0]
                 
-                # Verify the saved file exists
-                if not os.path.exists(image_path):
-                    raise IOError(f"Failed to save image to {image_path}")
-        except Exception as img_error:
-            logging.error(f"Error processing image {image_file}: {str(img_error)}")
-            if os.path.exists(image_path):
-                os.remove(image_path)
-            return False, f"Failed to process image: {str(img_error)}"
-    
-    # Use item-specific color detection
-    if item_type == 'pants':
-        from color_utils import get_pants_colors
-        color = get_pants_colors(image_path)
-        if color is None:
-            return False, "Failed to detect pants color"
-    
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            cur.execute(PREPARED_STATEMENTS['insert_item'], (
-                item_type, 
-                f"{color[0]},{color[1]},{color[2]}", 
-                ','.join(styles),
-                ','.join(genders),
-                ','.join(sizes),
-                image_path,
-                hyperlink,
-                price
-            ))
-            new_id = cur.fetchone()[0]
-            
-            # Record initial price if provided
-            if price is not None:
-                cur.execute("""
-                    INSERT INTO item_price_history (item_id, price)
-                    VALUES (%s, %s)
-                """, (new_id, price))
-            
-            conn.commit()
-            return True, f"New {item_type} added successfully with ID: {new_id}"
-        except Exception as e:
-            conn.rollback()
-            return False, str(e)
-        finally:
-            cur.close()
+                # Record initial price if provided
+                if price is not None:
+                    cur.execute("""
+                        INSERT INTO item_price_history (item_id, price)
+                        VALUES (%s, %s)
+                    """, (new_id, price))
+                
+                conn.commit()
+                return True, f"New {item_type} added successfully with ID: {new_id}"
+            except Exception as e:
+                conn.rollback()
+                return False, str(e)
+            finally:
+                cur.close()
+                
+    except Exception as e:
+        logging.error(f"Error in add_user_clothing_item: {str(e)}")
+        if os.path.exists(image_path):
+            os.remove(image_path)
+        return False, str(e)
 
 # Add the new function after line 382
 @retry_on_error()

@@ -243,25 +243,48 @@ def main_page():
                             if color:
                                 colors.append((color, item_type))
                     
-                    # Calculate box dimensions
-                    box_width = (outfit_img.width - (40 + (20 * (len(colors) - 1)))) // len(colors)
-                    box_height = 60
-                    y_position = outfit_img.height + 20
+                    # Calculate box dimensions with better spacing
+                    box_width = min((outfit_img.width - (60 + (30 * (len(colors) - 1)))) // len(colors), 100)
+                    box_height = 80
+                    y_position = outfit_img.height + 10
                     
-                    # Draw color boxes and labels
+                    # Draw title for the color palette
+                    title_font = ImageFont.load_default()
+                    title_text = "Outfit Color Palette"
+                    title_bbox = draw.textbbox((0, 0), title_text, font=title_font)
+                    title_width = title_bbox[2] - title_bbox[0]
+                    draw.text(((outfit_img.width - title_width) // 2, outfit_img.height + 5), 
+                            title_text, fill=(0, 0, 0), font=title_font)
+                    
+                    y_position += 25  # Adjust position after title
+                    
+                    # Draw color boxes and labels with enhanced styling
                     font = ImageFont.load_default()
                     for color, item_type in colors:
-                        # Draw color box
+                        # Draw color box with rounded corners effect
+                        # Main box
                         draw.rectangle(
                             [x_offset, y_position, x_offset + box_width, y_position + box_height],
                             fill=tuple(color),
-                            outline=(0, 0, 0)
+                            outline=(0, 0, 0),
+                            width=2
                         )
                         
-                        # Draw item type and hex code
+                        # Draw item type and hex code with better formatting
                         hex_color = rgb_to_hex(color)
                         text_y = y_position + box_height + 5
-                        draw.text((x_offset, text_y), f"{item_type}: {hex_color}", fill=(0, 0, 0), font=font)
+                        
+                        # Center align text
+                        item_bbox = draw.textbbox((0, 0), item_type.capitalize(), font=font)
+                        item_width = item_bbox[2] - item_bbox[0]
+                        hex_bbox = draw.textbbox((0, 0), hex_color, font=font)
+                        hex_width = hex_bbox[2] - hex_bbox[0]
+                        
+                        # Draw item type and hex code centered under the color box
+                        draw.text((x_offset + (box_width - item_width) // 2, text_y), 
+                                item_type.capitalize(), fill=(0, 0, 0), font=font)
+                        draw.text((x_offset + (box_width - hex_width) // 2, text_y + 15), 
+                                hex_color, fill=(0, 0, 0), font=font)
                         
                         x_offset += box_width + 20
                     
