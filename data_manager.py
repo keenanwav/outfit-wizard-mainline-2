@@ -47,51 +47,94 @@ PREPARED_STATEMENTS = {
     """
 }
 
-def create_connection_pool():
-    """Create and return a connection pool with optimized settings"""
-    try:
-        return SimpleConnectionPool(
-            MIN_CONNECTIONS,
-            MAX_CONNECTIONS,
-            host=os.environ['PGHOST'],
-            database=os.environ['PGDATABASE'],
-            user=os.environ['PGUSER'],
-            password=os.environ['PGPASSWORD'],
-            keepalives=1,
-            keepalives_idle=30,
-            keepalives_interval=10,
-            keepalives_count=5,
-            options=f'-c statement_timeout={STATEMENT_TIMEOUT}'
-        )
-    except Exception as e:
-        logging.error(f"Error creating connection pool: {str(e)}")
-        raise
+def create_connection_pool(max_retries=3, retry_delay=2):
+    """Create and return a connection pool with optimized settings and retry logic"""
+    for attempt in range(max_retries):
+        try:
+            return SimpleConnectionPool(
+                MIN_CONNECTIONS,
+                MAX_CONNECTIONS,
+                host=os.environ['PGHOST'],
+                database=os.environ['PGDATABASE'],
+                user=os.environ['PGUSER'],
+                password=os.environ['PGPASSWORD'],
+                keepalives=1,
+                keepalives_idle=30,
+                keepalives_interval=10,
+                keepalives_count=5,
+                options=f'-c statement_timeout={STATEMENT_TIMEOUT}',
+                sslmode='require'
+            )
+        except Exception as e:
+            logging.error(f"Attempt {attempt + 1}/{max_retries} - Error creating connection pool: {str(e)}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay * (2 ** attempt))  # Exponential backoff
+            else:
+                raise
 
-# Create the connection pool
-connection_pool = create_connection_pool()
+# Create the connection pool with retry logic
+try:
+    connection_pool = create_connection_pool()
+except Exception as e:
+    logging.error(f"Failed to create initial connection pool: {str(e)}")
+    connection_pool = None
 
 @contextmanager
-def get_db_connection():
-    """Context manager for handling database connections from the pool with timeout"""
+def get_db_connection(max_retries=3, retry_delay=2):
+    """Context manager for handling database connections with retry logic"""
+    global connection_pool
     conn = None
-    try:
-        conn = connection_pool.getconn()
-        if conn:
-            conn.set_session(autocommit=False)  # Explicit transaction control
-            yield conn
-    except psycopg2.OperationalError as e:
-        logging.error(f"Database connection timeout: {str(e)}")
-        raise
-    except Exception as e:
-        logging.error(f"Database connection error: {str(e)}")
-        raise
-    finally:
-        if conn:
-            try:
-                conn.rollback()  # Ensure no hanging transactions
-            except Exception:
-                pass
-            connection_pool.putconn(conn)
+    
+    for attempt in range(max_retries):
+        try:
+            # Recreate pool if it doesn't exist or on SSL error
+            if connection_pool is None or attempt > 0:
+                connection_pool = create_connection_pool()
+            
+            conn = connection_pool.getconn()
+            if conn:
+                # Test connection with timeout
+                conn.set_session(autocommit=False)
+                conn.set_client_encoding('UTF8')
+                
+                # Set connection timeout
+                with conn.cursor() as cur:
+                    cur.execute('SET statement_timeout = 30000')  # 30 seconds
+                    cur.execute('SELECT 1')
+                
+                yield conn
+                return
+        except psycopg2.OperationalError as e:
+            logging.error(f"Attempt {attempt + 1}/{max_retries} - Database connection error: {str(e)}")
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                connection_pool.putconn(conn)
+            
+            # Reset pool on SSL error
+            if "SSL connection has been closed unexpectedly" in str(e):
+                try:
+                    connection_pool = create_connection_pool()
+                except Exception as pool_error:
+                    logging.error(f"Failed to recreate connection pool: {str(pool_error)}")
+                    connection_pool = None
+            
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay * (2 ** attempt))
+            else:
+                raise
+        except Exception as e:
+            logging.error(f"Database error: {str(e)}")
+            raise
+        finally:
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                connection_pool.putconn(conn)
 
 def create_user_items_table():
     """Create necessary database tables with indexes"""
@@ -704,14 +747,35 @@ def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink, price=
 @retry_on_error()
 def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file, hyperlink="", price=None):
     """Add clothing item with prepared statement and initial price history"""
-    if not os.path.exists("user_images"):
-        os.makedirs("user_images", exist_ok=True)
-    
-    image_filename = f"{item_type}_{uuid.uuid4()}.png"
-    image_path = os.path.join("user_images", image_filename)
-    
-    with Image.open(image_file) as img:
-        img.save(image_path)
+    try:
+        # Ensure user_images directory exists with proper permissions
+        user_images_dir = os.path.abspath("user_images")
+        if not os.path.exists(user_images_dir):
+            os.makedirs(user_images_dir, mode=0o755, exist_ok=True)
+        
+        image_filename = f"{item_type}_{uuid.uuid4()}.png"
+        image_path = os.path.join(user_images_dir, image_filename)
+        
+        # Verify source image exists and is readable
+        if not os.path.exists(image_file):
+            return False, f"Source image file not found: {image_file}"
+            
+        try:
+            with Image.open(image_file) as img:
+                # Convert to RGB if necessary
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                # Save with error handling
+                img.save(image_path, format='PNG')
+                
+                # Verify the saved file exists
+                if not os.path.exists(image_path):
+                    raise IOError(f"Failed to save image to {image_path}")
+        except Exception as img_error:
+            logging.error(f"Error processing image {image_file}: {str(img_error)}")
+            if os.path.exists(image_path):
+                os.remove(image_path)
+            return False, f"Failed to process image: {str(img_error)}"
     
     # Use item-specific color detection
     if item_type == 'pants':
