@@ -21,7 +21,6 @@ psycopg2-pool = "^1.2"
 selenium = "^4.26.1"
 requests = "^2.32.3"
 python-dotenv = "^1.0.1"
-webcolors = "^24.11.1"
 
 
 [build-system]
