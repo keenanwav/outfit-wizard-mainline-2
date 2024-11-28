@@ -1,6 +1,9 @@
 import streamlit as st
 import os
 from PIL import Image
+import streamlit as st
+import os
+from PIL import Image
 import numpy as np
 from PIL import ImageDraw, ImageFont
 import pandas as pd
@@ -15,7 +18,7 @@ from data_manager import (
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
-from color_utils import get_color_palette, display_color_palette, rgb_to_hex, parse_color_string
+from color_utils import get_color_palette, display_color_palette, rgb_to_hex, parse_color_string, get_color_name
 from outfit_generator import generate_outfit, cleanup_merged_outfits
 from datetime import datetime, timedelta
 from style_assistant import get_style_recommendation, format_clothing_items
@@ -258,10 +261,13 @@ def main_page():
                             outline=(0, 0, 0)
                         )
                         
-                        # Draw item type and hex code
+                        # Draw item type, hex code and color name
                         hex_color = rgb_to_hex(color)
+                        color_name = get_color_name(color)
                         text_y = y_position + box_height + 5
-                        draw.text((x_offset, text_y), f"{item_type}: {hex_color}", fill=(0, 0, 0), font=font)
+                        draw.text((x_offset, text_y), f"{item_type}", fill=(0, 0, 0), font=font)
+                        draw.text((x_offset, text_y + 15), f"{hex_color}", fill=(0, 0, 0), font=font)
+                        draw.text((x_offset, text_y + 30), f"{color_name}", fill=(0, 0, 0), font=font)
                         
                         x_offset += box_width + 20
                     

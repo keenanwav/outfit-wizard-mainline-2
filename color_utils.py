@@ -1,6 +1,9 @@
 from PIL import Image
 import numpy as np
 from sklearn.cluster import KMeans
+from webcolors import rgb_to_name, CSS3_HEX_TO_NAMES, hex_to_rgb
+from scipy.spatial import KDTree
+import numpy as np
 import os
 import streamlit as st
 
@@ -144,5 +147,24 @@ def display_color_palette(colors):
                 "></div>
                 <p style="text-align: center; font-size: 12px; margin: 0 auto;">{hex_color}</p>
                 """,
+
+def get_color_name(rgb_color):
+    """Get the closest color name for an RGB value"""
+    try:
+        # Try getting the exact color name
+        hex_color = rgb_to_hex(rgb_color)
+        color_name = rgb_to_name(rgb_color)
+        return color_name
+    except ValueError:
+        # If exact match not found, find the closest color
+        names = []
+        rgb_values = []
+        for hex_code, name in CSS3_HEX_TO_NAMES.items():
+            names.append(name)
+            rgb_values.append(hex_to_rgb(hex_code))
+        
+        kdtree = KDTree(rgb_values)
+        _, index = kdtree.query(rgb_color)
+        return names[index]
                 unsafe_allow_html=True
             )
