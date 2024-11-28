@@ -415,9 +415,31 @@ def personal_wardrobe_page():
     if not items_df.empty:
         st.markdown("### Your Items")
         
+        # Add filter dropdowns
+        col1, col2 = st.columns(2)
+        with col1:
+            selected_type = st.selectbox(
+                "Filter by Type",
+                ["All"] + ["shirt", "pants", "shoes"],
+                format_func=lambda x: x.capitalize() if x != "All" else x
+            )
+        with col2:
+            selected_gender = st.selectbox(
+                "Filter by Gender",
+                ["All", "Male", "Female", "Unisex"]
+            )
+        
+        # Apply filters
+        filtered_df = items_df.copy()
+        if selected_type != "All":
+            filtered_df = filtered_df[filtered_df['type'] == selected_type]
+        if selected_gender != "All":
+            filtered_df = filtered_df[filtered_df['gender'].str.contains(selected_gender, na=False)]
+        
         # Group items by type
-        for item_type in ["shirt", "pants", "shoes"]:
-            type_items = items_df[items_df['type'] == item_type]
+        displayed_types = [selected_type] if selected_type != "All" else ["shirt", "pants", "shoes"]
+        for item_type in displayed_types:
+            type_items = filtered_df[filtered_df['type'] == item_type]
             if not type_items.empty:
                 st.markdown(f"#### {item_type.capitalize()}s")
                 
