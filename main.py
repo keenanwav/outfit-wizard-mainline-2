@@ -239,6 +239,10 @@ def main_page():
                     # Collect colors from each item
                     for item_type, item in outfit.items():
                         if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
+                            # Skip items with missing images
+                            if not os.path.exists(item.get('image_path', '')):
+                                logging.warning(f"Skipping {item_type} due to missing image: {item.get('image_path', '')}")
+                                continue
                             color = parse_color_string(str(item['color']))
                             if color:
                                 colors.append((color, item_type))
