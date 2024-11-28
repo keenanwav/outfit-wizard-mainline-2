@@ -227,6 +227,9 @@ def main_page():
                     palette_height = 100
                     new_height = outfit_img.height + palette_height
                     
+                    # Ensure user_images directory exists
+                    os.makedirs('user_images', exist_ok=True)
+                    
                     # Create new image with space for palette
                     final_image = Image.new('RGB', (outfit_img.width, new_height), (255, 255, 255))
                     final_image.paste(outfit_img, (0, 0))
@@ -239,18 +242,31 @@ def main_page():
                     # Collect colors from each item
                     for item_type, item in outfit.items():
                         if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
-                            # Skip items with missing images
-                            if not os.path.exists(item.get('image_path', '')):
-                                logging.warning(f"Skipping {item_type} due to missing image: {item.get('image_path', '')}")
+                            image_path = item.get('image_path', '')
+                            if not image_path or not os.path.exists(image_path):
+                                logging.warning(f"Skipping {item_type} due to missing image: {image_path}")
                                 continue
                             color = parse_color_string(str(item['color']))
                             if color:
                                 colors.append((color, item_type))
                     
                     # Calculate box dimensions with better spacing
-                    box_width = min((outfit_img.width - (60 + (30 * (len(colors) - 1)))) // len(colors), 100)
-                    box_height = 80
-                    y_position = outfit_img.height + 10
+                    if not colors:
+                        # Display message when no colors are available
+                        font = ImageFont.load_default()
+                        message = "No color information available"
+                        msg_bbox = draw.textbbox((0, 0), message, font=font)
+                        msg_width = msg_bbox[2] - msg_bbox[0]
+                        draw.text(
+                            ((outfit_img.width - msg_width) // 2, outfit_img.height + 40),
+                            message,
+                            fill=(128, 128, 128),
+                            font=font
+                        )
+                    else:
+                        box_width = min((outfit_img.width - (60 + (30 * (len(colors) - 1)))) // len(colors), 100)
+                        box_height = 80
+                        y_position = outfit_img.height + 10
                     
                     # Draw title for the color palette
                     title_font = ImageFont.load_default()
