@@ -1,7 +1,7 @@
 from PIL import Image
 import numpy as np
 from sklearn.cluster import KMeans
-from webcolors import rgb_to_name, CSS3_HEX_TO_NAMES, hex_to_rgb
+from webcolors import rgb_to_name, CSS3_NAMES_TO_HEX, hex_to_rgb
 from scipy.spatial import KDTree
 import os
 import streamlit as st
@@ -56,7 +56,7 @@ def get_color_name(rgb_color):
         # If exact match not found, find the closest color
         names = []
         rgb_values = []
-        for hex_code, name in CSS3_HEX_TO_NAMES.items():
+        for name, hex_code in CSS3_NAMES_TO_HEX.items():
             names.append(name)
             rgb_values.append(hex_to_rgb(hex_code))
         
