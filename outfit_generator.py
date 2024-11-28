@@ -11,6 +11,19 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Tuple, Dict
 import psycopg2
 
+def is_valid_image(image_path: str) -> bool:
+    """Validate if an image file exists and can be opened"""
+    try:
+        if not os.path.exists(image_path):
+            return False
+        # Try to open the image to ensure it's valid
+        with Image.open(image_path) as img:
+            img.verify()
+        return True
+    except Exception as e:
+        logging.debug(f"Invalid image file {image_path}: {str(e)}")
+        return False
+
 def delete_file_batch(file_batch: List[str]) -> Tuple[int, List[str]]:
     """Delete a batch of files and return success count and errors"""
     success_count = 0
@@ -162,6 +175,7 @@ def calculate_outfit_total_price(outfit: Dict) -> float:
     return total_price
 
 def generate_outfit(clothing_items, size, style, gender):
+    """Generate an outfit based on given criteria"""
     selected_outfit = {}
     missing_items = []
     
@@ -173,16 +187,28 @@ def generate_outfit(clothing_items, size, style, gender):
     # Add a small delay for better user experience
     time.sleep(0.5)
     
+    # Filter items based on criteria
+    filtered_items = clothing_items[
+        (clothing_items['size'].str.contains(size, na=False)) &
+        (clothing_items['style'].str.contains(style, na=False)) &
+        (clothing_items['gender'].str.contains(gender, na=False))
+    ]
+    
+    # Select one item of each type, ensuring images are valid
     for item_type in ['shirt', 'pants', 'shoes']:
-        type_items = clothing_items[clothing_items['type'] == item_type]
-        filtered_items = type_items[
-            (type_items['size'].str.contains(size, na=False)) &
-            (type_items['style'].str.contains(style, na=False)) &
-            (type_items['gender'].str.contains(gender, na=False))
-        ]
+        type_items = filtered_items[filtered_items['type'] == item_type]
         
-        if len(filtered_items) > 0:
-            selected_outfit[item_type] = filtered_items.iloc[random.randint(0, len(filtered_items) - 1)].to_dict()
+        # Filter out items with invalid images
+        valid_items = type_items[type_items['image_path'].apply(lambda x: is_valid_image(x))]
+        
+        if not valid_items.empty:
+            selected_item = valid_items.sample(n=1).iloc[0]
+            selected_outfit[item_type] = {
+                'image_path': selected_item['image_path'],
+                'color': selected_item['color'],
+                'price': float(selected_item['price']) if selected_item['price'] else 0,
+                'hyperlink': selected_item['hyperlink'] if selected_item['hyperlink'] else None
+            }
         else:
             missing_items.append(item_type)
     
@@ -211,37 +237,33 @@ def generate_outfit(clothing_items, size, style, gender):
             
             # Add each clothing item to the merged image with improved sizing
             for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
-                try:
-                    item_img = Image.open(selected_outfit[item_type]['image_path'])
-                    
-                    # Calculate dimensions with adjusted scaling
-                    aspect_ratio = item_img.size[0] / item_img.size[1]
-                    new_height = int(item_height * 1.1)  # Maintained proportion
-                    new_width = int(new_height * aspect_ratio)
-                    
-                    # Ensure width doesn't exceed template width while maintaining proportion
-                    if new_width > template_width * 0.9:
-                        new_width = int(template_width * 0.9)
-                        new_height = int(new_width / aspect_ratio)
-                    
-                    # Resize the item image
-                    item_img = item_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                    
-                    # Calculate position to center horizontally and adjust vertical position
-                    x_position = (template_width - new_width) // 2
-                    y_position = vertical_spacing + (i * (item_height + vertical_spacing))
-                    
-                    # Create a mask for transparency
-                    if item_img.mode == 'RGBA':
-                        mask = item_img.split()[3]
-                    else:
-                        mask = None
-                    
-                    # Paste the item image
-                    merged_image.paste(item_img, (x_position, y_position), mask)
-                    
-                except Exception as e:
-                    logging.error(f"Error processing {item_type} image: {str(e)}")
+                item_img = Image.open(selected_outfit[item_type]['image_path'])
+                
+                # Calculate dimensions with adjusted scaling
+                aspect_ratio = item_img.size[0] / item_img.size[1]
+                new_height = int(item_height * 1.1)  # Maintained proportion
+                new_width = int(new_height * aspect_ratio)
+                
+                # Ensure width doesn't exceed template width while maintaining proportion
+                if new_width > template_width * 0.9:
+                    new_width = int(template_width * 0.9)
+                    new_height = int(new_width / aspect_ratio)
+                
+                # Resize the item image
+                item_img = item_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                
+                # Calculate position to center horizontally and adjust vertical position
+                x_position = (template_width - new_width) // 2
+                y_position = vertical_spacing + (i * (item_height + vertical_spacing))
+                
+                # Create a mask for transparency
+                if item_img.mode == 'RGBA':
+                    mask = item_img.split()[3]
+                else:
+                    mask = None
+                
+                # Paste the item image
+                merged_image.paste(item_img, (x_position, y_position), mask)
             
             # Save the merged image
             merged_filename = f"outfit_{uuid.uuid4()}.png"
@@ -256,5 +278,6 @@ def generate_outfit(clothing_items, size, style, gender):
             
         except Exception as e:
             logging.error(f"Error creating merged outfit image: {str(e)}")
+            return {}, ['Error creating outfit image']
     
     return selected_outfit, missing_items
