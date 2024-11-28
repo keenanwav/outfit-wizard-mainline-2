@@ -48,32 +48,24 @@ PREPARED_STATEMENTS = {
 }
 
 def create_connection_pool():
-    """Create and return a connection pool with optimized settings and retries"""
-    max_retries = 3
-    retry_delay = 1
-    last_error = None
-    
-    for attempt in range(max_retries):
-        try:
-            return SimpleConnectionPool(
-                MIN_CONNECTIONS,
-                MAX_CONNECTIONS,
-                dsn=os.environ['DATABASE_URL'],
-                keepalives=1,
-                keepalives_idle=30,
-                keepalives_interval=10,
-                keepalives_count=5,
-                options=f'-c statement_timeout={STATEMENT_TIMEOUT}'
-            )
-        except Exception as e:
-            last_error = e
-            if attempt < max_retries - 1:
-                sleep_time = retry_delay * (2 ** attempt)
-                time.sleep(sleep_time)
-                logging.warning(f"Retrying database connection (attempt {attempt + 2}/{max_retries})")
-            else:
-                logging.error(f"Error creating connection pool after {max_retries} attempts: {str(e)}")
-                raise last_error
+    """Create and return a connection pool with optimized settings"""
+    try:
+        return SimpleConnectionPool(
+            MIN_CONNECTIONS,
+            MAX_CONNECTIONS,
+            host=os.environ['PGHOST'],
+            database=os.environ['PGDATABASE'],
+            user=os.environ['PGUSER'],
+            password=os.environ['PGPASSWORD'],
+            keepalives=1,
+            keepalives_idle=30,
+            keepalives_interval=10,
+            keepalives_count=5,
+            options=f'-c statement_timeout={STATEMENT_TIMEOUT}'
+        )
+    except Exception as e:
+        logging.error(f"Error creating connection pool: {str(e)}")
+        raise
 
 # Create the connection pool
 connection_pool = create_connection_pool()

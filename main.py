@@ -2,7 +2,6 @@ import streamlit as st
 import os
 from PIL import Image
 import numpy as np
-from PIL import ImageDraw, ImageFont
 import pandas as pd
 from collections import Counter
 from data_manager import (
@@ -220,67 +219,13 @@ def main_page():
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                     filename = f"{custom_name or f'outfit_{timestamp}'}.png"
                     
-                    # Create a copy of the outfit image with color palette
-                    outfit_img = Image.open(outfit['merged_image_path'])
-                    
-                    # Calculate dimensions for color palette section
-                    palette_height = 100
-                    new_height = outfit_img.height + palette_height
-                    
-                    # Create new image with space for palette
-                    final_image = Image.new('RGB', (outfit_img.width, new_height), (255, 255, 255))
-                    final_image.paste(outfit_img, (0, 0))
-                    
-                    # Extract and draw color palette
-                    draw = ImageDraw.Draw(final_image)
-                    colors = []
-                    x_offset = 20
-                    
-                    # Collect colors from each item
-                    for item_type, item in outfit.items():
-                        if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
-                            color = parse_color_string(str(item['color']))
-                            if color:
-                                colors.append((color, item_type))
-                    
-                    # Calculate box dimensions
-                    box_width = (outfit_img.width - (40 + (20 * (len(colors) - 1)))) // len(colors)
-                    box_height = 60
-                    y_position = outfit_img.height + 20
-                    
-                    # Draw color boxes and labels
-                    font = ImageFont.load_default()
-                    for color, item_type in colors:
-                        # Draw color box
-                        draw.rectangle(
-                            [x_offset, y_position, x_offset + box_width, y_position + box_height],
-                            fill=tuple(color),
-                            outline=(0, 0, 0)
-                        )
-                        
-                        # Draw item type and hex code
-                        hex_color = rgb_to_hex(color)
-                        text_y = y_position + box_height + 5
-                        draw.text((x_offset, text_y), f"{item_type}: {hex_color}", fill=(0, 0, 0), font=font)
-                        
-                        x_offset += box_width + 20
-                    
-                    # Save the final image to a temporary file
-                    temp_path = f"temp_download_{filename}"
-                    final_image.save(temp_path)
-                    
-                    # Create download button with the new image
-                    with open(temp_path, 'rb') as file:
+                    with open(outfit['merged_image_path'], 'rb') as file:
                         btn = st.download_button(
                             label="Download Outfit",
                             data=file,
                             file_name=filename,
                             mime="image/png"
                         )
-                    
-                    # Clean up temporary file
-                    if os.path.exists(temp_path):
-                        os.remove(temp_path)
 
     with tab2:
         st.markdown("### 🤖 Smart Style Assistant")
