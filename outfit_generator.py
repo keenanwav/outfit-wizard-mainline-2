@@ -243,7 +243,51 @@ def generate_outfit(clothing_items, size, style, gender):
             # Create a new image using the template
             merged_image = template.copy()
             
+            # Add color palette section on the center-left
+            palette_width = int(template_width * 0.2)  # 20% of template width
+            palette_x = int(template_width * 0.05)  # 5% margin from left
+            palette_y = int(template_height * 0.2)  # Start at 20% from top
+            
+            # Draw color swatches for each item
+            swatch_size = int(palette_width * 0.8)  # 80% of palette width
+            swatch_margin = int(swatch_size * 0.2)  # 20% of swatch size
+            
+            draw = ImageDraw.Draw(merged_image)
+            
+            for i, (item_type, item) in enumerate(selected_outfit.items()):
+                if item_type not in ['merged_image_path', 'total_price']:
+                    # Parse color and create swatch
+                    color_str = str(item['color'])
+                    if isinstance(color_str, str) and color_str.startswith('rgb'):
+                        try:
+                            color = tuple(map(int, color_str.strip('rgb()').split(',')))
+                        except:
+                            continue
+                        
+                        # Draw color swatch
+                        swatch_y = palette_y + (i * (swatch_size + swatch_margin))
+                        draw.rectangle(
+                            [
+                                palette_x,
+                                swatch_y,
+                                palette_x + swatch_size,
+                                swatch_y + swatch_size
+                            ],
+                            fill=color,
+                            outline=(255, 255, 255),
+                            width=2
+                        )
+                        
+                        # Add item label
+                        draw.text(
+                            (palette_x, swatch_y - 20),
+                            item_type.capitalize(),
+                            fill=(255, 255, 255),
+                            font=ImageFont.load_default()
+                        )
+            
             # Add each clothing item to the merged image with improved sizing
+            # Adjust x_position to account for palette width
             for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
                 item_img = Image.open(selected_outfit[item_type]['image_path'])
                 

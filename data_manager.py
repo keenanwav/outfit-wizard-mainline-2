@@ -1,3 +1,4 @@
+from outfit_generator import is_valid_image
 import pandas as pd
 import os
 from PIL import Image
