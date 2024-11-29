@@ -267,7 +267,7 @@ def main_page():
                     for idx, item in enumerate(recommendation['recommended_items']):
                         col = cols[idx % 3]
                         with col:
-                            if os.path.exists(item['image_path']):
+                            if item.get('image_path') and os.path.exists(item['image_path']):
                                 st.image(item['image_path'], use_column_width=True)
                                 st.markdown(f"**{item['type'].capitalize()}**")
                                 st.markdown(f"Style: {item['style']}")
@@ -461,7 +461,7 @@ def personal_wardrobe_page():
                 for idx, item in type_items.iterrows():
                     col = cols[int(idx) % 3]
                     with col:
-                        if os.path.exists(item['image_path']):
+                        if item.get('image_path') and os.path.exists(item['image_path']):
                             st.image(item['image_path'], use_column_width=True)
                             
                             # Show current color
