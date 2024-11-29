@@ -4,6 +4,8 @@ from PIL import Image
 import uuid
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+from outfit_generator import is_valid_image
+from typing import List, Dict, Tuple
 from sklearn.preprocessing import MultiLabelBinarizer, StandardScaler
 from sklearn.decomposition import TruncatedSVD
 from scipy.sparse import csr_matrix
@@ -960,5 +962,42 @@ def cleanup_orphaned_entries():
             conn.rollback()
             logging.error(f"Error during orphaned entries cleanup: {str(e)}")
             return False, f"Cleanup failed: {str(e)}"
+
+def get_items_with_missing_images() -> Tuple[List[Dict], int]:
+    """
+    Check for items with missing or invalid images and return warning information
+    Returns:
+        Tuple containing:
+        - List of dictionaries with item details
+        - Total count of items with issues
+    """
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT id, type, name, image_path 
+                FROM user_clothing_items 
+                WHERE image_path IS NOT NULL
+            """)
+            items = cur.fetchall()
+            
+            items_with_issues = []
+            for item_id, item_type, item_name, image_path in items:
+                if not is_valid_image(image_path):
+                    items_with_issues.append({
+                        'id': item_id,
+                        'type': item_type,
+                        'name': item_name,
+                        'image_path': image_path,
+                        'issue': 'Missing or invalid image file'
+                    })
+            
+            return items_with_issues, len(items_with_issues)
+            
+        except Exception as e:
+            logging.error(f"Error checking for missing images: {str(e)}")
+            return [], 0
+        finally:
+            cur.close()
         finally:
             cur.close()
