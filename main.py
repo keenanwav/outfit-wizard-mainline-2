@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-from PIL import Image
+from PIL import Image, ImageDraw
 import numpy as np
 import pandas as pd
 from collections import Counter
