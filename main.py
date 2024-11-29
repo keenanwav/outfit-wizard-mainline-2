@@ -15,7 +15,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
 from color_utils import get_color_palette, display_color_palette, rgb_to_hex, parse_color_string
-from outfit_generator import generate_outfit, cleanup_merged_outfits
+from outfit_generator import generate_outfit, cleanup_merged_outfits, is_valid_image
 from datetime import datetime, timedelta
 from style_assistant import get_style_recommendation, format_clothing_items
 import time
@@ -388,10 +388,21 @@ def personal_wardrobe_page():
             st.markdown(f'<p class="validation-error">{message}</p>', unsafe_allow_html=True)
         
         if uploaded_file and is_valid:
+            # Validate file type
+            if not uploaded_file.name.lower().endswith('.png'):
+                st.error("Only PNG files are allowed. Please upload a PNG image.")
+                return
+
             # Extract color after image upload
             temp_path = f"temp_{uploaded_file.name}"
             with open(temp_path, "wb") as f:
                 f.write(uploaded_file.getvalue())
+            
+            # Validate the image file
+            if not is_valid_image(temp_path):
+                os.remove(temp_path)
+                st.error("The uploaded file is not a valid PNG image. Please try again with a valid image file.")
+                return
             
             colors = get_color_palette(temp_path)
             if colors is not None:
@@ -408,6 +419,8 @@ def personal_wardrobe_page():
                         st.rerun()
                     else:
                         st.error(message)
+            else:
+                st.error("Could not extract colors from the image. Please try a different image.")
             
             os.remove(temp_path)
     
