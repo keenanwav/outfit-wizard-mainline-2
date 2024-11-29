@@ -41,8 +41,16 @@ def delete_file_batch(file_batch: List[str]) -> Tuple[int, List[str]]:
     return success_count, errors
 
 def cleanup_merged_outfits():
-    """Clean up old unsaved outfit files from merged_outfits folder with configurable settings"""
+    """Clean up old unsaved outfit files and orphaned database entries"""
     try:
+        # First, clean up orphaned database entries
+        from data_manager import cleanup_orphaned_entries
+        success, message = cleanup_orphaned_entries()
+        if not success:
+            logging.error(f"Failed to clean up orphaned entries: {message}")
+        else:
+            logging.info(f"Orphaned entries cleanup: {message}")
+
         if not os.path.exists('merged_outfits'):
             logging.info("Merged outfits directory does not exist. No cleanup needed.")
             return

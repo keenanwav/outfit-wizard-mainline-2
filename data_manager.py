@@ -900,3 +900,65 @@ def load_saved_outfits():
             } for outfit in outfits]
         finally:
             cur.close()
+
+@retry_on_error()
+def cleanup_orphaned_entries():
+    """Clean up database entries that have missing or invalid image files"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            # Get all items with their image paths
+            cur.execute("""
+                SELECT id, type, image_path 
+                FROM user_clothing_items 
+                WHERE image_path IS NOT NULL
+            """)
+            items = cur.fetchall()
+            
+            orphaned_items = []
+            for item_id, item_type, image_path in items:
+                # Check if image file exists and is valid
+                if not os.path.exists(image_path) or not is_valid_image(image_path):
+                    orphaned_items.append((item_id, item_type, image_path))
+            
+            if orphaned_items:
+                # Log orphaned items before processing
+                logging.warning(f"Found {len(orphaned_items)} orphaned entries in database")
+                for item_id, item_type, path in orphaned_items:
+                    logging.info(f"Orphaned {item_type} (ID: {item_id}): {path}")
+                
+                # Move orphaned entries to audit table for reference
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS orphaned_items_audit (
+                        id SERIAL PRIMARY KEY,
+                        original_id INTEGER,
+                        type VARCHAR(50),
+                        image_path VARCHAR(255),
+                        removed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                
+                # Insert into audit table and mark as orphaned
+                execute_values(cur, """
+                    INSERT INTO orphaned_items_audit (original_id, type, image_path)
+                    VALUES %s
+                """, [(id, type, path) for id, type, path in orphaned_items])
+                
+                # Update main table to mark these items as orphaned
+                cur.execute("""
+                    UPDATE user_clothing_items 
+                    SET image_path = NULL 
+                    WHERE id = ANY(%s)
+                """, ([item[0] for item in orphaned_items],))
+                
+                conn.commit()
+                return True, f"Processed {len(orphaned_items)} orphaned entries"
+            
+            return True, "No orphaned entries found"
+            
+        except Exception as e:
+            conn.rollback()
+            logging.error(f"Error during orphaned entries cleanup: {str(e)}")
+            return False, f"Cleanup failed: {str(e)}"
+        finally:
+            cur.close()
