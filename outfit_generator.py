@@ -243,30 +243,19 @@ def generate_outfit(clothing_items, size, style, gender):
             # Create a new image using the template
             merged_image = template.copy()
             
-            # Add color palette section at the bottom
-            palette_height = int(template_height * 0.15)  # 15% of template height for palette section
-            palette_y = template_height - palette_height  # Position at bottom
-            swatch_size = int(palette_height * 0.6)  # Swatch size relative to palette height
-            swatch_margin = int(template_width * 0.05)  # 5% margin between swatches
+            # Add color palette section on the center-left
+            palette_width = int(template_width * 0.2)  # 20% of template width
+            palette_x = int(template_width * 0.05)  # 5% margin from left
+            palette_y = int(template_height * 0.2)  # Start at 20% from top
             
-            # Calculate total width needed for all swatches
-            total_swatches_width = (swatch_size * 3) + (swatch_margin * 2)
-            start_x = (template_width - total_swatches_width) // 2  # Center the swatches horizontally
+            # Draw color swatches for each item
+            swatch_size = int(palette_width * 0.8)  # 80% of palette width
+            swatch_margin = int(swatch_size * 0.2)  # 20% of swatch size
             
             draw = ImageDraw.Draw(merged_image)
             
-            # Draw background for color palette section
-            draw.rectangle(
-                [0, palette_y, template_width, template_height],
-                fill=(50, 50, 50),  # Dark gray background
-                outline=None
-            )
-            
-            # Draw color swatches for each item type in order
-            item_types = ['shirt', 'pants', 'shoes']
-            for i, item_type in enumerate(item_types):
-                if item_type in selected_outfit:
-                    item = selected_outfit[item_type]
+            for i, (item_type, item) in enumerate(selected_outfit.items()):
+                if item_type not in ['merged_image_path', 'total_price']:
                     # Parse color and create swatch
                     color_str = str(item['color'])
                     if isinstance(color_str, str) and color_str.startswith('rgb'):
@@ -275,16 +264,13 @@ def generate_outfit(clothing_items, size, style, gender):
                         except:
                             continue
                         
-                        # Calculate position for current swatch
-                        swatch_x = start_x + (i * (swatch_size + swatch_margin))
-                        swatch_y = palette_y + (palette_height - swatch_size) // 2
-                        
                         # Draw color swatch
+                        swatch_y = palette_y + (i * (swatch_size + swatch_margin))
                         draw.rectangle(
                             [
-                                swatch_x,
+                                palette_x,
                                 swatch_y,
-                                swatch_x + swatch_size,
+                                palette_x + swatch_size,
                                 swatch_y + swatch_size
                             ],
                             fill=color,
@@ -292,23 +278,12 @@ def generate_outfit(clothing_items, size, style, gender):
                             width=2
                         )
                         
-                        # Add item label above swatch
-                        label = item_type.capitalize()
-                        try:
-                            font = ImageFont.truetype("arial.ttf", 20)
-                        except:
-                            font = ImageFont.load_default()
-                            
-                        # Get text size for centering
-                        text_bbox = draw.textbbox((0, 0), label, font=font)
-                        text_width = text_bbox[2] - text_bbox[0]
-                        
-                        # Draw label centered above swatch
+                        # Add item label
                         draw.text(
-                            (swatch_x + (swatch_size - text_width) // 2, swatch_y - 25),
-                            label,
+                            (palette_x, swatch_y - 20),
+                            item_type.capitalize(),
                             fill=(255, 255, 255),
-                            font=font
+                            font=ImageFont.load_default()
                         )
             
             # Add each clothing item to the merged image with improved sizing
