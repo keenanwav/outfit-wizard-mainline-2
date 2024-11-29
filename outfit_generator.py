@@ -1,6 +1,6 @@
 import pandas as pd
 import random
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import os
 import uuid
 import logging
