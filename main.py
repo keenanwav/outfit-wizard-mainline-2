@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import pandas as pd
 from collections import Counter
@@ -219,26 +219,56 @@ def main_page():
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                     filename = f"{custom_name or f'outfit_{timestamp}'}.png"
                     
-                    # Extract colors from the outfit image and create palette
-                    colors = get_color_palette(outfit['merged_image_path'], n_colors=5)
-                    if colors is not None:
+                    # Extract colors from individual items
+                    colors = {}
+                    for item_type in ['shirt', 'pants', 'shoes']:
+                        if item_type in outfit and isinstance(outfit[item_type], dict):
+                            item_color = parse_color_string(outfit[item_type]['color'])
+                            colors[item_type] = item_color
+
+                    if colors:
                         # Open the original image
                         with Image.open(outfit['merged_image_path']) as img:
-                            # Create a new image with extra space for the color palette
-                            palette_height = 100  # Height for color palette
+                            # Create a new image with extra space for the color palette and hex codes
+                            palette_height = 150  # Height for color palette (100px) and hex codes (50px)
                             new_img = Image.new('RGB', (img.width, img.height + palette_height), 'white')
                             # Paste the original image
                             new_img.paste(img, (0, 0))
                             
                             # Draw color palette
                             draw = ImageDraw.Draw(new_img)
-                            palette_width = img.width // len(colors)
-                            for i, color in enumerate(colors):
-                                x1 = i * palette_width
-                                x2 = (i + 1) * palette_width
-                                y1 = img.height
-                                y2 = img.height + palette_height
-                                draw.rectangle([x1, y1, x2, y2], fill=tuple(color))
+                            
+                            # Calculate dimensions for color blocks
+                            block_width = img.width // 4  # Width of each color block
+                            spacing = (img.width - (3 * block_width)) // 4  # Equal spacing between blocks
+                            block_height = 100  # Height of color blocks
+                            
+                            # Position for color blocks
+                            y1 = img.height
+                            y2 = y1 + block_height
+                            
+                            # Add color blocks and hex codes
+                            try:
+                                font = ImageFont.truetype("DejaVuSans.ttf", 20)
+                            except:
+                                font = ImageFont.load_default()
+
+                            for idx, item_type in enumerate(['shirt', 'pants', 'shoes']):
+                                if item_type in colors:
+                                    # Calculate x positions for current block
+                                    x1 = spacing + (idx * (block_width + spacing))
+                                    x2 = x1 + block_width
+                                    
+                                    # Draw color block
+                                    color = tuple(colors[item_type])
+                                    draw.rectangle([x1, y1, x2, y2], fill=color)
+                                    
+                                    # Add hex code below the color block
+                                    hex_code = rgb_to_hex(colors[item_type])
+                                    text_width = draw.textlength(hex_code, font=font)
+                                    text_x = x1 + (block_width - text_width) // 2
+                                    text_y = y2 + 10
+                                    draw.text((text_x, text_y), hex_code, fill='black', font=font)
                             
                             # Save the new image with palette
                             temp_path = f"temp_download_{filename}"
