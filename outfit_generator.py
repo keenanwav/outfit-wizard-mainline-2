@@ -11,47 +11,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Tuple, Dict
 import psycopg2
 
-from PIL import Image, ImageDraw, ImageFont
-from color_utils import get_color_palette, rgb_to_hex
-
-def draw_color_palette_on_image(image, colors, position, label):
-    """Draw a color palette with label on the image at the specified position"""
-    draw = ImageDraw.Draw(image)
-    palette_width = 60
-    palette_height = 30
-    spacing = 5
-    
-    # Draw label
-    try:
-        font = ImageFont.truetype("DejaVuSans.ttf", 16)
-    except:
-        font = ImageFont.load_default()
-    
-    draw.text((position[0], position[1]), label, fill=(0, 0, 0), font=font)
-    
-    # Draw color rectangle
-    color = colors[0] if isinstance(colors, np.ndarray) else colors
-    draw.rectangle(
-        [
-            position[0], 
-            position[1] + 25,  # Below the label
-            position[0] + palette_width, 
-            position[1] + 25 + palette_height
-        ],
-        fill=tuple(map(int, color)),
-        outline=(0, 0, 0)
-    )
-    
-    # Draw hex code
-    hex_color = rgb_to_hex(color)
-    draw.text(
-        (position[0], position[1] + 60),
-        hex_color,
-        fill=(0, 0, 0),
-        font=font
-    )
-    
-    return position[0] + palette_width + spacing
 def is_valid_image(image_path: str) -> bool:
     """Validate if an image file exists and can be opened"""
     try:
@@ -281,13 +240,8 @@ def generate_outfit(clothing_items, size, style, gender):
             item_height = template_height // 4  # Adjusted for new template height
             vertical_spacing = item_height // 6  # Maintained proportion
             
-            # Add extra height for color palettes (100 pixels)
-            palette_height = 100
-            template_with_palette = Image.new('RGB', (template_width, template_height + palette_height), background_color)
-            template_with_palette.paste(template, (0, 0))
-            
-            # Create a new image using the template with palette space
-            merged_image = template_with_palette.copy()
+            # Create a new image using the template
+            merged_image = template.copy()
             
             # Add each clothing item to the merged image with improved sizing
             for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
@@ -318,24 +272,6 @@ def generate_outfit(clothing_items, size, style, gender):
                 
                 # Paste the item image
                 merged_image.paste(item_img, (x_position, y_position), mask)
-            
-            # Draw color palettes at the bottom
-            start_x = 50
-            palette_y = template_height + 20  # Start below the outfit images
-            
-            for item_type in ['shirt', 'pants', 'shoes']:
-                # Get color from the item
-                item_color = selected_outfit[item_type]['color']
-                if isinstance(item_color, str):
-                    item_color = [int(c) for c in item_color.split(',')]
-                
-                # Draw the palette and get the next x position
-                start_x = draw_color_palette_on_image(
-                    merged_image,
-                    item_color,
-                    (start_x, palette_y),
-                    item_type.capitalize()
-                )
             
             # Save the merged image
             merged_filename = f"outfit_{uuid.uuid4()}.png"
