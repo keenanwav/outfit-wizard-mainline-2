@@ -230,7 +230,7 @@ def main_page():
                         # Open the original image
                         with Image.open(outfit['merged_image_path']) as img:
                             # Create a new image with extra space for the color palette and hex codes
-                            palette_height = 120  # Height for color palette (80px) and hex codes (40px)
+                            palette_height = 150  # Height for color palette (70px) and hex codes (80px)
                             new_img = Image.new('RGB', (img.width, img.height + palette_height), 'white')
                             # Paste the original image
                             new_img.paste(img, (0, 0))
@@ -240,7 +240,7 @@ def main_page():
                             
                             # Calculate dimensions for color blocks
                             block_width = img.width // 3.5  # Width of each color block
-                            block_height = 80  # Height of color blocks
+                            block_height = 70  # Height of color blocks
                             total_blocks_width = block_width * 3
                             total_spacing = img.width - total_blocks_width
                             spacing = total_spacing / 4  # Equal spacing between blocks and edges
@@ -284,7 +284,7 @@ def main_page():
                                     hex_code = rgb_to_hex(colors[item_type]).upper()  # Convert to uppercase
                                     text_width = draw.textlength(hex_code, font=font)
                                     text_x = x1 + (block_width - text_width) // 2
-                                    text_y = y2 + 10
+                                    text_y = y2 + 20
                                     draw.text((text_x, text_y), hex_code, fill='black', font=font)
                             
                             # Save the new image with palette
