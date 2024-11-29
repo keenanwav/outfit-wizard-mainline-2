@@ -219,13 +219,51 @@ def main_page():
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                     filename = f"{custom_name or f'outfit_{timestamp}'}.png"
                     
-                    with open(outfit['merged_image_path'], 'rb') as file:
-                        btn = st.download_button(
-                            label="Download Outfit",
-                            data=file,
-                            file_name=filename,
-                            mime="image/png"
-                        )
+                    # Extract colors from the outfit image and create palette
+                    colors = get_color_palette(outfit['merged_image_path'], n_colors=5)
+                    if colors is not None:
+                        # Open the original image
+                        with Image.open(outfit['merged_image_path']) as img:
+                            # Create a new image with extra space for the color palette
+                            palette_height = 100  # Height for color palette
+                            new_img = Image.new('RGB', (img.width, img.height + palette_height), 'white')
+                            # Paste the original image
+                            new_img.paste(img, (0, 0))
+                            
+                            # Draw color palette
+                            draw = ImageDraw.Draw(new_img)
+                            palette_width = img.width // len(colors)
+                            for i, color in enumerate(colors):
+                                x1 = i * palette_width
+                                x2 = (i + 1) * palette_width
+                                y1 = img.height
+                                y2 = img.height + palette_height
+                                draw.rectangle([x1, y1, x2, y2], fill=tuple(color))
+                            
+                            # Save the new image with palette
+                            temp_path = f"temp_download_{filename}"
+                            new_img.save(temp_path)
+                            
+                            # Provide download button for the modified image
+                            with open(temp_path, 'rb') as file:
+                                btn = st.download_button(
+                                    label="Download Outfit with Color Palette",
+                                    data=file,
+                                    file_name=filename,
+                                    mime="image/png"
+                                )
+                            
+                            # Clean up temporary file
+                            os.remove(temp_path)
+                    else:
+                        # Fallback to original image if color extraction fails
+                        with open(outfit['merged_image_path'], 'rb') as file:
+                            btn = st.download_button(
+                                label="Download Outfit",
+                                data=file,
+                                file_name=filename,
+                                mime="image/png"
+                            )
 
     with tab2:
         st.markdown("### 🤖 Smart Style Assistant")
