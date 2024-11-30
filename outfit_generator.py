@@ -240,26 +240,22 @@ def generate_outfit(clothing_items, size, style, gender):
             item_height = template_height // 4  # Adjusted for new template height
             vertical_spacing = item_height // 6  # Maintained proportion
             
-            # Load and resize mannequin template
-            mannequin_template = Image.open('manikin temp.png')
-            template_width = 750  # Maintain consistent width
-            template_height = int(template_width * (mannequin_template.size[1] / mannequin_template.size[0]))
-            mannequin_template = mannequin_template.resize((template_width, template_height))
+            # Load the mannequin template
+            try:
+                mannequin_template = Image.open('background template.png')
+                # Resize mannequin template to match our dimensions while maintaining aspect ratio
+                template_ratio = mannequin_template.size[1] / mannequin_template.size[0]
+                new_template_height = int(template_width * template_ratio)
+                mannequin_template = mannequin_template.resize((template_width, new_template_height), Image.Resampling.LANCZOS)
+                merged_image = mannequin_template.copy()
+            except Exception as e:
+                logging.error(f"Error loading mannequin template: {str(e)}")
+                # Fallback to plain template if mannequin template fails to load
+                merged_image = template.copy()
             
-            # Create the base template with the mannequin
-            merged_image = Image.new('RGB', (template_width, template_height), (255, 255, 255))
-            merged_image.paste(mannequin_template, (0, 0))
-            
-            # Define relative positioning for each item type (in percentages)
-            positions = {
-                'shirt': {'top': 0.2, 'center': 0.5, 'scale': 0.4},
-                'pants': {'top': 0.45, 'center': 0.5, 'scale': 0.45},
-                'shoes': {'top': 0.85, 'center': 0.5, 'scale': 0.2}
-            }
-            
-            # Add color palette section on the right
+            # Add color palette section on the right side
             palette_width = int(template_width * 0.15)  # 15% of template width
-            palette_x = int(template_width * 0.82)  # 82% from left
+            palette_x = int(template_width * 0.82)  # 82% from left (right side)
             palette_y = int(template_height * 0.2)  # Start at 20% from top
             
             # Draw color swatches for each item
@@ -300,26 +296,44 @@ def generate_outfit(clothing_items, size, style, gender):
                             font=ImageFont.load_default()
                         )
             
-            # Add each clothing item to the merged image with improved sizing
-            # Adjust x_position to account for palette width
-            for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
+            # Add each clothing item to the merged image with mannequin-specific positioning
+            # Define relative positions for each item type on the mannequin
+            position_map = {
+                'shirt': {
+                    'width_ratio': 0.45,  # 45% of template width
+                    'height_ratio': 0.35,  # 35% of item height
+                    'x_offset_ratio': 0.27,  # 27% from left
+                    'y_offset_ratio': 0.15,  # 15% from top
+                },
+                'pants': {
+                    'width_ratio': 0.35,  # 35% of template width
+                    'height_ratio': 0.45,  # 45% of item height
+                    'x_offset_ratio': 0.32,  # 32% from left
+                    'y_offset_ratio': 0.45,  # 45% from top
+                },
+                'shoes': {
+                    'width_ratio': 0.25,  # 25% of template width
+                    'height_ratio': 0.15,  # 15% of item height
+                    'x_offset_ratio': 0.37,  # 37% from left
+                    'y_offset_ratio': 0.85,  # 85% from top
+                }
+            }
+
+            for item_type in ['shirt', 'pants', 'shoes']:
                 item_img = Image.open(selected_outfit[item_type]['image_path'])
+                position = position_map[item_type]
                 
-                # Get positioning info for current item type
-                pos = positions[item_type]
-                
-                # Calculate dimensions based on template size and item scale
-                max_width = int(template_width * pos['scale'])
+                # Calculate dimensions based on template size
+                new_width = int(template_width * position['width_ratio'])
                 aspect_ratio = item_img.size[0] / item_img.size[1]
-                new_height = int(max_width / aspect_ratio)
-                new_width = max_width
+                new_height = int(new_width / aspect_ratio)
                 
                 # Resize the item image
                 item_img = item_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
                 
-                # Calculate position to center horizontally and place at specified vertical position
-                x_position = int(template_width * pos['center'] - new_width / 2)
-                y_position = int(template_height * pos['top'])
+                # Calculate position based on template dimensions
+                x_position = int(template_width * position['x_offset_ratio'])
+                y_position = int(template_height * position['y_offset_ratio'])
                 
                 # Create a mask for transparency
                 if item_img.mode == 'RGBA':
