@@ -19,6 +19,32 @@ from outfit_generator import generate_outfit, cleanup_merged_outfits, is_valid_i
 from datetime import datetime, timedelta
 from style_assistant import get_style_recommendation, format_clothing_items
 import time
+def create_mannequin_outfit_image(recommended_items, template_size=(800, 1000)):
+    """Create a visualization of the outfit using the mannequin template"""
+    # Load the mannequin template
+    template = Image.open('manikin temp.png')
+    
+    # Resize the template while maintaining aspect ratio
+    template.thumbnail(template_size, Image.Resampling.LANCZOS)
+    
+    # Create a new image with white background
+    final_image = Image.new('RGBA', template_size, 'white')
+    
+    # Calculate position to center the template
+    x_offset = (template_size[0] - template.width) // 2
+    y_offset = (template_size[1] - template.height) // 2
+    
+    # Paste the template
+    final_image.paste(template, (x_offset, y_offset), template)
+    
+    # Save the visualization
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    output_path = f"style_recipes/mannequin_outfit_{timestamp}.png"
+    os.makedirs("style_recipes", exist_ok=True)
+    
+    final_image.save(output_path, 'PNG')
+    return output_path
+
 def create_style_recipe_image(recommendation, template_size=(1000, 1200)):
     """Create a visually appealing image for the style recommendation"""
     # Create a new image with white background
@@ -524,22 +550,45 @@ def main_page():
                     preferences=preferences
                 )
                 
-                # Generate and display the style recipe image
-                recipe_image_path = create_style_recipe_image(recommendation)
+                # Generate and display both visualization styles
+                col1, col2 = st.columns(2)
                 
-                if os.path.exists(recipe_image_path):
-                    st.image(recipe_image_path, use_column_width=True)
+                with col1:
+                    st.markdown("### 👔 Outfit Visualization")
+                    # Generate mannequin-based visualization
+                    mannequin_image_path = create_mannequin_outfit_image(recommendation['recommended_items'])
+                    if os.path.exists(mannequin_image_path):
+                        st.image(mannequin_image_path, use_column_width=True)
+                        
+                        # Add download button for the mannequin visualization
+                        with open(mannequin_image_path, 'rb') as file:
+                            st.download_button(
+                                label="📥 Download Outfit Visualization",
+                                data=file,
+                                file_name=os.path.basename(mannequin_image_path),
+                                mime="image/png"
+                            )
+                    else:
+                        st.error("Failed to generate outfit visualization")
+                
+                with col2:
+                    st.markdown("### 📝 Style Recipe")
+                    # Generate traditional style recipe image
+                    recipe_image_path = create_style_recipe_image(recommendation)
                     
-                    # Add download button for the recipe image
-                    with open(recipe_image_path, 'rb') as file:
-                        st.download_button(
-                            label="📥 Download Style Recipe",
-                            data=file,
-                            file_name=os.path.basename(recipe_image_path),
-                            mime="image/png"
-                        )
-                else:
-                    st.error("Failed to generate style recipe image")
+                    if os.path.exists(recipe_image_path):
+                        st.image(recipe_image_path, use_column_width=True)
+                        
+                        # Add download button for the recipe image
+                        with open(recipe_image_path, 'rb') as file:
+                            st.download_button(
+                                label="📥 Download Style Recipe",
+                                data=file,
+                                file_name=os.path.basename(recipe_image_path),
+                                mime="image/png"
+                            )
+                    else:
+                        st.error("Failed to generate style recipe image")
                     
                 # Keep the text version in an expander for accessibility
                 with st.expander("View Text Version"):
