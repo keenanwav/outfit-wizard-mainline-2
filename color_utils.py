@@ -3,44 +3,128 @@ import numpy as np
 from sklearn.cluster import KMeans
 import os
 import streamlit as st
-# Dictionary mapping common color names to their RGB values
+import colorsys
+
+# Expanded dictionary mapping common color names to their RGB values
 COLOR_NAMES = {
-    'red': (255, 0, 0),
-    'green': (0, 255, 0),
-    'blue': (0, 0, 255),
-    'yellow': (255, 255, 0),
-    'cyan': (0, 255, 255),
-    'magenta': (255, 0, 255),
+    # Reds
+    'bright red': (255, 0, 0),
+    'dark red': (139, 0, 0),
+    'light red': (255, 102, 102),
+    'burgundy': (128, 0, 32),
+    'crimson': (220, 20, 60),
+    
+    # Blues
+    'bright blue': (0, 0, 255),
+    'navy blue': (0, 0, 128),
+    'light blue': (173, 216, 230),
+    'sky blue': (135, 206, 235),
+    'royal blue': (65, 105, 225),
+    'steel blue': (70, 130, 180),
+    
+    # Greens
+    'bright green': (0, 255, 0),
+    'dark green': (0, 100, 0),
+    'forest green': (34, 139, 34),
+    'olive green': (128, 128, 0),
+    'sage green': (138, 154, 91),
+    'mint green': (152, 255, 152),
+    
+    # Yellows
+    'bright yellow': (255, 255, 0),
+    'light yellow': (255, 255, 224),
+    'golden yellow': (255, 223, 0),
+    'mustard': (255, 219, 88),
+    
+    # Browns
+    'dark brown': (101, 67, 33),
+    'medium brown': (165, 42, 42),
+    'light brown': (196, 164, 132),
+    'tan': (210, 180, 140),
+    'coffee brown': (111, 78, 55),
+    
+    # Grays
+    'dark gray': (64, 64, 64),
+    'medium gray': (128, 128, 128),
+    'light gray': (192, 192, 192),
+    'silver': (192, 192, 192),
+    'charcoal': (54, 69, 79),
+    
+    # Purples
+    'bright purple': (128, 0, 128),
+    'dark purple': (48, 25, 52),
+    'light purple': (230, 190, 255),
+    'lavender': (230, 230, 250),
+    'plum': (221, 160, 221),
+    
+    # Oranges
+    'bright orange': (255, 165, 0),
+    'dark orange': (255, 140, 0),
+    'light orange': (255, 200, 140),
+    'peach': (255, 218, 185),
+    'coral': (255, 127, 80),
+    
+    # Pinks
+    'hot pink': (255, 105, 180),
+    'light pink': (255, 182, 193),
+    'salmon pink': (255, 145, 164),
+    'rose': (255, 0, 127),
+    
+    # Neutrals
     'black': (0, 0, 0),
     'white': (255, 255, 255),
-    'gray': (128, 128, 128),
-    'brown': (165, 42, 42),
-    'orange': (255, 165, 0),
-    'purple': (128, 0, 128),
-    'pink': (255, 192, 203),
-    'navy': (0, 0, 128),
-    'teal': (0, 128, 128),
-    'olive': (128, 128, 0),
-    'maroon': (128, 0, 0),
+    'cream': (255, 253, 208),
     'beige': (245, 245, 220),
+    'ivory': (255, 255, 240),
+    
+    # Additional fashion colors
     'khaki': (240, 230, 140),
-    'coral': (255, 127, 80),
+    'teal': (0, 128, 128),
+    'maroon': (128, 0, 0),
+    'mauve': (224, 176, 255),
+    'turquoise': (64, 224, 208),
 }
 
+def rgb_to_hsv(rgb):
+    """Convert RGB color to HSV color space"""
+    r, g, b = [x/255.0 for x in rgb]
+    h, s, v = colorsys.rgb_to_hsv(r, g, b)
+    return h, s, v
+
 def get_color_name(rgb_color):
-    """Find the closest named color for an RGB value"""
+    """Find the closest named color for an RGB value using HSV color space"""
     min_distance = float('inf')
     closest_color = 'unknown'
-    r, g, b = rgb_color
+    input_hsv = rgb_to_hsv(rgb_color)
     
-    for name, color in COLOR_NAMES.items():
-        # Calculate Euclidean distance between colors
-        distance = sum((c1 - c2) ** 2 for c1, c2 in zip((r, g, b), color))
+    # Convert input color to HSV
+    h_input, s_input, v_input = input_hsv
+    
+    for name, rgb in COLOR_NAMES.items():
+        # Convert each color to HSV
+        h, s, v = rgb_to_hsv(rgb)
+        
+        # Calculate weighted distance in HSV space
+        # Hue is circular, so we need to handle it specially
+        h_diff = min(abs(h - h_input), 1 - abs(h - h_input))
+        s_diff = abs(s - s_input)
+        v_diff = abs(v - v_input)
+        
+        # Weight the components (hue is most important, then saturation, then value)
+        distance = (h_diff * 5.0) + (s_diff * 3.0) + (v_diff * 2.0)
+        
         if distance < min_distance:
             min_distance = distance
             closest_color = name
-            
-    return closest_color.capitalize()
+    
+    # Add brightness descriptor for very light or dark colors
+    _, _, v = input_hsv
+    if v < 0.2 and closest_color not in ['black', 'dark gray']:
+        return f"Very dark {closest_color}"
+    elif v > 0.8 and closest_color not in ['white', 'light gray', 'cream', 'ivory']:
+        return f"Very light {closest_color}"
+    
+    return closest_color.title()
 
 
 def parse_color_string(color_str):
