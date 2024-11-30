@@ -51,8 +51,15 @@ def create_style_recipe_image(recommendation, template_size=(1000, 1200)):
     }
     
     current_section = None
-    for line in recommendation['text'].split('\n'):
-        line = line.strip()
+    # Handle both string and list types for recommendation['text']
+    text_lines = []
+    if isinstance(recommendation['text'], str):
+        text_lines = recommendation['text'].split('\n')
+    elif isinstance(recommendation['text'], list):
+        text_lines = recommendation['text']
+    
+    for line in text_lines:
+        line = str(line).strip()
         if line.startswith(('- Outfit:', '- Style Tips:', '- Accessories:')):
             current_section = line[2:].split(':')[0]
             sections[current_section] = line.split(':', 1)[1].strip()
