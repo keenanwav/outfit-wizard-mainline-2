@@ -555,7 +555,15 @@ def personal_wardrobe_page():
                             # Show current color
                             current_color = parse_color_string(item['color'])
                             st.markdown("**Current Color:**")
-                            display_color_palette([current_color], use_columns=False)
+                            st.markdown(f'''
+                                <div style="
+                                    background-color: rgb({current_color[0]}, {current_color[1]}, {current_color[2]});
+                                    width: 50px;
+                                    height: 50px;
+                                    border-radius: 8px;
+                                    margin: 8px auto;
+                                "></div>
+                            ''', unsafe_allow_html=True)
                             
                             # Edit/Delete/Color buttons
                             edit_col, color_col, del_col = st.columns([2, 2, 1])
@@ -592,12 +600,28 @@ def personal_wardrobe_page():
                                     
                                     # Show color preview
                                     st.markdown("### Preview")
-                                    display_color_palette([preview_rgb], use_columns=False)
+                                    st.markdown(f'''
+                                        <div style="
+                                            background-color: rgb({preview_rgb[0]}, {preview_rgb[1]}, {preview_rgb[2]});
+                                            width: 50px;
+                                            height: 50px;
+                                            border-radius: 8px;
+                                            margin: 8px auto;
+                                        "></div>
+                                    ''', unsafe_allow_html=True)
                                     st.markdown(f"Color Name: **{get_color_name(preview_rgb)}**")
                                 
                                 with col2:
                                     st.markdown("### Current")
-                                    display_color_palette([current_color], use_columns=False)
+                                    st.markdown(f'''
+                                        <div style="
+                                            background-color: rgb({current_color[0]}, {current_color[1]}, {current_color[2]});
+                                            width: 50px;
+                                            height: 50px;
+                                            border-radius: 8px;
+                                            margin: 8px auto;
+                                        "></div>
+                                    ''', unsafe_allow_html=True)
                                     st.markdown(f"Color Name: **{get_color_name(current_color)}**")
                                 
                                 save_col, cancel_col = st.columns(2)
