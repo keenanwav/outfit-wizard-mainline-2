@@ -58,6 +58,7 @@ def create_connection_pool():
             database=os.environ['PGDATABASE'],
             user=os.environ['PGUSER'],
             password=os.environ['PGPASSWORD'],
+            sslmode='require',
             keepalives=1,
             keepalives_idle=30,
             keepalives_interval=10,
@@ -673,13 +674,57 @@ def record_price_change(item_id, new_price):
         finally:
             cur.close()
 
-# Update the edit_clothing_item function to include price history
 @retry_on_error()
-def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink, price=None):
-    """Edit clothing item with prepared statement and price history tracking"""
+def record_color_change(item_id, old_color, new_color):
+    """Record a color change in history"""
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
+            cur.execute("""
+                INSERT INTO item_color_history (item_id, old_color, new_color)
+                VALUES (%s, %s, %s)
+            """, (item_id, old_color, new_color))
+            conn.commit()
+            return True
+        except Exception as e:
+            logging.error(f"Error recording color change: {str(e)}")
+            return False
+        finally:
+            cur.close()
+
+@retry_on_error()
+def get_color_history(item_id):
+    """Get color history for an item"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT old_color, new_color, changed_at
+                FROM item_color_history
+                WHERE item_id = %s
+                ORDER BY changed_at DESC
+            """, (item_id,))
+            return cur.fetchall()
+        finally:
+            cur.close()
+# Update the edit_clothing_item function to include price history
+@retry_on_error()
+def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink, price=None):
+    """Edit clothing item with prepared statement, price and color history tracking"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            # Get current color before update
+            cur.execute("SELECT color FROM user_clothing_items WHERE id = %s", (item_id,))
+            result = cur.fetchone()
+            if result:
+                old_color = result[0]
+                new_color = f"{color[0]},{color[1]},{color[2]}"
+                
+                # Record color change if different
+                if old_color != new_color:
+                    record_color_change(item_id, old_color, new_color)
+            
             # Record price change if price is provided and different
             if price is not None:
                 record_price_change(item_id, price)
