@@ -49,7 +49,7 @@ PREPARED_STATEMENTS = {
 }
 
 def create_connection_pool():
-    """Create and return a connection pool with optimized settings"""
+    """Create and return a connection pool with optimized settings and enhanced SSL configuration"""
     try:
         return SimpleConnectionPool(
             MIN_CONNECTIONS,
@@ -58,12 +58,17 @@ def create_connection_pool():
             database=os.environ['PGDATABASE'],
             user=os.environ['PGUSER'],
             password=os.environ['PGPASSWORD'],
-            sslmode='require',
+            sslmode='verify-full',
+            sslrootcert='system',
+            connect_timeout=30,
             keepalives=1,
             keepalives_idle=30,
             keepalives_interval=10,
             keepalives_count=5,
-            options=f'-c statement_timeout={STATEMENT_TIMEOUT}'
+            options=f'-c statement_timeout={STATEMENT_TIMEOUT}',
+            application_name='outfit_wizard',
+            tcp_user_timeout=30000,
+            client_encoding='UTF8'
         )
     except Exception as e:
         logging.error(f"Error creating connection pool: {str(e)}")
@@ -158,7 +163,7 @@ def create_user_items_table():
             cur.close()
 
 def retry_on_error(max_retries=3, delay=1):
-    """Decorator for retrying database operations with exponential backoff"""
+    """Decorator for retrying database operations with exponential backoff and enhanced error handling"""
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -171,6 +176,21 @@ def retry_on_error(max_retries=3, delay=1):
                     if "statement timeout" in str(e):
                         logging.error(f"Statement timeout in {func.__name__}: {str(e)}")
                         raise
+                    if "SSL connection has been closed unexpectedly" in str(e):
+                        logging.error(f"SSL connection error in {func.__name__}: {str(e)}")
+                        # Force recreation of connection pool on SSL errors
+                        global connection_pool
+                        try:
+                            connection_pool = create_connection_pool()
+                        except Exception as pool_error:
+                            logging.error(f"Failed to recreate connection pool: {str(pool_error)}")
+                    if attempt < max_retries - 1:
+                        sleep_time = delay * (2 ** attempt)  # Exponential backoff
+                        jitter = random.uniform(0, 0.1 * sleep_time)  # Add jitter
+                        time.sleep(sleep_time + jitter)
+                except (psycopg2.InterfaceError, psycopg2.InternalError) as e:
+                    last_error = e
+                    logging.error(f"Database interface error in {func.__name__}: {str(e)}")
                     if attempt < max_retries - 1:
                         sleep_time = delay * (2 ** attempt)
                         time.sleep(sleep_time)

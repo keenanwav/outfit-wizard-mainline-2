@@ -581,34 +581,49 @@ def personal_wardrobe_page():
                                 current_color = parse_color_string(item['color'])
                                 hex_color = rgb_to_hex(current_color)
                                 
-                                new_color = st.color_picker("Pick a new color", hex_color)
-                                if st.button("Save Color", key=f"save_color_{idx}"):
-                                    # Convert hex to RGB
+                                col1, col2 = st.columns([3, 1])
+                                with col1:
+                                    new_color = st.color_picker("Pick a new color", hex_color, key=f"color_picker_{idx}")
+                                    # Convert hex to RGB for preview
                                     r = int(new_color[1:3], 16)
                                     g = int(new_color[3:5], 16)
                                     b = int(new_color[5:7], 16)
-                                    new_rgb = (r, g, b)
+                                    preview_rgb = (r, g, b)
                                     
-                                    success, message = edit_clothing_item(
-                                        item['id'],
-                                        new_rgb,
-                                        item['style'].split(','),
-                                        item['gender'].split(','),
-                                        item['size'].split(','),
-                                        item['hyperlink'],
-                                        float(item['price']) if item['price'] else None
-                                    )
-                                    
-                                    if success:
-                                        st.session_state.editing_color = None
-                                        st.success("Color updated successfully!")
-                                        st.rerun()
-                                    else:
-                                        st.error(message)
+                                    # Show color preview
+                                    st.markdown("### Preview")
+                                    display_color_palette([preview_rgb])
+                                    st.markdown(f"Color Name: **{get_color_name(preview_rgb)}**")
+                                
+                                with col2:
+                                    st.markdown("### Current")
+                                    display_color_palette([current_color])
+                                    st.markdown(f"Color Name: **{get_color_name(current_color)}**")
+                                
+                                save_col, cancel_col = st.columns(2)
+                                with save_col:
+                                    if st.button("💾 Save Color", key=f"save_color_{idx}", type="primary"):
+                                        success, message = edit_clothing_item(
+                                            item['id'],
+                                            preview_rgb,
+                                            item['style'].split(','),
+                                            item['gender'].split(','),
+                                            item['size'].split(','),
+                                            item['hyperlink'],
+                                            float(item['price']) if item['price'] else None
+                                        )
                                         
-                                if st.button("Cancel", key=f"cancel_color_{idx}"):
-                                    st.session_state.editing_color = None
-                                    st.rerun()
+                                        if success:
+                                            st.session_state.editing_color = None
+                                            st.success("Color updated successfully!")
+                                            st.rerun()
+                                        else:
+                                            st.error(message)
+                                
+                                with cancel_col:
+                                    if st.button("❌ Cancel", key=f"cancel_color_{idx}"):
+                                        st.session_state.editing_color = None
+                                        st.rerun()
                             
                             # Edit form
                             if st.session_state.editing_item is not None and st.session_state.editing_item['id'] == item['id']:
