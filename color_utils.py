@@ -244,30 +244,78 @@ def rgb_to_hex(rgb):
     """Convert RGB color to hex format"""
     return '#{:02x}{:02x}{:02x}'.format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
 
-def display_color_palette(colors):
-    """Create a streamlit color palette display with color names"""
+def display_color_palette(colors, use_columns=True):
+    """Create a streamlit color palette display with color names
+    
+    Args:
+        colors: List of RGB color tuples
+        use_columns: Boolean, if True uses st.columns layout, if False uses flex layout
+    """
     if colors is None or len(colors) == 0:
         return
     
-    # Create columns for each color
-    cols = st.columns(len(colors))
-    
-    # Display each color with its hex value and name
-    for idx, color in enumerate(colors):
-        hex_color = rgb_to_hex(color)
-        color_name = get_color_name(color)
-        with cols[idx]:
-            st.markdown(
-                f"""
+    if use_columns:
+        # Create columns for each color
+        cols = st.columns(len(colors))
+        
+        # Display each color with its hex value and name
+        for idx, color in enumerate(colors):
+            hex_color = rgb_to_hex(color)
+            color_name = get_color_name(color)
+            with cols[idx]:
+                st.markdown(
+                    f"""
+                    <div style="
+                        background-color: {hex_color};
+                        width: 2rem;
+                        aspect-ratio: 1;
+                        border-radius: 8px;
+                        margin: 0 auto 8px auto;
+                    "></div>
+                    <p style="text-align: center; font-size: 12px; margin: 0 auto;">{hex_color}</p>
+                    <p style="text-align: center; font-size: 12px; margin: 0 auto; color: #666;">{color_name}</p>
+                    """,
+                    unsafe_allow_html=True
+                )
+    else:
+        # Create a flex container for all colors
+        color_blocks = []
+        for color in colors:
+            hex_color = rgb_to_hex(color)
+            color_name = get_color_name(color)
+            color_blocks.append(f"""
                 <div style="
-                    background-color: {hex_color};
-                    width: 2rem;
-                    aspect-ratio: 1;
-                    border-radius: 8px;
-                    margin: 0 auto 8px auto;
-                "></div>
-                <p style="text-align: center; font-size: 12px; margin: 0 auto;">{hex_color}</p>
-                <p style="text-align: center; font-size: 12px; margin: 0 auto; color: #666;">{color_name}</p>
-                """,
-                unsafe_allow_html=True
-            )
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    margin: 0 8px;
+                ">
+                    <div style="
+                        background-color: {hex_color};
+                        width: 2rem;
+                        aspect-ratio: 1;
+                        border-radius: 8px;
+                        margin-bottom: 8px;
+                    "></div>
+                    <p style="text-align: center; font-size: 12px; margin: 0;">{hex_color}</p>
+                    <p style="text-align: center; font-size: 12px; margin: 0; color: #666;">{color_name}</p>
+                </div>
+            """)
+        
+        # Combine all color blocks in a flex container
+        st.markdown(
+            f"""
+            <div style="
+                display: flex;
+                flex-direction: row;
+                justify-content: center;
+                align-items: flex-start;
+                flex-wrap: wrap;
+                gap: 16px;
+                padding: 8px 0;
+            ">
+                {"".join(color_blocks)}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
