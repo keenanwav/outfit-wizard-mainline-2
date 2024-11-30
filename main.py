@@ -316,21 +316,86 @@ def main_page():
                             )
 
     with tab2:
-        st.markdown("### 🤖 Smart Style Assistant")
-        st.markdown("Get personalized style recommendations based on your wardrobe and preferences.")
+        # Add custom CSS for magic wand animation
+        st.markdown("""
+        <style>
+        .magic-wand {
+            display: inline-block;
+            font-size: 2em;
+            animation: sparkle 1.5s infinite;
+        }
+        @keyframes sparkle {
+            0% { transform: rotate(0deg); opacity: 1; }
+            50% { transform: rotate(15deg); opacity: 0.8; }
+            100% { transform: rotate(0deg); opacity: 1; }
+        }
+        .style-card {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            transition: transform 0.3s ease;
+        }
+        .style-card:hover {
+            transform: translateY(-5px);
+        }
+        .input-container {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+        .recommendation-header {
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .item-grid {
+            display: grid;
+            gap: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Header with animated magic wand
+        st.markdown("""
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h2>
+                <span class="magic-wand">🪄</span>
+                Smart Style Assistant
+                <span class="magic-wand">✨</span>
+            </h2>
+        </div>
+        """, unsafe_allow_html=True)
         
-        # Input fields for style assistant
-        occasion = st.text_input("What's the occasion?", 
-                                placeholder="E.g., job interview, casual dinner, wedding")
+        # Input section with enhanced UI
+        st.markdown('<div class="input-container">', unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
         
-        weather = st.text_input("Weather conditions?", 
-                               placeholder="E.g., sunny and warm, cold and rainy")
+        with col1:
+            occasion = st.text_input("✨ What's the occasion?", 
+                                   placeholder="E.g., job interview, casual dinner, wedding")
+            weather = st.text_input("🌤️ Weather conditions?", 
+                                  placeholder="E.g., sunny and warm, cold and rainy")
         
-        preferences = st.text_area("Additional preferences or requirements?",
-                                  placeholder="E.g., prefer dark colors, need to look professional")
+        with col2:
+            preferences = st.text_area("🎯 Style preferences?",
+                                     placeholder="E.g., prefer dark colors, need to look professional",
+                                     height=122)
         
-        if st.button("Get Style Advice"):
-            with st.spinner("🎨 Analyzing your wardrobe and generating recommendations..."):
+        generate_col, _ = st.columns([2, 3])
+        with generate_col:
+            generate_button = st.button("🪄 Generate Magic Style", type="primary", use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        if generate_button:
+            with st.spinner("🎨 Casting style magic..."):
                 # Format clothing items for the AI
                 formatted_items = format_clothing_items(items_df)
                 
@@ -342,27 +407,39 @@ def main_page():
                     preferences=preferences
                 )
                 
-                # Display recommendation text
-                st.markdown("### Your Personalized Style Recommendation")
+                # Display recommendation in an enhanced card
+                st.markdown('<div class="style-card">', unsafe_allow_html=True)
+                st.markdown('<div class="recommendation-header">', unsafe_allow_html=True)
+                st.markdown("### ✨ Your Magical Style Recipe")
+                st.markdown('</div>', unsafe_allow_html=True)
                 st.markdown(recommendation['text'])
+                st.markdown('</div>', unsafe_allow_html=True)
                 
-                # Display recommended items in a grid
+                # Display recommended items in an enhanced grid
                 if recommendation['recommended_items']:
-                    st.markdown("### Recommended Items")
+                    st.markdown("### 🎭 Recommended Pieces")
+                    st.markdown('<div class="item-grid">', unsafe_allow_html=True)
                     
                     # Create columns for the grid (3 items per row)
                     cols = st.columns(3)
                     for idx, item in enumerate(recommendation['recommended_items']):
                         col = cols[idx % 3]
                         with col:
-                            if item.get('image_path') and os.path.exists(item['image_path']):
-                                st.image(item['image_path'], use_column_width=True)
-                                st.markdown(f"**{item['type'].capitalize()}**")
-                                st.markdown(f"Style: {item['style']}")
-                                
-                                # Display item color
-                                color = parse_color_string(str(item['color']))
-                                display_color_palette([color])
+                            with st.container():
+                                if item.get('image_path') and os.path.exists(item['image_path']):
+                                    st.image(item['image_path'], use_column_width=True)
+                                    st.markdown(f"**{item['type'].capitalize()}** ✨")
+                                    st.markdown(f"Style: {item['style']} 🎯")
+                                    
+                                    # Display item color with enhanced visualization
+                                    color = parse_color_string(str(item['color']))
+                                    st.markdown("**Color Palette**")
+                                    display_color_palette([color])
+                                    
+                                    # Add a subtle separator
+                                    st.markdown("---")
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
 
 def personal_wardrobe_page():
     """Display and manage personal wardrobe items"""
