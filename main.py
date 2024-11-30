@@ -230,7 +230,7 @@ def main_page():
                         # Open the original image
                         with Image.open(outfit['merged_image_path']) as img:
                             # Create a new image with extra space for the color palette and hex codes
-                            palette_height = 150  # Height for color palette (70px) and hex codes (80px)
+                            palette_height = 180  # Increased height for better spacing
                             new_img = Image.new('RGB', (img.width, img.height + palette_height), 'white')
                             # Paste the original image
                             new_img.paste(img, (0, 0))
@@ -238,29 +238,30 @@ def main_page():
                             # Draw color palette
                             draw = ImageDraw.Draw(new_img)
                             
-                            # Calculate dimensions for color blocks
-                            block_width = img.width // 3.5  # Width of each color block
-                            block_height = 70  # Height of color blocks
-                            total_blocks_width = block_width * 3
-                            total_spacing = img.width - total_blocks_width
-                            spacing = total_spacing / 4  # Equal spacing between blocks and edges
+                            # Calculate dimensions for color blocks with precise spacing
+                            margin = img.width * 0.1  # 10% margin on each side
+                            available_width = img.width - (2 * margin)  # Width available for blocks
+                            block_width = available_width // 3.6  # Equal width for all blocks
+                            block_height = 80  # Increased height for better visibility
+                            spacing = (available_width - (3 * block_width)) / 2  # Equal spacing between blocks
                             
-                            # Position for color blocks
-                            y1 = img.height + 20  # Add some padding from the image
+                            # Position for color blocks with improved spacing
+                            y1 = img.height + 30  # Increased padding from the image
                             y2 = y1 + block_height
                             
-                            # Try to load a system font, fallback to default if not available
+                            # Modern typography with enhanced legibility
                             try:
-                                # Try multiple font options
+                                # Try multiple modern sans-serif font options
                                 font_options = [
-                                    "DejaVuSans.ttf",
-                                    "Arial.ttf",
-                                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+                                    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                                    "Arial-Bold.ttf",
+                                    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                                    "DejaVuSans-Bold.ttf"
                                 ]
                                 font = None
                                 for font_path in font_options:
                                     try:
-                                        font = ImageFont.truetype(font_path, 16)  # Smaller font size
+                                        font = ImageFont.truetype(font_path, 18)  # Increased font size
                                         break
                                     except:
                                         continue
@@ -269,22 +270,22 @@ def main_page():
                             except:
                                 font = ImageFont.load_default()
 
-                            # Add item types and color blocks
+                            # Add item types and color blocks with improved layout
                             for idx, item_type in enumerate(['shirt', 'pants', 'shoes']):
                                 if item_type in colors:
-                                    # Calculate x positions for current block
-                                    x1 = spacing + (idx * (block_width + spacing))
+                                    # Calculate x positions for current block with precise spacing
+                                    x1 = margin + (idx * (block_width + spacing))
                                     x2 = x1 + block_width
                                     
-                                    # Draw color block
+                                    # Draw color block with clean edges
                                     color = tuple(colors[item_type])
-                                    draw.rectangle([x1, y1, x2, y2], fill=color)
+                                    draw.rectangle([x1, y1, x2, y2], fill=color, outline='#E0E0E0', width=1)
                                     
-                                    # Add hex code below the color block
+                                    # Add hex code below the color block with improved spacing
                                     hex_code = rgb_to_hex(colors[item_type]).upper()  # Convert to uppercase
                                     text_width = draw.textlength(hex_code, font=font)
                                     text_x = x1 + (block_width - text_width) // 2
-                                    text_y = y2 + 20
+                                    text_y = y2 + 25  # Increased spacing between block and text
                                     draw.text((text_x, text_y), hex_code, fill='black', font=font)
                             
                             # Save the new image with palette
