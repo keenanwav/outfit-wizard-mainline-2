@@ -19,6 +19,116 @@ from outfit_generator import generate_outfit, cleanup_merged_outfits, is_valid_i
 from datetime import datetime, timedelta
 from style_assistant import get_style_recommendation, format_clothing_items
 import time
+def create_style_recipe_image(recommendation, template_size=(1000, 1200)):
+    """Create a visually appealing image for the style recommendation"""
+    # Create a new image with white background
+    image = Image.new('RGB', template_size, 'white')
+    draw = ImageDraw.Draw(image)
+    
+    # Try to load a nice font, fallback to default if not available
+    try:
+        title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 48)
+        heading_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
+        body_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
+    except:
+        title_font = ImageFont.load_default()
+        heading_font = ImageFont.load_default()
+        body_font = ImageFont.load_default()
+    
+    # Add decorative header
+    header_gradient = Image.new('RGB', (template_size[0], 100), '#ff6b6b')
+    image.paste(header_gradient, (0, 0))
+    
+    # Add title
+    draw.text((template_size[0]//2, 60), "✨ Your Magical Style Recipe ✨", 
+              font=title_font, fill='white', anchor="mm")
+    
+    # Parse recommendation text into sections
+    sections = {
+        'Outfit': '',
+        'Style Tips': '',
+        'Accessories': ''
+    }
+    
+    current_section = None
+    for line in recommendation['text'].split('\n'):
+        line = line.strip()
+        if line.startswith(('- Outfit:', '- Style Tips:', '- Accessories:')):
+            current_section = line[2:].split(':')[0]
+            sections[current_section] = line.split(':', 1)[1].strip()
+        elif current_section and line:
+            sections[current_section] += '\n' + line
+    
+    # Layout sections
+    y_offset = 150
+    for section_title, content in sections.items():
+        # Section header with gradient background
+        draw.rectangle([(50, y_offset), (template_size[0]-50, y_offset+50)], 
+                      fill='#4ecdc4')
+        draw.text((75, y_offset+25), f"{section_title}", 
+                 font=heading_font, fill='white', anchor="lm")
+        
+        # Section content with wrapped text
+        y_offset += 70
+        words = content.split()
+        lines = []
+        current_line = []
+        
+        for word in words:
+            current_line.append(word)
+            text_width = draw.textlength(" ".join(current_line), font=body_font)
+            if text_width > template_size[0] - 100:
+                current_line.pop()
+                lines.append(" ".join(current_line))
+                current_line = [word]
+        
+        if current_line:
+            lines.append(" ".join(current_line))
+        
+        for line in lines:
+            draw.text((75, y_offset), line, font=body_font, fill='black')
+            y_offset += 35
+        
+        y_offset += 50
+    
+    # Add recommended items if available
+    if recommendation['recommended_items']:
+        draw.text((template_size[0]//2, y_offset), "Recommended Pieces", 
+                 font=heading_font, fill='#4ecdc4', anchor="mm")
+        y_offset += 50
+        
+        # Calculate thumbnail size and positions
+        thumb_size = 200
+        spacing = (template_size[0] - (3 * thumb_size)) // 4
+        
+        for idx, item in enumerate(recommendation['recommended_items'][:3]):
+            if item.get('image_path') and os.path.exists(item['image_path']):
+                # Load and resize item image
+                item_img = Image.open(item['image_path'])
+                item_img.thumbnail((thumb_size, thumb_size))
+                
+                # Calculate position
+                x_pos = spacing + idx * (thumb_size + spacing)
+                image.paste(item_img, (x_pos, y_offset))
+                
+                # Add item details below thumbnail
+                details_y = y_offset + thumb_size + 10
+                draw.text((x_pos + thumb_size//2, details_y), 
+                         f"{item['type'].capitalize()}", 
+                         font=body_font, fill='#4ecdc4', anchor="mm")
+    
+    # Add decorative footer
+    footer_gradient = Image.new('RGB', (template_size[0], 50), '#4ecdc4')
+    image.paste(footer_gradient, (0, template_size[1]-50))
+    
+    # Generate unique filename
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    output_path = f"style_recipes/recipe_{timestamp}.png"
+    os.makedirs("style_recipes", exist_ok=True)
+    
+    # Save the image
+    image.save(output_path)
+    return output_path
 
 logging.basicConfig(
     level=logging.INFO,
@@ -407,13 +517,26 @@ def main_page():
                     preferences=preferences
                 )
                 
-                # Display recommendation in an enhanced card
-                st.markdown('<div class="style-card">', unsafe_allow_html=True)
-                st.markdown('<div class="recommendation-header">', unsafe_allow_html=True)
-                st.markdown("### ✨ Your Magical Style Recipe")
-                st.markdown('</div>', unsafe_allow_html=True)
-                st.markdown(recommendation['text'])
-                st.markdown('</div>', unsafe_allow_html=True)
+                # Generate and display the style recipe image
+                recipe_image_path = create_style_recipe_image(recommendation)
+                
+                if os.path.exists(recipe_image_path):
+                    st.image(recipe_image_path, use_column_width=True)
+                    
+                    # Add download button for the recipe image
+                    with open(recipe_image_path, 'rb') as file:
+                        st.download_button(
+                            label="📥 Download Style Recipe",
+                            data=file,
+                            file_name=os.path.basename(recipe_image_path),
+                            mime="image/png"
+                        )
+                else:
+                    st.error("Failed to generate style recipe image")
+                    
+                # Keep the text version in an expander for accessibility
+                with st.expander("View Text Version"):
+                    st.markdown(recommendation['text'])
                 
                 # Display recommended items in an enhanced grid
                 if recommendation['recommended_items']:
