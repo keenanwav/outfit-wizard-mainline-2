@@ -3,6 +3,45 @@ import numpy as np
 from sklearn.cluster import KMeans
 import os
 import streamlit as st
+# Dictionary mapping common color names to their RGB values
+COLOR_NAMES = {
+    'red': (255, 0, 0),
+    'green': (0, 255, 0),
+    'blue': (0, 0, 255),
+    'yellow': (255, 255, 0),
+    'cyan': (0, 255, 255),
+    'magenta': (255, 0, 255),
+    'black': (0, 0, 0),
+    'white': (255, 255, 255),
+    'gray': (128, 128, 128),
+    'brown': (165, 42, 42),
+    'orange': (255, 165, 0),
+    'purple': (128, 0, 128),
+    'pink': (255, 192, 203),
+    'navy': (0, 0, 128),
+    'teal': (0, 128, 128),
+    'olive': (128, 128, 0),
+    'maroon': (128, 0, 0),
+    'beige': (245, 245, 220),
+    'khaki': (240, 230, 140),
+    'coral': (255, 127, 80),
+}
+
+def get_color_name(rgb_color):
+    """Find the closest named color for an RGB value"""
+    min_distance = float('inf')
+    closest_color = 'unknown'
+    r, g, b = rgb_color
+    
+    for name, color in COLOR_NAMES.items():
+        # Calculate Euclidean distance between colors
+        distance = sum((c1 - c2) ** 2 for c1, c2 in zip((r, g, b), color))
+        if distance < min_distance:
+            min_distance = distance
+            closest_color = name
+            
+    return closest_color.capitalize()
+
 
 def parse_color_string(color_str):
     try:
@@ -122,16 +161,17 @@ def rgb_to_hex(rgb):
     return '#{:02x}{:02x}{:02x}'.format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
 
 def display_color_palette(colors):
-    """Create a streamlit color palette display"""
+    """Create a streamlit color palette display with color names"""
     if colors is None or len(colors) == 0:
         return
     
     # Create columns for each color
     cols = st.columns(len(colors))
     
-    # Display each color with its hex value
+    # Display each color with its hex value and name
     for idx, color in enumerate(colors):
         hex_color = rgb_to_hex(color)
+        color_name = get_color_name(color)
         with cols[idx]:
             st.markdown(
                 f"""
@@ -143,6 +183,7 @@ def display_color_palette(colors):
                     margin: 0 auto 8px auto;
                 "></div>
                 <p style="text-align: center; font-size: 12px; margin: 0 auto;">{hex_color}</p>
+                <p style="text-align: center; font-size: 12px; margin: 0 auto; color: #666;">{color_name}</p>
                 """,
                 unsafe_allow_html=True
             )

@@ -282,10 +282,12 @@ def main_page():
                                     color = tuple(colors[item_type])
                                     draw.rectangle([x1, y1, x2, y2], fill=color, outline='#000000', width=1)
                                     
-                                    # Add combined item type and hex code on single line
+                                    # Add item type, hex code, and color name
                                     text_y = y2 + 5  # Minimal spacing after block
                                     hex_code = rgb_to_hex(colors[item_type]).lower()  # Convert to lowercase
-                                    combined_text = f"{item_type} {hex_code}"  # Format: "shirt #d8a918"
+                                    color_name = get_color_name(colors[item_type])
+                                    # Format: "shirt - Olive #d8a918"
+                                    combined_text = f"{item_type} - {color_name} {hex_code}"
                                     draw.text((x1, text_y), combined_text, fill='black', font=font)
                             
                             # Save the new image with palette
