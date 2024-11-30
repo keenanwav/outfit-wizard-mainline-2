@@ -261,7 +261,7 @@ def main_page():
                                 font = None
                                 for font_path in font_options:
                                     try:
-                                        font = ImageFont.truetype(font_path, 12)  # Reduced font size to 12px
+                                        font = ImageFont.truetype(font_path, 10)  # Further reduced font size to 10px
                                         break
                                     except:
                                         continue
@@ -282,14 +282,11 @@ def main_page():
                                     color = tuple(colors[item_type])
                                     draw.rectangle([x1, y1, x2, y2], fill=color, outline='#000000', width=1)
                                     
-                                    # Add item type text (first line)
-                                    text_y = y2 + 8  # Reduced spacing after block
-                                    draw.text((x1, text_y), item_type, fill='black', font=font)
-                                    
-                                    # Add hex code (second line)
+                                    # Add combined item type and hex code on single line
+                                    text_y = y2 + 5  # Minimal spacing after block
                                     hex_code = rgb_to_hex(colors[item_type]).lower()  # Convert to lowercase
-                                    text_y += 15  # Reduced spacing between lines
-                                    draw.text((x1, text_y), hex_code, fill='black', font=font)
+                                    combined_text = f"{item_type} {hex_code}"  # Format: "shirt #d8a918"
+                                    draw.text((x1, text_y), combined_text, fill='black', font=font)
                             
                             # Save the new image with palette
                             temp_path = f"temp_download_{filename}"
