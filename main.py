@@ -14,7 +14,7 @@ from data_manager import (
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
-from color_utils import get_color_palette, display_color_palette, rgb_to_hex, parse_color_string
+from color_utils import get_color_palette, display_color_palette, rgb_to_hex, parse_color_string, get_color_name
 from outfit_generator import generate_outfit, cleanup_merged_outfits, is_valid_image
 from datetime import datetime, timedelta
 from style_assistant import get_style_recommendation, format_clothing_items
