@@ -229,8 +229,8 @@ def main_page():
                     if colors:
                         # Open the original image
                         with Image.open(outfit['merged_image_path']) as img:
-                            # Create a new image with extra space for the color palette and hex codes
-                            palette_height = 180  # Increased height for better spacing
+                            # Create a new image with extra space for the color palette and text
+                            palette_height = 100  # Reduced space for color blocks and two lines of text
                             new_img = Image.new('RGB', (img.width, img.height + palette_height), 'white')
                             # Paste the original image
                             new_img.paste(img, (0, 0))
@@ -238,30 +238,30 @@ def main_page():
                             # Draw color palette
                             draw = ImageDraw.Draw(new_img)
                             
-                            # Calculate dimensions for color blocks with precise spacing
+                            # Calculate dimensions for blocks (3:1 width to height ratio)
                             margin = img.width * 0.1  # 10% margin on each side
                             available_width = img.width - (2 * margin)  # Width available for blocks
-                            block_width = available_width // 3.6  # Equal width for all blocks
-                            block_height = 80  # Increased height for better visibility
-                            spacing = (available_width - (3 * block_width)) / 2  # Equal spacing between blocks
+                            total_width = available_width * 0.8  # Total width is 80% of available width
+                            block_width = total_width // 3  # Width for each block
+                            block_height = block_width // 3  # Height is 1/3 of width for 3:1 ratio
+                            spacing = (available_width - total_width) // 4  # Equal spacing between blocks
                             
-                            # Position for color blocks with improved spacing
-                            y1 = img.height + 30  # Increased padding from the image
+                            # Position for color blocks
+                            y1 = img.height + 20  # Reduced padding from the image
                             y2 = y1 + block_height
                             
-                            # Modern typography with enhanced legibility
+                            # Set up typography with smaller font size
                             try:
-                                # Try multiple modern sans-serif font options
+                                # Try multiple sans-serif font options
                                 font_options = [
-                                    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                                    "Arial-Bold.ttf",
-                                    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-                                    "DejaVuSans-Bold.ttf"
+                                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                                    "Arial.ttf",
+                                    "/usr/share/fonts/truetype/liberation/LiberationSans.ttf"
                                 ]
                                 font = None
                                 for font_path in font_options:
                                     try:
-                                        font = ImageFont.truetype(font_path, 18)  # Increased font size
+                                        font = ImageFont.truetype(font_path, 12)  # Reduced font size to 12px
                                         break
                                     except:
                                         continue
@@ -270,23 +270,26 @@ def main_page():
                             except:
                                 font = ImageFont.load_default()
 
-                            # Add item types and color blocks with improved layout
+                            # Add item types and color blocks
+                            x_start = margin + spacing  # Starting position for first block
                             for idx, item_type in enumerate(['shirt', 'pants', 'shoes']):
                                 if item_type in colors:
-                                    # Calculate x positions for current block with precise spacing
-                                    x1 = margin + (idx * (block_width + spacing))
+                                    # Calculate x positions for current block
+                                    x1 = x_start + idx * (block_width + spacing)
                                     x2 = x1 + block_width
                                     
-                                    # Draw color block with clean edges
+                                    # Draw color block with thin border
                                     color = tuple(colors[item_type])
-                                    draw.rectangle([x1, y1, x2, y2], fill=color, outline='#E0E0E0', width=1)
+                                    draw.rectangle([x1, y1, x2, y2], fill=color, outline='#000000', width=1)
                                     
-                                    # Add hex code below the color block with improved spacing
-                                    hex_code = rgb_to_hex(colors[item_type]).upper()  # Convert to uppercase
-                                    text_width = draw.textlength(hex_code, font=font)
-                                    text_x = x1 + (block_width - text_width) // 2
-                                    text_y = y2 + 25  # Increased spacing between block and text
-                                    draw.text((text_x, text_y), hex_code, fill='black', font=font)
+                                    # Add item type text (first line)
+                                    text_y = y2 + 8  # Reduced spacing after block
+                                    draw.text((x1, text_y), item_type, fill='black', font=font)
+                                    
+                                    # Add hex code (second line)
+                                    hex_code = rgb_to_hex(colors[item_type]).lower()  # Convert to lowercase
+                                    text_y += 15  # Reduced spacing between lines
+                                    draw.text((x1, text_y), hex_code, fill='black', font=font)
                             
                             # Save the new image with palette
                             temp_path = f"temp_download_{filename}"
