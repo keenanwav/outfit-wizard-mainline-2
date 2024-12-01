@@ -19,8 +19,10 @@ from outfit_generator import generate_outfit, cleanup_merged_outfits, is_valid_i
 from datetime import datetime, timedelta
 from style_assistant import get_style_recommendation, format_clothing_items
 import time
-def create_mannequin_outfit_image(recommended_items, template_size=(800, 1000)):
-    """Create a visualization of the outfit using the mannequin template"""
+def create_mannequin_outfit_image(recommended_items, weather=None, template_size=(800, 1000)):
+    """Create a visualization of the outfit using the mannequin template and clothing templates"""
+    from clothing_templates import get_template_for_item, apply_color_to_template, get_item_position, parse_color_string
+    
     # Load the mannequin template
     template = Image.open('manikin temp.png')
     
@@ -34,8 +36,26 @@ def create_mannequin_outfit_image(recommended_items, template_size=(800, 1000)):
     x_offset = (template_size[0] - template.width) // 2
     y_offset = (template_size[1] - template.height) // 2
     
-    # Paste the template
+    # Paste the mannequin template
     final_image.paste(template, (x_offset, y_offset), template)
+    
+    # Layer clothing items on top
+    for item in recommended_items:
+        # Get appropriate template based on item type and weather
+        template_path = get_template_for_item(item['type'], weather)
+        if template_path and os.path.exists(template_path):
+            # Parse color and apply to template
+            color = parse_color_string(item['color'])
+            colored_item = apply_color_to_template(template_path, color)
+            
+            # Get position for this item type
+            pos = get_item_position(item['type'], template_size)
+            
+            # Resize colored item to match template proportions
+            colored_item.thumbnail((template_size[0] // 2, template_size[1] // 2), Image.Resampling.LANCZOS)
+            
+            # Paste the colored item onto the final image
+            final_image.paste(colored_item, pos, colored_item)
     
     # Save the visualization
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -551,12 +571,82 @@ def main_page():
                 )
                 
                 # Generate and display both visualization styles
+                # Weather and occasion inputs with improved UI
+                input_col1, input_col2 = st.columns(2)
+                with input_col1:
+                    weather = st.selectbox(
+                        "Select Weather",
+                        ["Warm", "Hot", "Cool", "Cold"],
+                        help="Choose the weather condition to get appropriate clothing recommendations"
+                    )
+                    occasion = st.selectbox(
+                        "Select Occasion",
+                        ["Casual", "Formal", "Sport", "Beach"],
+                        help="Choose the occasion for your outfit"
+                    )
+                
+                with input_col2:
+                    preferences = st.text_area(
+                        "Style Preferences",
+                        help="Add any specific style preferences or requirements"
+                    )
+                    manual_selection = st.checkbox(
+                        "Enable Manual Selection",
+                        help="Manually select clothing items for visualization"
+                    )
+
+                # Manual selection interface
+                if manual_selection:
+                    st.markdown("### 👕 Manual Item Selection")
+                    items_df = load_clothing_items()
+                    
+                    if not items_df.empty:
+                        select_col1, select_col2, select_col3 = st.columns(3)
+                        
+                        with select_col1:
+                            selected_shirt = st.selectbox(
+                                "Select Shirt",
+                                options=items_df[items_df['type'] == 'shirt']['id'].tolist(),
+                                format_func=lambda x: f"Shirt #{x}"
+                            )
+                        
+                        with select_col2:
+                            selected_pants = st.selectbox(
+                                "Select Pants",
+                                options=items_df[items_df['type'] == 'pants']['id'].tolist(),
+                                format_func=lambda x: f"Pants #{x}"
+                            )
+                        
+                        with select_col3:
+                            selected_shoes = st.selectbox(
+                                "Select Shoes",
+                                options=items_df[items_df['type'] == 'shoes']['id'].tolist(),
+                                format_func=lambda x: f"Shoes #{x}"
+                            )
+                        
+                        # Create custom recommendation from selected items
+                        selected_items = []
+                        for item_id in [selected_shirt, selected_pants, selected_shoes]:
+                            item = items_df[items_df['id'] == item_id].iloc[0]
+                            selected_items.append({
+                                'id': int(item['id']),
+                                'type': item['type'],
+                                'image_path': item['image_path'],
+                                'color': item['color'],
+                                'style': item['style']
+                            })
+                        recommendation = {'recommended_items': selected_items}
+
+                # Display visualization
                 col1, col2 = st.columns(2)
                 
                 with col1:
                     st.markdown("### 👔 Outfit Visualization")
-                    # Generate mannequin-based visualization
-                    mannequin_image_path = create_mannequin_outfit_image(recommendation['recommended_items'])
+                    # Generate mannequin-based visualization with weather consideration
+                    mannequin_image_path = create_mannequin_outfit_image(
+                        recommendation['recommended_items'],
+                        weather=weather.lower() if not manual_selection else None
+                    )
                     if os.path.exists(mannequin_image_path):
                         st.image(mannequin_image_path, use_column_width=True)
                         
