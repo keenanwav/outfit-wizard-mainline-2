@@ -576,28 +576,28 @@ def main_page():
                 )
                 
                 # Generate and display both visualization styles
-                # Weather and occasion inputs with improved UI
-                input_col1, input_col2 = st.columns(2)
-                with input_col1:
-                    weather = st.selectbox(
-                        "Select Weather",
-                        ["Warm", "Hot", "Cool", "Cold"],
-                        help="Choose the weather condition to get appropriate clothing recommendations"
-                    )
-                    occasion = st.selectbox(
-                        "Select Occasion",
-                        ["Casual", "Formal", "Sport", "Beach"],
-                        help="Choose the occasion for your outfit"
+                # Enhanced visualization options
+                st.markdown("### 🎨 Visualization Options")
+                viz_col1, viz_col2 = st.columns(2)
+                
+                with viz_col1:
+                    visualization_type = st.radio(
+                        "Choose Visualization Style",
+                        ["Modern (Mannequin)", "Classic (Style Recipe)", "Both"],
+                        horizontal=True,
+                        help="Select how you want to view your outfit recommendation"
                     )
                 
-                with input_col2:
-                    preferences = st.text_area(
-                        "Style Preferences",
-                        help="Add any specific style preferences or requirements"
+                with viz_col2:
+                    include_color_palette = st.checkbox(
+                        "Include Color Palette",
+                        value=True,
+                        help="Add a color palette to your outfit visualization"
                     )
-                    manual_selection = st.checkbox(
-                        "Enable Manual Selection",
-                        help="Manually select clothing items for visualization"
+                    show_style_tips = st.checkbox(
+                        "Show Style Tips",
+                        value=True,
+                        help="Display additional styling suggestions"
                     )
 
                 # Manual selection interface
@@ -642,46 +642,60 @@ def main_page():
                             })
                         recommendation = {'recommended_items': selected_items}
 
-                # Display visualization
-                col1, col2 = st.columns(2)
-                
-                with col1:
+                # Display enhanced visualization based on user selection
+                if visualization_type in ["Modern (Mannequin)", "Both"]:
                     st.markdown("### 👔 Outfit Visualization")
-                    # Generate mannequin-based visualization with weather consideration
                     mannequin_image_path = create_mannequin_outfit_image(
                         recommendation['recommended_items'],
-                        weather=weather.lower() if not manual_selection else None
+                        weather=weather.lower()
                     )
                     if os.path.exists(mannequin_image_path):
                         st.image(mannequin_image_path, use_column_width=True)
                         
-                        # Add download button for the mannequin visualization
-                        with open(mannequin_image_path, 'rb') as file:
-                            st.download_button(
-                                label="📥 Download Outfit Visualization",
-                                data=file,
-                                file_name=os.path.basename(mannequin_image_path),
-                                mime="image/png"
-                            )
+                        download_col1, download_col2 = st.columns(2)
+                        with download_col1:
+                            with open(mannequin_image_path, 'rb') as file:
+                                st.download_button(
+                                    label="📥 Download Outfit Visualization",
+                                    data=file,
+                                    file_name=os.path.basename(mannequin_image_path),
+                                    mime="image/png"
+                                )
+                        
+                        if include_color_palette:
+                            with download_col2:
+                                # Add color palette button
+                                if st.button("🎨 Show Color Analysis", key="color_analysis"):
+                                    st.markdown("### 🎨 Color Harmony Analysis")
+                                    for item in recommendation['recommended_items']:
+                                        color = parse_color_string(str(item['color']))
+                                        st.markdown(f"**{item['type'].capitalize()}**: {get_color_name(color)}")
+                                        display_color_palette([color])
                     else:
                         st.error("Failed to generate outfit visualization")
-                
-                with col2:
+
+                if visualization_type in ["Classic (Style Recipe)", "Both"]:
                     st.markdown("### 📝 Style Recipe")
-                    # Generate traditional style recipe image
                     recipe_image_path = create_style_recipe_image(recommendation)
                     
                     if os.path.exists(recipe_image_path):
                         st.image(recipe_image_path, use_column_width=True)
                         
-                        # Add download button for the recipe image
-                        with open(recipe_image_path, 'rb') as file:
-                            st.download_button(
-                                label="📥 Download Style Recipe",
-                                data=file,
-                                file_name=os.path.basename(recipe_image_path),
-                                mime="image/png"
-                            )
+                        recipe_col1, recipe_col2 = st.columns(2)
+                        with recipe_col1:
+                            with open(recipe_image_path, 'rb') as file:
+                                st.download_button(
+                                    label="📥 Download Style Recipe",
+                                    data=file,
+                                    file_name=os.path.basename(recipe_image_path),
+                                    mime="image/png"
+                                )
+                        
+                        if show_style_tips:
+                            with recipe_col2:
+                                if st.button("💡 View Styling Tips", key="style_tips"):
+                                    st.markdown("### 💡 Professional Styling Tips")
+                                    st.markdown(recommendation['text'])
                     else:
                         st.error("Failed to generate style recipe image")
                     
