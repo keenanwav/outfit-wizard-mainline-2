@@ -111,17 +111,13 @@ def get_style_recommendation(
                 if any(color in item['color'].lower() for color in preferred_colors)
             ]
     
-    # Select items by type ensuring complete outfit
+    # Select items by type ensuring complete outfit from user's wardrobe
     selected_items = {'shirt': None, 'pants': None, 'shoes': None}
     for item_type in selected_items:
+        # Filter items by type from the user's wardrobe (suitable_items already contains user's items)
         type_items = [item for item in suitable_items if item['type'] == item_type]
         if type_items:
-            selected_items[item_type] = type_items[0]  # Select first suitable item
-            # Update template selection for cold/cool/windy conditions
-            if item_type == 'shirt' and (is_cold or 'cool' in weather or 'windy' in weather):
-                type_items[0]['image_path'] = 'long sleeve shirt.png'
-            elif item_type == 'pants' and (is_cold or 'cool' in weather or 'windy' in weather):
-                type_items[0]['image_path'] = 'long leg pants.png'
+            selected_items[item_type] = type_items[0]  # Select first suitable item from user's wardrobe
             recommended_items.append(type_items[0])
     
     # Generate style tips based on occasion
