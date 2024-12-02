@@ -111,14 +111,77 @@ def get_style_recommendation(
                 if any(color in item['color'].lower() for color in preferred_colors)
             ]
     
+    # Enhanced item selection with style matching and color coordination
+    def calculate_item_score(item, occasion, preferences):
+        score = 0
+        # Style match with occasion
+        if occasion.lower() in item['style'].lower():
+            score += 3
+        # Color preference match
+        if preferences:
+            preferences = preferences.lower()
+            if ('dark' in preferences and any(dark in item['color'].lower() for dark in ['black', 'navy', 'dark'])):
+                score += 2
+            elif ('light' in preferences and any(light in item['color'].lower() for light in ['white', 'beige', 'light'])):
+                score += 2
+            elif ('bright' in preferences and any(bright in item['color'].lower() for bright in ['red', 'yellow', 'blue', 'green'])):
+                score += 2
+        return score
+
+    def color_compatibility_score(color1, color2):
+        # Basic color compatibility check
+        if color1.lower() == color2.lower():
+            return 1  # Matching colors
+        neutral_colors = ['black', 'white', 'gray', 'beige', 'navy']
+        if any(neutral in color1.lower() for neutral in neutral_colors) or \
+           any(neutral in color2.lower() for neutral in neutral_colors):
+            return 2  # Neutral colors work well with anything
+        return 0  # Default compatibility
+
     # Select items by type ensuring complete outfit from user's wardrobe
     selected_items = {'shirt': None, 'pants': None, 'shoes': None}
-    for item_type in selected_items:
-        # Filter items by type from the user's wardrobe (suitable_items already contains user's items)
-        type_items = [item for item in suitable_items if item['type'] == item_type]
-        if type_items:
-            selected_items[item_type] = type_items[0]  # Select first suitable item from user's wardrobe
-            recommended_items.append(type_items[0])
+    
+    # First, get all items by type and sort by initial score
+    categorized_items = {
+        item_type: sorted(
+            [item for item in suitable_items if item['type'] == item_type],
+            key=lambda x: calculate_item_score(x, occasion, preferences),
+            reverse=True
+        )
+        for item_type in selected_items
+    }
+    
+    # Select shirt first (as base piece)
+    if categorized_items['shirt']:
+        selected_items['shirt'] = categorized_items['shirt'][0]
+        recommended_items.append(selected_items['shirt'])
+    
+    # Select pants considering shirt color compatibility
+    if categorized_items['pants'] and selected_items['shirt']:
+        pants_items = categorized_items['pants']
+        pants_items.sort(
+            key=lambda x: (
+                calculate_item_score(x, occasion, preferences) +
+                color_compatibility_score(x['color'], selected_items['shirt']['color'])
+            ),
+            reverse=True
+        )
+        selected_items['pants'] = pants_items[0]
+        recommended_items.append(selected_items['pants'])
+    
+    # Select shoes considering both shirt and pants colors
+    if categorized_items['shoes'] and selected_items['shirt'] and selected_items['pants']:
+        shoes_items = categorized_items['shoes']
+        shoes_items.sort(
+            key=lambda x: (
+                calculate_item_score(x, occasion, preferences) +
+                color_compatibility_score(x['color'], selected_items['shirt']['color']) +
+                color_compatibility_score(x['color'], selected_items['pants']['color'])
+            ),
+            reverse=True
+        )
+        selected_items['shoes'] = shoes_items[0]
+        recommended_items.append(selected_items['shoes'])
     
     # Generate style tips based on occasion
     if occasion == 'formal':
