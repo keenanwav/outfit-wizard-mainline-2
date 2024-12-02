@@ -575,30 +575,11 @@ def main_page():
                     preferences=preferences
                 )
                 
-                # Generate and display both visualization styles
-                # Weather and occasion inputs with improved UI
-                input_col1, input_col2 = st.columns(2)
-                with input_col1:
-                    weather = st.selectbox(
-                        "Select Weather",
-                        ["Warm", "Hot", "Cool", "Cold"],
-                        help="Choose the weather condition to get appropriate clothing recommendations"
-                    )
-                    occasion = st.selectbox(
-                        "Select Occasion",
-                        ["Casual", "Formal", "Sport", "Beach"],
-                        help="Choose the occasion for your outfit"
-                    )
-                
-                with input_col2:
-                    preferences = st.text_area(
-                        "Style Preferences",
-                        help="Add any specific style preferences or requirements"
-                    )
-                    manual_selection = st.checkbox(
-                        "Enable Manual Selection",
-                        help="Manually select clothing items for visualization"
-                    )
+                # Use a single manual selection toggle
+                manual_selection = st.checkbox(
+                    "Enable Manual Selection",
+                    help="Manually select clothing items for visualization"
+                )
 
                 # Manual selection interface
                 if manual_selection:
@@ -647,10 +628,10 @@ def main_page():
                 
                 with col1:
                     st.markdown("### 👔 Outfit Visualization")
-                    # Generate mannequin-based visualization with weather consideration
+                    # Generate mannequin-based visualization using initial weather input
                     mannequin_image_path = create_mannequin_outfit_image(
                         recommendation['recommended_items'],
-                        weather=weather.lower() if not manual_selection else None
+                        weather=weather.lower() if weather and not manual_selection else None
                     )
                     if os.path.exists(mannequin_image_path):
                         st.image(mannequin_image_path, use_column_width=True)
