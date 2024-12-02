@@ -28,7 +28,7 @@ def get_style_recommendation(
     
     # Weather condition check with comprehensive keywords
     weather_conditions = {
-        'cold': ['cold', 'freezing', 'chilly', 'cool'],
+        'cold': ['cold', 'freezing', 'chilly', 'cool', 'windy'],  # Added 'cool' and 'windy'
         'warm': ['warm', 'hot', 'sunny'],
         'rainy': ['rainy', 'rain', 'wet'],
     }
@@ -70,12 +70,12 @@ def get_style_recommendation(
             if item_tags and 'athletic' not in item_tags and 'sport' not in item_tags:
                 continue  # Only athletic wear for sports
         
-        # Weather-based filtering
-        if is_cold:
+        # Weather-based filtering with improved conditions
+        if is_cold or 'cool' in weather or 'windy' in weather:
             if item_type == 'shirt' and item_tags and 'short' in item_tags:
-                continue  # Skip short sleeves in cold weather
+                continue  # Skip short sleeves in cold/cool/windy weather
             if item_type == 'pants' and item_tags and 'shorts' in item_tags:
-                continue  # Skip shorts in cold weather
+                continue  # Skip shorts in cold/cool/windy weather
                 
         elif is_warm:
             if item_type == 'shirt' and item_tags and 'long' in item_tags:
@@ -86,8 +86,8 @@ def get_style_recommendation(
         suitable_items.append(item)
     
     # Add weather-based recommendation text
-    if is_cold:
-        recommendation_text.append("- Outfit: Selected warmer clothing for cold weather")
+    if is_cold or 'cool' in weather or 'windy' in weather:
+        recommendation_text.append("- Outfit: Selected warmer clothing for cool/cold weather")
     elif is_warm:
         recommendation_text.append("- Outfit: Selected lighter clothing for warm weather")
     if is_rainy:
@@ -117,7 +117,12 @@ def get_style_recommendation(
         type_items = [item for item in suitable_items if item['type'] == item_type]
         if type_items:
             selected_items[item_type] = type_items[0]  # Select first suitable item
-            recommended_items.append(selected_items[item_type])
+            # Update template selection for cold/cool/windy conditions
+            if item_type == 'shirt' and (is_cold or 'cool' in weather or 'windy' in weather):
+                type_items[0]['image_path'] = 'long sleeve shirt.png'
+            elif item_type == 'pants' and (is_cold or 'cool' in weather or 'windy' in weather):
+                type_items[0]['image_path'] = 'long leg pants.png'
+            recommended_items.append(type_items[0])
     
     # Generate style tips based on occasion
     if occasion == 'formal':
