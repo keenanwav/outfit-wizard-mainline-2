@@ -587,45 +587,27 @@ def main_page():
                     items_df = load_clothing_items()
                     
                     if not items_df.empty:
-                        # Add filtering options
-                        filter_col1, filter_col2 = st.columns(2)
-                        with filter_col1:
-                            filter_style = st.selectbox(
-                                "Filter by Style",
-                                options=["All"] + sorted(items_df['style'].unique().tolist()),
-                                key="filter_style"
-                            )
-                        
-                        # Apply filters
-                        filtered_items = items_df
-                        if filter_style != "All":
-                            filtered_items = items_df[items_df['style'] == filter_style]
-                        
-                        # Item selection columns
                         select_col1, select_col2, select_col3 = st.columns(3)
                         
                         with select_col1:
-                            shirt_options = filtered_items[filtered_items['type'] == 'shirt']
                             selected_shirt = st.selectbox(
                                 "Select Shirt",
-                                options=shirt_options['id'].tolist(),
-                                format_func=lambda x: f"Shirt #{x} ({shirt_options[shirt_options['id'] == x]['style'].iloc[0]})"
+                                options=items_df[items_df['type'] == 'shirt']['id'].tolist(),
+                                format_func=lambda x: f"Shirt #{x}"
                             )
                         
                         with select_col2:
-                            pants_options = filtered_items[filtered_items['type'] == 'pants']
                             selected_pants = st.selectbox(
                                 "Select Pants",
-                                options=pants_options['id'].tolist(),
-                                format_func=lambda x: f"Pants #{x} ({pants_options[pants_options['id'] == x]['style'].iloc[0]})"
+                                options=items_df[items_df['type'] == 'pants']['id'].tolist(),
+                                format_func=lambda x: f"Pants #{x}"
                             )
                         
                         with select_col3:
-                            shoes_options = filtered_items[filtered_items['type'] == 'shoes']
                             selected_shoes = st.selectbox(
                                 "Select Shoes",
-                                options=shoes_options['id'].tolist(),
-                                format_func=lambda x: f"Shoes #{x} ({shoes_options[shoes_options['id'] == x]['style'].iloc[0]})"
+                                options=items_df[items_df['type'] == 'shoes']['id'].tolist(),
+                                format_func=lambda x: f"Shoes #{x}"
                             )
                         
                         # Create custom recommendation from selected items
