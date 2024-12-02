@@ -536,7 +536,7 @@ def main_page():
         <div style="text-align: center; margin-bottom: 30px;">
             <h2>
                 <span class="magic-wand">🪄</span>
-                Smart Style Assistant
+                Smart Style Assistant (BETA)
                 <span class="magic-wand">✨</span>
             </h2>
         </div>
