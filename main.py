@@ -575,11 +575,13 @@ def main_page():
                     preferences=preferences
                 )
                 
-                # Use a single manual selection toggle
-                manual_selection = st.checkbox(
-                    "Enable Manual Selection",
-                    help="Manually select clothing items for visualization"
-                )
+                # Create two columns for manual selection toggle
+                toggle_col1, toggle_col2 = st.columns([1, 3])
+                with toggle_col1:
+                    manual_selection = st.checkbox(
+                        "Enable Manual Selection",
+                        help="Manually select clothing items for visualization"
+                    )
 
                 # Manual selection interface
                 if manual_selection:
