@@ -207,6 +207,8 @@ if 'editing_color' not in st.session_state:
     st.session_state.editing_color = None
 if 'color_preview' not in st.session_state:
     st.session_state.color_preview = None
+if 'manual_selection' not in st.session_state:
+    st.session_state.manual_selection = False
 
 # Load custom CSS
 def load_custom_css():
@@ -575,9 +577,15 @@ def main_page():
                     preferences=preferences
                 )
                 
-                # Generate and display both visualization styles
                 # Enhanced visualization options
                 st.markdown("### 🎨 Visualization Options")
+                
+                # Add manual selection toggle
+                manual_selection = st.toggle('Enable Manual Item Selection', 
+                                          value=st.session_state.manual_selection,
+                                          help="Select individual items manually instead of automatic recommendations")
+                st.session_state.manual_selection = manual_selection
+                
                 viz_col1, viz_col2 = st.columns(2)
                 
                 with viz_col1:
@@ -601,7 +609,7 @@ def main_page():
                     )
 
                 # Manual selection interface
-                if manual_selection:
+                if st.session_state.manual_selection:
                     st.markdown("### 👕 Manual Item Selection")
                     items_df = load_clothing_items()
                     
