@@ -563,11 +563,11 @@ def main_page():
         st.markdown('</div>', unsafe_allow_html=True)
         
         if generate_button:
-            with st.spinner("🎨 Casting style magic..."):
-                # Format clothing items for the AI
+            with st.spinner("🎨 Creating your style recipe..."):
+                # Format clothing items for recommendation
                 formatted_items = format_clothing_items(items_df)
                 
-                # Get AI recommendation
+                # Get rule-based recommendation
                 recommendation = get_style_recommendation(
                     formatted_items,
                     occasion=occasion,
