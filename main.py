@@ -39,23 +39,28 @@ def create_mannequin_outfit_image(recommended_items, weather=None, template_size
     # Paste the mannequin template
     final_image.paste(template, (x_offset, y_offset), template)
     
-    # Layer clothing items on top
-    for item in recommended_items:
-        # Get appropriate template based on item type and weather
-        template_path = get_template_for_item(item['type'], weather)
-        if template_path and os.path.exists(template_path):
-            # Parse color and apply to template
-            color = parse_color_string(item['color'])
-            colored_item = apply_color_to_template(template_path, color)
-            
-            # Get position for this item type
-            pos = get_item_position(item['type'], template_size)
-            
-            # Resize colored item to match template proportions
-            colored_item.thumbnail((template_size[0] // 2, template_size[1] // 2), Image.Resampling.LANCZOS)
-            
-            # Paste the colored item onto the final image
-            final_image.paste(colored_item, pos, colored_item)
+    # Define layering order
+    layer_order = ['pants', 'shirt', 'shoes']
+    
+    # Layer clothing items in the correct order
+    for layer_type in layer_order:
+        for item in recommended_items:
+            if item['type'] == layer_type:
+                # Get appropriate template based on item type and weather
+                template_path = get_template_for_item(item['type'], weather)
+                if template_path and os.path.exists(template_path):
+                    # Parse color and apply to template
+                    color = parse_color_string(item['color'])
+                    colored_item = apply_color_to_template(template_path, color)
+                    
+                    # Get position for this item type
+                    pos = get_item_position(item['type'], template_size)
+                    
+                    # Resize colored item to match template proportions
+                    colored_item.thumbnail((template_size[0] // 2, template_size[1] // 2), Image.Resampling.LANCZOS)
+                    
+                    # Paste the colored item onto the final image
+                    final_image.paste(colored_item, pos, colored_item)
     
     # Save the visualization
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
