@@ -47,7 +47,7 @@ def get_style_recommendation(
     for item in clothing_items:
         item_type = item['type']
         item_style = item['style'].lower()
-        item_tags = item.get('tags', [])
+        item_tags = item.get('tags', []) if isinstance(item.get('tags'), list) else []
         
         # Skip items that don't match the occasion
         if occasion not in item_style:
@@ -55,32 +55,32 @@ def get_style_recommendation(
             
         # Occasion-specific rules
         if occasion == 'formal':
-            if item_type == 'shirt' and 'short' in item_tags:
+            if item_type == 'shirt' and item_tags and 'short' in item_tags:
                 continue  # Skip short sleeves for formal occasions
-            if item_type == 'pants' and 'shorts' in item_tags:
+            if item_type == 'pants' and item_tags and 'shorts' in item_tags:
                 continue  # Skip shorts for formal occasions
                 
         elif occasion == 'beach':
-            if item_type == 'shirt' and 'long' in item_tags:
+            if item_type == 'shirt' and item_tags and 'long' in item_tags:
                 continue  # Skip long sleeves for beach
-            if item_type == 'pants' and 'long' in item_tags:
+            if item_type == 'pants' and item_tags and 'long' in item_tags:
                 continue  # Skip long pants for beach
                 
         elif occasion == 'sport':
-            if 'athletic' not in item_tags and 'sport' not in item_tags:
+            if item_tags and 'athletic' not in item_tags and 'sport' not in item_tags:
                 continue  # Only athletic wear for sports
         
         # Weather-based filtering
         if is_cold:
-            if item_type == 'shirt' and 'short' in item_tags:
+            if item_type == 'shirt' and item_tags and 'short' in item_tags:
                 continue  # Skip short sleeves in cold weather
-            if item_type == 'pants' and 'shorts' in item_tags:
+            if item_type == 'pants' and item_tags and 'shorts' in item_tags:
                 continue  # Skip shorts in cold weather
                 
         elif is_warm:
-            if item_type == 'shirt' and 'long' in item_tags:
+            if item_type == 'shirt' and item_tags and 'long' in item_tags:
                 continue  # Skip long sleeves in warm weather
-            if item_type == 'pants' and 'long' in item_tags and occasion != 'formal':
+            if item_type == 'pants' and item_tags and 'long' in item_tags and occasion != 'formal':
                 continue  # Skip long pants in warm weather (except formal)
         
         suitable_items.append(item)
@@ -158,7 +158,7 @@ def format_clothing_items(items_df) -> List[Dict]:
             'style': item['style'],
             'color': item['color'],
             'size': item['size'],
-            'tags': item['tags'] if 'tags' in item else [],
+            'tags': item.get('tags', []) if isinstance(item.get('tags'), list) else [],
             'image_path': item['image_path']
         })
     return formatted_items
