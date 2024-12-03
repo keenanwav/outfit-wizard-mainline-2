@@ -143,45 +143,82 @@ def get_style_recommendation(
     
     # First, get all items by type and sort by initial score
     categorized_items = {
-        item_type: sorted(
-            [item for item in suitable_items if item['type'] == item_type],
-            key=lambda x: calculate_item_score(x, occasion, preferences),
-            reverse=True
-        )
+        item_type: [item for item in suitable_items if item['type'] == item_type]
         for item_type in selected_items
     }
     
-    # Select shirt first (as base piece)
-    if categorized_items['shirt']:
-        selected_items['shirt'] = categorized_items['shirt'][0]
-        recommended_items.append(selected_items['shirt'])
+    # Ensure we have at least one item from each category
+    missing_categories = [
+        category for category, items in categorized_items.items()
+        if not items
+    ]
     
-    # Select pants considering shirt color compatibility
-    if categorized_items['pants'] and selected_items['shirt']:
-        pants_items = categorized_items['pants']
-        pants_items.sort(
-            key=lambda x: (
-                calculate_item_score(x, occasion, preferences) +
-                color_compatibility_score(x['color'], selected_items['shirt']['color'])
-            ),
-            reverse=True
+    if missing_categories:
+        recommendation_text.append(
+            f"⚠️ Missing items in categories: {', '.join(missing_categories)}"
         )
-        selected_items['pants'] = pants_items[0]
-        recommended_items.append(selected_items['pants'])
+        # Fall back to all available items for missing categories
+        for category in missing_categories:
+            categorized_items[category] = [
+                item for item in clothing_items 
+                if item['type'] == category
+            ]
     
-    # Select shoes considering both shirt and pants colors
-    if categorized_items['shoes'] and selected_items['shirt'] and selected_items['pants']:
-        shoes_items = categorized_items['shoes']
-        shoes_items.sort(
-            key=lambda x: (
-                calculate_item_score(x, occasion, preferences) +
-                color_compatibility_score(x['color'], selected_items['shirt']['color']) +
-                color_compatibility_score(x['color'], selected_items['pants']['color'])
-            ),
-            reverse=True
+    def calculate_outfit_score(shirt, pants, shoes):
+        """Calculate overall outfit score based on style coordination"""
+        if not all([shirt, pants, shoes]):
+            return -1
+            
+        base_score = (
+            calculate_item_score(shirt, occasion, preferences) +
+            calculate_item_score(pants, occasion, preferences) +
+            calculate_item_score(shoes, occasion, preferences)
         )
-        selected_items['shoes'] = shoes_items[0]
-        recommended_items.append(selected_items['shoes'])
+        
+        # Color harmony score
+        color_score = (
+            color_compatibility_score(shirt['color'], pants['color']) +
+            color_compatibility_score(pants['color'], shoes['color']) +
+            color_compatibility_score(shoes['color'], shirt['color'])
+        )
+        
+        # Style consistency score
+        style_match = sum(
+            1 for i1, i2 in [(shirt, pants), (pants, shoes), (shoes, shirt)]
+            if i1['style'].lower() == i2['style'].lower()
+        )
+        
+        return base_score + (color_score * 2) + (style_match * 3)
+    
+    # Generate all possible combinations and score them
+    best_combination = None
+    best_score = -1
+    
+    for shirt in categorized_items['shirt']:
+        for pants in categorized_items['pants']:
+            for shoes in categorized_items['shoes']:
+                score = calculate_outfit_score(shirt, pants, shoes)
+                if score > best_score:
+                    best_score = score
+                    best_combination = (shirt, pants, shoes)
+    
+    # Select the best combination if found
+    if best_combination:
+        shirt, pants, shoes = best_combination
+        selected_items['shirt'] = shirt
+        selected_items['pants'] = pants
+        selected_items['shoes'] = shoes
+        recommended_items.extend([shirt, pants, shoes])
+        
+        # Add style coordination details to recommendation text
+        recommendation_text.append(
+            "✨ Selected items with optimal style coordination and color harmony"
+        )
+        
+        if all(item['style'].lower() == occasion.lower() for item in [shirt, pants, shoes]):
+            recommendation_text.append(
+                f"🎯 Perfect style match: All items match {occasion} style"
+            )
     
     # Generate style tips based on occasion
     if occasion == 'formal':
