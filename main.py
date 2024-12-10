@@ -226,13 +226,15 @@ if st.session_state.get('show_login_page', False):
     # Don't show anything else when on login page
     pass
 elif authenticated:
-    # Initialize session state for various UI states
-    if 'show_prices' not in st.session_state:
-        st.session_state.show_prices = True
-    if 'editing_color' not in st.session_state:
-        st.session_state.editing_color = None
-    if 'color_preview' not in st.session_state:
-        st.session_state.color_preview = None
+    def main_page():
+        """Display main page with outfit generation"""
+        # Initialize session state for various UI states
+        if 'show_prices' not in st.session_state:
+            st.session_state.show_prices = True
+        if 'editing_color' not in st.session_state:
+            st.session_state.editing_color = None
+        if 'color_preview' not in st.session_state:
+            st.session_state.color_preview = None
 
 # Load custom CSS
 def load_custom_css():
