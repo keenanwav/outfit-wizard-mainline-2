@@ -139,59 +139,72 @@ def authenticate_user(email: str, password: str) -> Tuple[bool, Optional[Dict]]:
 
 def render_login_ui():
     """Render the login user interface"""
-    st.title("Welcome to Outfit Wizard")
-    
     # Initialize session state
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
     if 'user_info' not in st.session_state:
         st.session_state.user_info = None
+    if 'show_login_page' not in st.session_state:
+        st.session_state.show_login_page = False
     
-    if not st.session_state.authenticated:
-        tab1, tab2 = st.tabs(["Login", "Sign Up"])
+    # If not authenticated and login page is requested
+    if not st.session_state.authenticated and st.session_state.show_login_page:
+        st.title("Welcome to Outfit Wizard")
         
-        with tab1:
-            st.subheader("Login")
-            login_email = st.text_input("Email", key="login_email")
-            login_password = st.text_input("Password", type="password", key="login_password")
-            
-            if st.button("Login", key="login_button"):
-                if login_email and login_password:
-                    success, user_info = authenticate_user(login_email, login_password)
-                    if success:
-                        st.session_state.authenticated = True
-                        st.session_state.user_info = user_info
-                        st.success("Login successful!")
-                        st.rerun()
-                    else:
-                        st.error("Invalid email or password")
-                else:
-                    st.warning("Please enter both email and password")
-        
-        with tab2:
-            st.subheader("Sign Up")
-            signup_email = st.text_input("Email", key="signup_email")
-            signup_password = st.text_input("Password", type="password", key="signup_password")
-            confirm_password = st.text_input("Confirm Password", type="password", key="confirm_password")
-            role = st.selectbox("Role", ["user", "admin"], key="signup_role")
-            
-            if st.button("Sign Up", key="signup_button"):
-                if signup_email and signup_password and confirm_password:
-                    if signup_password != confirm_password:
-                        st.error("Passwords do not match")
-                    elif len(signup_password) < 8:
-                        st.error("Password must be at least 8 characters long")
-                    else:
-                        if create_user(signup_email, signup_password, role):
-                            st.success("Account created successfully! Please login.")
-                            # Clear the form
-                            st.session_state.signup_email = ""
-                            st.session_state.signup_password = ""
-                            st.session_state.confirm_password = ""
+        # Create a container for the login form
+        with st.container():
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                tab1, tab2 = st.tabs(["Login", "Sign Up"])
+                
+                with tab1:
+                    st.subheader("Login")
+                    login_email = st.text_input("Email", key="login_email")
+                    login_password = st.text_input("Password", type="password", key="login_password")
+                    
+                    if st.button("Login", key="login_button", use_container_width=True):
+                        if login_email and login_password:
+                            success, user_info = authenticate_user(login_email, login_password)
+                            if success:
+                                st.session_state.authenticated = True
+                                st.session_state.user_info = user_info
+                                st.session_state.show_login_page = False
+                                st.success("Login successful!")
+                                st.rerun()
+                            else:
+                                st.error("Invalid email or password")
                         else:
-                            st.error("Email already exists or error creating account")
-                else:
-                    st.warning("Please fill in all fields")
+                            st.warning("Please enter both email and password")
+                
+                with tab2:
+                    st.subheader("Sign Up")
+                    signup_email = st.text_input("Email", key="signup_email")
+                    signup_password = st.text_input("Password", type="password", key="signup_password")
+                    confirm_password = st.text_input("Confirm Password", type="password", key="confirm_password")
+                    role = st.selectbox("Role", ["user", "admin"], key="signup_role")
+                    
+                    if st.button("Sign Up", key="signup_button", use_container_width=True):
+                        if signup_email and signup_password and confirm_password:
+                            if signup_password != confirm_password:
+                                st.error("Passwords do not match")
+                            elif len(signup_password) < 8:
+                                st.error("Password must be at least 8 characters long")
+                            else:
+                                if create_user(signup_email, signup_password, role):
+                                    st.success("Account created successfully! Please login.")
+                                    # Clear the form
+                                    st.session_state.signup_email = ""
+                                    st.session_state.signup_password = ""
+                                    st.session_state.confirm_password = ""
+                                else:
+                                    st.error("Email already exists or error creating account")
+                        else:
+                            st.warning("Please fill in all fields")
+                            
+                st.markdown("---")
+                if st.button("Back to Main Page", use_container_width=True):
+                    st.session_state.show_login_page = False
+                    st.rerun()
     
     return st.session_state.authenticated, st.session_state.user_info
 

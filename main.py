@@ -203,19 +203,26 @@ st.set_page_config(
 
 # Initialize authentication and session state
 init_auth()
-authenticated, user_info = render_login_ui()
 
-# Only show the main application if user is authenticated
-if authenticated:
-    # Show logout button in sidebar
-    with st.sidebar:
-        st.write(f"Welcome, {user_info['email']}")
+# Add authentication controls to sidebar
+with st.sidebar:
+    if 'authenticated' in st.session_state and st.session_state.authenticated:
+        st.write(f"Welcome, {st.session_state.user_info['email']}")
         if st.button("Logout"):
             logout()
         
         if check_admin_role():
             st.success("Admin access granted")
-    
+    else:
+        if st.button("Login/Sign Up"):
+            st.session_state.show_login_page = True
+            st.rerun()
+
+# Get authentication status
+authenticated, user_info = render_login_ui()
+
+# Only show the main application if user is authenticated and not on login page
+if authenticated and not st.session_state.get('show_login_page', False):
     # Initialize session state for various UI states
     if 'show_prices' not in st.session_state:
         st.session_state.show_prices = True
