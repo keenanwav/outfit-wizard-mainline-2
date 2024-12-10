@@ -5,6 +5,14 @@ from auth import (
     is_admin, admin_required
 )
 
+# Initialize session state
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+if 'user' not in st.session_state:
+    st.session_state.user = None
+if 'token_info' not in st.session_state:
+    st.session_state.token_info = None
+
 # Initialize the authentication tables
 create_auth_tables()
 
