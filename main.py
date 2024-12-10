@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 from PIL import Image, ImageDraw, ImageFont
+from auth import render_login_ui, init_auth, logout, check_admin_role
 import numpy as np
 import pandas as pd
 from collections import Counter
@@ -200,13 +201,28 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize session state for various UI states
-if 'show_prices' not in st.session_state:
-    st.session_state.show_prices = True
-if 'editing_color' not in st.session_state:
-    st.session_state.editing_color = None
-if 'color_preview' not in st.session_state:
-    st.session_state.color_preview = None
+# Initialize authentication and session state
+init_auth()
+authenticated, user_info = render_login_ui()
+
+# Only show the main application if user is authenticated
+if authenticated:
+    # Show logout button in sidebar
+    with st.sidebar:
+        st.write(f"Welcome, {user_info['email']}")
+        if st.button("Logout"):
+            logout()
+        
+        if check_admin_role():
+            st.success("Admin access granted")
+    
+    # Initialize session state for various UI states
+    if 'show_prices' not in st.session_state:
+        st.session_state.show_prices = True
+    if 'editing_color' not in st.session_state:
+        st.session_state.editing_color = None
+    if 'color_preview' not in st.session_state:
+        st.session_state.color_preview = None
 
 # Load custom CSS
 def load_custom_css():
