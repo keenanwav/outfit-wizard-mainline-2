@@ -257,7 +257,7 @@ with st.sidebar:
         if check_admin_role():
             st.success("Admin access granted")
     else:
-        if st.button("Login/Sign Up"):
+        if st.button("✨ Login/Sign Up", use_container_width=True):
             st.session_state.show_login_page = True
             st.rerun()
 
