@@ -202,6 +202,37 @@ st.set_page_config(
 )
 
 # Initialize authentication and session state
+# Initialize navigation state
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = 'home'
+
+# Navigation menu
+col1, col2, col3 = st.columns(3)
+with col1:
+    if st.button("🏠 Home", use_container_width=True, 
+                 type="primary" if st.session_state.current_page == 'home' else "secondary"):
+        st.session_state.current_page = 'home'
+        st.session_state.show_login_page = False
+        st.rerun()
+with col2:
+    if st.button("👕 My Items", use_container_width=True,
+                 type="primary" if st.session_state.current_page == 'items' else "secondary"):
+        st.session_state.current_page = 'items'
+        st.session_state.show_login_page = False
+        st.rerun()
+with col3:
+    if not st.session_state.get('authenticated', False):
+        if st.button("✨ Login/Sign Up", use_container_width=True,
+                    type="primary" if st.session_state.show_login_page else "secondary"):
+            st.session_state.current_page = 'login'
+            st.session_state.show_login_page = True
+            st.rerun()
+    else:
+        st.write(f"Welcome, {st.session_state.user_info['email']}")
+        if st.button("Logout", use_container_width=True):
+            logout()
+            st.rerun()
+
 init_auth()
 
 def main_page():
@@ -257,7 +288,7 @@ with st.sidebar:
         if check_admin_role():
             st.success("Admin access granted")
     else:
-        if st.button("✨ Login/Sign Up", use_container_width=True):
+        if st.button("Login/Sign Up"):
             st.session_state.show_login_page = True
             st.rerun()
 
