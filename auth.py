@@ -149,6 +149,7 @@ def render_login_ui():
     
     # If not authenticated and login page is requested
     if not st.session_state.authenticated and st.session_state.show_login_page:
+        st.empty()  # Clear any existing content
         st.title("Welcome to Outfit Wizard")
         
         # Create a container for the login form

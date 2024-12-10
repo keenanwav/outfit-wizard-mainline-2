@@ -206,6 +206,7 @@ init_auth()
 
 def main_page():
     """Display main page with outfit generation"""
+    load_custom_css()
     st.title("Outfit Wizard")
     
     # Initialize session state for various UI states
@@ -215,7 +216,7 @@ def main_page():
         st.session_state.editing_color = None
     if 'color_preview' not in st.session_state:
         st.session_state.color_preview = None
-    
+        
     if 'current_outfit' not in st.session_state:
         st.session_state.current_outfit = None
         
@@ -231,7 +232,20 @@ def main_page():
     
     with tab1:
         col1, col2, col3 = st.columns([2, 2, 1])
-        # ... rest of the main page content ...
+        
+        with col1:
+            size = st.selectbox("Size", ["S", "M", "L", "XL"])
+            style = st.selectbox("Style", ["Casual", "Formal", "Sport", "Beach"])
+        
+        with col2:
+            gender = st.selectbox("Gender", ["Male", "Female", "Unisex"])
+            
+        with col3:
+            st.write("")
+            st.write("")
+            if st.button("Toggle Prices" if st.session_state.show_prices else "Show Prices"):
+                st.session_state.show_prices = not st.session_state.show_prices
+                st.rerun()
 
 # Add authentication controls to sidebar
 with st.sidebar:
@@ -256,6 +270,9 @@ if st.session_state.get('show_login_page', False):
     pass
 elif authenticated:
     main_page()
+else:
+    st.title("Welcome to Outfit Wizard")
+    st.write("Please log in or sign up to continue.")
 
 # Load custom CSS
 def load_custom_css():
