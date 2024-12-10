@@ -204,6 +204,35 @@ st.set_page_config(
 # Initialize authentication and session state
 init_auth()
 
+def main_page():
+    """Display main page with outfit generation"""
+    st.title("Outfit Wizard")
+    
+    # Initialize session state for various UI states
+    if 'show_prices' not in st.session_state:
+        st.session_state.show_prices = True
+    if 'editing_color' not in st.session_state:
+        st.session_state.editing_color = None
+    if 'color_preview' not in st.session_state:
+        st.session_state.color_preview = None
+    
+    if 'current_outfit' not in st.session_state:
+        st.session_state.current_outfit = None
+        
+    # Load clothing items
+    items_df = load_clothing_items()
+    
+    if items_df.empty:
+        st.warning("Please add some clothing items in the 'My Items' section first!")
+        return
+    
+    # Add tabs for different features
+    tab1, tab2 = st.tabs(["📋 Generate Outfit", "🎯 Smart Style Assistant"])
+    
+    with tab1:
+        col1, col2, col3 = st.columns([2, 2, 1])
+        # ... rest of the main page content ...
+
 # Add authentication controls to sidebar
 with st.sidebar:
     if 'authenticated' in st.session_state and st.session_state.authenticated:
@@ -226,15 +255,7 @@ if st.session_state.get('show_login_page', False):
     # Don't show anything else when on login page
     pass
 elif authenticated:
-    def main_page():
-        """Display main page with outfit generation"""
-        # Initialize session state for various UI states
-        if 'show_prices' not in st.session_state:
-            st.session_state.show_prices = True
-        if 'editing_color' not in st.session_state:
-            st.session_state.editing_color = None
-        if 'color_preview' not in st.session_state:
-            st.session_state.color_preview = None
+    main_page()
 
 # Load custom CSS
 def load_custom_css():
