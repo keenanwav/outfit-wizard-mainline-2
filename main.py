@@ -218,11 +218,14 @@ with st.sidebar:
             st.session_state.show_login_page = True
             st.rerun()
 
-# Get authentication status
+# Handle login page state
 authenticated, user_info = render_login_ui()
 
-# Only show the main application if user is authenticated and not on login page
-if authenticated and not st.session_state.get('show_login_page', False):
+# Only show the main application if we're not on the login page and user is authenticated
+if st.session_state.get('show_login_page', False):
+    # Don't show anything else when on login page
+    pass
+elif authenticated:
     # Initialize session state for various UI states
     if 'show_prices' not in st.session_state:
         st.session_state.show_prices = True
