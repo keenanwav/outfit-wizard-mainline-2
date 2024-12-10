@@ -24,6 +24,8 @@ python-dotenv = "^1.0.1"
 flask = "^3.1.0"
 flask-login = "^0.6.3"
 google-auth = "^2.36.0"
+extra-streamlit-components = "^0.1.71"
+google-auth-oauthlib = "^1.2.1"
 
 
 [build-system]
