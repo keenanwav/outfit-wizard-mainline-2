@@ -1,6 +1,11 @@
 import streamlit as st
 import os
 from PIL import Image, ImageDraw, ImageFont
+from auth import login_manager, User, create_auth_tables, get_user_by_email, create_user
+from google.oauth2 import id_token
+from google.auth.transport import requests
+import json
+from streamlit_google_oauth import login_button
 import numpy as np
 import pandas as pd
 from collections import Counter
@@ -253,10 +258,44 @@ def check_cleanup_needed():
     except Exception as e:
         logging.error(f"Error checking cleanup status: {str(e)}")
 
+def init_auth():
+    if 'user' not in st.session_state:
+        st.session_state.user = None
+
+def login_page():
+    st.title("Welcome to Outfit Wizard")
+    client_id = os.getenv('GOOGLE_CLIENT_ID')
+    
+    if login_button("Login with Google", client_id):
+        user_info = json.loads(st.experimental_get_query_params().get("user_info")[0])
+        email = user_info["email"]
+        
+        user = get_user_by_email(email)
+        if not user:
+            user = create_user(email)
+        
+        st.session_state.user = {
+            "id": user.id,
+            "email": user.email,
+            "role": user.role
+        }
+        st.rerun()
+
 def main_page():
     """Display main page with outfit generation"""
+    init_auth()
+    
+    if not st.session_state.user:
+        login_page()
+        return
+        
     load_custom_css()
     st.title("Outfit Wizard")
+    
+    # Add logout button
+    if st.sidebar.button("Logout"):
+        st.session_state.user = None
+        st.rerun()
     
     # Initialize session state for current outfit
     if 'current_outfit' not in st.session_state:
