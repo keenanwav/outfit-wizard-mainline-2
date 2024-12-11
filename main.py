@@ -247,36 +247,17 @@ def main_page():
                 st.session_state.show_prices = not st.session_state.show_prices
                 st.rerun()
 
-# Add authentication controls to header
-header_col1, header_col2, header_col3 = st.columns([1, 2, 1])
-with header_col3:
+# Add authentication controls to sidebar
+with st.sidebar:
     if 'authenticated' in st.session_state and st.session_state.authenticated:
-        st.write(f"👋 Welcome, {st.session_state.user_info['email']}")
-        if st.button("Logout", key="logout_btn", type="secondary"):
+        st.write(f"Welcome, {st.session_state.user_info['email']}")
+        if st.button("Logout"):
             logout()
         
         if check_admin_role():
             st.success("Admin access granted")
     else:
-        st.markdown("""
-            <style>
-            div.stButton > button:first-child {
-                background: linear-gradient(45deg, #4ecdc4, #45b7af);
-                color: white;
-                padding: 8px 16px;
-                border-radius: 20px;
-                border: none;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                transition: all 0.3s ease;
-                font-weight: 500;
-            }
-            div.stButton > button:first-child:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            }
-            </style>
-        """, unsafe_allow_html=True)
-        if st.button("👤 Login/Sign Up", type="primary"):
+        if st.button("Login/Sign Up"):
             st.session_state.show_login_page = True
             st.rerun()
 
