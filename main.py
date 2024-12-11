@@ -201,51 +201,39 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize session state variables
-if 'show_login_page' not in st.session_state:
-    st.session_state.show_login_page = False
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-if 'user_info' not in st.session_state:
-    st.session_state.user_info = None
+# Initialize authentication and session state
+# Initialize navigation state
 if 'current_page' not in st.session_state:
     st.session_state.current_page = 'home'
 
-# Initialize authentication
+# Navigation menu
+col1, col2, col3 = st.columns(3)
+with col1:
+    if st.button("🏠 Home", use_container_width=True, 
+                 type="primary" if st.session_state.current_page == 'home' else "secondary"):
+        st.session_state.current_page = 'home'
+        st.session_state.show_login_page = False
+        st.rerun()
+with col2:
+    if st.button("👕 My Items", use_container_width=True,
+                 type="primary" if st.session_state.current_page == 'items' else "secondary"):
+        st.session_state.current_page = 'items'
+        st.session_state.show_login_page = False
+        st.rerun()
+with col3:
+    if not st.session_state.get('authenticated', False):
+        if st.button("✨ Login/Sign Up", use_container_width=True,
+                    type="primary" if st.session_state.show_login_page else "secondary"):
+            st.session_state.current_page = 'login'
+            st.session_state.show_login_page = True
+            st.rerun()
+    else:
+        st.write(f"Welcome, {st.session_state.user_info['email']}")
+        if st.button("Logout", use_container_width=True):
+            logout()
+            st.rerun()
+
 init_auth()
-
-# Navigation menu - "Go to" section
-st.sidebar.markdown("### Go to")
-if st.sidebar.button("🏠 Home", 
-                    type="primary" if st.session_state.current_page == 'home' else "secondary",
-                    use_container_width=True):
-    st.session_state.current_page = 'home'
-    st.session_state.show_login_page = False
-    st.rerun()
-    
-if st.sidebar.button("👕 My Items",
-                    type="primary" if st.session_state.current_page == 'items' else "secondary",
-                    use_container_width=True):
-    st.session_state.current_page = 'items'
-    st.session_state.show_login_page = False
-    st.rerun()
-
-# Login/Logout section
-if not st.session_state.authenticated:
-    if st.sidebar.button("✨ Login/Sign Up",
-                        type="primary" if st.session_state.show_login_page else "secondary",
-                        use_container_width=True):
-        st.session_state.current_page = 'login'
-        st.session_state.show_login_page = True
-        st.rerun()
-else:
-    st.sidebar.write(f"Welcome, {st.session_state.user_info['email']}")
-    if st.sidebar.button("Logout", use_container_width=True):
-        logout()
-        st.rerun()
-
-if check_admin_role():
-    st.sidebar.success("Admin access granted")
 
 def main_page():
     """Display main page with outfit generation"""
@@ -290,20 +278,29 @@ def main_page():
                 st.session_state.show_prices = not st.session_state.show_prices
                 st.rerun()
 
-# Handle login page state and main content display
+# Add authentication controls to sidebar
+with st.sidebar:
+    if 'authenticated' in st.session_state and st.session_state.authenticated:
+        st.write(f"Welcome, {st.session_state.user_info['email']}")
+        if st.button("Logout"):
+            logout()
+        
+        if check_admin_role():
+            st.success("Admin access granted")
+    else:
+        if st.button("Login/Sign Up"):
+            st.session_state.show_login_page = True
+            st.rerun()
+
+# Handle login page state
 authenticated, user_info = render_login_ui()
 
-# Display main content based on current page and authentication status
-if st.session_state.show_login_page:
-    # Login page is handled by render_login_ui()
+# Only show the main application if we're not on the login page and user is authenticated
+if st.session_state.get('show_login_page', False):
+    # Don't show anything else when on login page
     pass
 elif authenticated:
-    if st.session_state.current_page == 'home':
-        main_page()
-    elif st.session_state.current_page == 'items':
-        # Add your items page logic here
-        st.title("My Items")
-        st.write("Items management page coming soon...")
+    main_page()
 else:
     st.title("Welcome to Outfit Wizard")
     st.write("Please log in or sign up to continue.")
