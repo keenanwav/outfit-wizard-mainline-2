@@ -404,25 +404,61 @@ def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink, price=
             cur.close()
 
 @retry_on_error()
-def delete_clothing_item(item_id):
-    """Delete clothing item with prepared statement"""
+def delete_clothing_item(item_id, permanent=False):
+    """Move clothing item to recycle bin or permanently delete it"""
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
             item_id = int(item_id) if hasattr(item_id, 'item') else item_id
             
-            cur.execute("SELECT image_path FROM user_clothing_items WHERE id = %s", (item_id,))
+            # Get full item details before deletion
+            cur.execute("""
+                SELECT id, type, color, style, gender, size, image_path, hyperlink, 
+                       tags, season, notes, price
+                FROM user_clothing_items 
+                WHERE id = %s
+            """, (item_id,))
             item = cur.fetchone()
             
-            if item and item[0]:
-                if os.path.exists(item[0]):
-                    os.remove(item[0])
+            if not item:
+                return False, f"Item with ID {item_id} not found"
                 
+            if permanent:
+                # Permanently delete the image file
+                if item[6] and os.path.exists(item[6]):  # item[6] is image_path
+                    os.remove(item[6])
+                    
                 cur.execute(PREPARED_STATEMENTS['delete_item'], (item_id,))
                 conn.commit()
-                return True, f"Item with ID {item_id} deleted successfully"
+                return True, f"Item with ID {item_id} permanently deleted"
+            else:
+                # Move item to recycle bin
+                cur.execute("""
+                    INSERT INTO recycle_bin 
+                    (original_id, type, color, style, gender, size, image_path, 
+                     hyperlink, tags, season, notes, price)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, item)
+                
+                # Move the image to a backup location
+                if item[6] and os.path.exists(item[6]):  # item[6] is image_path
+                    backup_dir = os.path.join('user_images', 'deleted')
+                    os.makedirs(backup_dir, exist_ok=True)
+                    backup_path = os.path.join(backup_dir, os.path.basename(item[6]))
+                    os.rename(item[6], backup_path)
+                    
+                    # Update the backup path in recycle bin
+                    cur.execute("""
+                        UPDATE recycle_bin 
+                        SET image_path = %s 
+                        WHERE original_id = %s
+                    """, (backup_path, item_id))
+                
+                # Remove from active items
+                cur.execute(PREPARED_STATEMENTS['delete_item'], (item_id,))
+                conn.commit()
+                return True, f"Item with ID {item_id} moved to recycle bin"
             
-            return False, f"Item with ID {item_id} not found"
         finally:
             cur.close()
 
@@ -841,6 +877,113 @@ def update_item_image(item_id: int, new_image_path: str) -> Tuple[bool, str]:
                 
                 # Save the new image
                 with Image.open(new_image_path) as img:
+@retry_on_error()
+def list_recycle_bin_items():
+    """List all items in the recycle bin"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT id, original_id, type, color, style, gender, size, 
+                       image_path, hyperlink, tags, season, notes, price, deleted_at
+                FROM recycle_bin
+                ORDER BY deleted_at DESC
+            """)
+            items = cur.fetchall()
+            return [{
+                'id': item[0],
+                'original_id': item[1],
+                'type': item[2],
+                'color': item[3],
+                'style': item[4],
+                'gender': item[5],
+                'size': item[6],
+                'image_path': item[7],
+                'hyperlink': item[8],
+                'tags': item[9] if item[9] else [],
+                'season': item[10],
+                'notes': item[11],
+                'price': float(item[12]) if item[12] else 0,
+                'deleted_at': item[13].strftime("%Y-%m-%d %H:%M:%S")
+            } for item in items]
+        finally:
+            cur.close()
+
+@retry_on_error()
+def restore_item_from_recycle_bin(recycle_id: int) -> Tuple[bool, str]:
+    """Restore an item from the recycle bin"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            # Get item details from recycle bin
+            cur.execute("""
+                SELECT type, color, style, gender, size, image_path, 
+                       hyperlink, tags, season, notes, price
+                FROM recycle_bin
+                WHERE id = %s
+            """, (recycle_id,))
+            item = cur.fetchone()
+            
+            if not item:
+                return False, f"Item with ID {recycle_id} not found in recycle bin"
+            
+            # Restore the image file if it exists
+            if item[5] and os.path.exists(item[5]):  # item[5] is image_path
+                restored_path = os.path.join('user_images', os.path.basename(item[5]))
+                os.rename(item[5], restored_path)
+                image_path = restored_path
+            else:
+                image_path = item[5]
+            
+            # Insert item back into user_clothing_items
+            cur.execute(PREPARED_STATEMENTS['insert_item'], (
+                item[0],  # type
+                item[1],  # color
+                item[2],  # style
+                item[3],  # gender
+                item[4],  # size
+                image_path,
+                item[6],  # hyperlink
+                item[10]  # price
+            ))
+            
+            # Remove from recycle bin
+            cur.execute("DELETE FROM recycle_bin WHERE id = %s", (recycle_id,))
+            
+            conn.commit()
+            return True, "Item restored successfully"
+        except Exception as e:
+            conn.rollback()
+            return False, f"Error restoring item: {str(e)}"
+        finally:
+            cur.close()
+
+@retry_on_error()
+def permanently_delete_from_recycle_bin(recycle_id: int) -> Tuple[bool, str]:
+    """Permanently delete an item from the recycle bin"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            # Get image path before deletion
+            cur.execute("SELECT image_path FROM recycle_bin WHERE id = %s", (recycle_id,))
+            result = cur.fetchone()
+            
+            if not result:
+                return False, f"Item with ID {recycle_id} not found in recycle bin"
+            
+            # Delete the image file if it exists
+            if result[0] and os.path.exists(result[0]):
+                os.remove(result[0])
+            
+            # Remove from recycle bin
+            cur.execute("DELETE FROM recycle_bin WHERE id = %s", (recycle_id,))
+            conn.commit()
+            return True, f"Item permanently deleted from recycle bin"
+        except Exception as e:
+            conn.rollback()
+            return False, f"Error deleting item: {str(e)}"
+        finally:
+            cur.close()
                     img.save(final_image_path)
                 
                 # Update the database with new image path

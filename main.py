@@ -208,6 +208,66 @@ def main_page():
     """Display main page with outfit generation"""
     load_custom_css()
     st.title("Outfit Wizard")
+def render_recycle_bin():
+    """Display recycle bin interface"""
+    st.title("🗑️ Recycle Bin")
+    
+    if not check_admin_role():
+        st.warning("You need admin access to view the recycle bin.")
+        return
+        
+    # Load items from recycle bin
+    deleted_items = list_recycle_bin_items()
+    
+    if not deleted_items:
+        st.info("Recycle bin is empty.")
+        return
+        
+    # Display items in a table format
+    st.markdown("### Recently Deleted Items")
+    
+    for item in deleted_items:
+        with st.expander(f"{item['type'].title()} - Deleted on {item['deleted_at']}"):
+            col1, col2, col3 = st.columns([2, 2, 1])
+            
+            with col1:
+                if item['image_path'] and os.path.exists(item['image_path']):
+                    st.image(item['image_path'], width=150)
+                else:
+                    st.write("Image not available")
+                    
+            with col2:
+                st.write(f"**Type:** {item['type'].title()}")
+                st.write(f"**Color:** {item['color']}")
+                st.write(f"**Style:** {item['style']}")
+                st.write(f"**Size:** {item['size']}")
+                if item['price']:
+                    st.write(f"**Price:** ${item['price']:.2f}")
+                    
+            with col3:
+                if st.button("🔄 Restore", key=f"restore_{item['id']}"):
+                    success, message = restore_item_from_recycle_bin(item['id'])
+                    if success:
+                        st.success(message)
+                        st.rerun()
+                    else:
+                        st.error(message)
+                        
+                if st.button("🗑️ Delete Permanently", key=f"delete_{item['id']}"):
+                    if st.warning("This action cannot be undone. Are you sure?", icon="⚠️"):
+                        success, message = permanently_delete_from_recycle_bin(item['id'])
+                        if success:
+                            st.success(message)
+                            st.rerun()
+                        else:
+                            st.error(message)
+    
+    # Manual cleanup option
+    st.markdown("---")
+    st.markdown("### 🧹 Manual Cleanup")
+    if st.button("Run Manual Cleanup", help="Clean up old merged outfit files"):
+        cleanup_merged_outfits(force_cleanup=True)
+        st.success("Manual cleanup completed successfully!")
     
     # Initialize session state for various UI states
     if 'show_prices' not in st.session_state:

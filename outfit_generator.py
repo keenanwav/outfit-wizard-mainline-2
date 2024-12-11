@@ -40,7 +40,7 @@ def delete_file_batch(file_batch: List[str]) -> Tuple[int, List[str]]:
     
     return success_count, errors
 
-def cleanup_merged_outfits():
+def cleanup_merged_outfits(force_cleanup=False):
     """Clean up old unsaved outfit files and orphaned database entries"""
     try:
         # First, clean up orphaned database entries
@@ -55,21 +55,17 @@ def cleanup_merged_outfits():
             logging.info("Merged outfits directory does not exist. No cleanup needed.")
             return
             
+        # Only proceed with cleanup if force_cleanup is True
+        if not force_cleanup:
+            logging.info("Automatic cleanup is disabled. Use manual cleanup instead.")
+            return
+            
         # Get cleanup settings from database
         from data_manager import get_cleanup_settings, update_last_cleanup_time
         
         settings = get_cleanup_settings()
         if not settings:
             logging.error("Failed to get cleanup settings from database")
-            return
-            
-        current_time = datetime.now()
-        last_cleanup = settings['last_cleanup']
-        cleanup_interval = timedelta(hours=settings['cleanup_interval_hours'])
-        
-        # Check if cleanup is needed based on interval
-        if last_cleanup and (current_time - last_cleanup) < cleanup_interval:
-            logging.info(f"Cleanup not needed yet. Next cleanup in {cleanup_interval - (current_time - last_cleanup)}")
             return
             
         stats = {
