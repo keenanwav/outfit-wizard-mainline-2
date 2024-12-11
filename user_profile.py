@@ -21,39 +21,101 @@ if 'user_data' not in st.session_state:
         }
     }
 
-st.set_page_config(page_title="User Profile", layout="wide")
+# Page configuration
+st.set_page_config(
+    page_title="User Profile",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
 
-# Custom CSS to match the design
+# Custom CSS to match design
 st.markdown("""
     <style>
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 2px;
-        background-color: #f8f9fa;
+    /* Main container styling */
+    .main > div {
+        padding: 2rem;
+        max-width: 800px;
+        margin: 0 auto;
     }
-    .stTabs [data-baseweb="tab"] {
-        padding: 10px 20px;
+    
+    /* Tabs styling */
+    .stTabs {
         background-color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
+    
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0;
+        background-color: #f8f9fa;
+        padding: 0.5rem;
+        border-radius: 4px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        padding: 0.75rem 1.5rem;
+        font-size: 0.9rem;
+    }
+    
     .stTabs [aria-selected="true"] {
-        background-color: #e9ecef;
+        background-color: white;
+        border-radius: 4px;
+        font-weight: 600;
     }
-    div[data-testid="stVerticalBlock"] > div:has(div.stButton) {
-        text-align: right;
+    
+    /* Form styling */
+    .stTextInput > div > div {
+        background-color: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+    }
+    
+    .stButton > button {
+        width: auto;
+        padding: 0.5rem 1.5rem;
+        background-color: black;
+        color: white;
+        border-radius: 4px;
+    }
+    
+    /* Profile section styling */
+    .profile-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .user-info h1 {
+        margin: 0;
+        font-size: 1.5rem;
+    }
+    
+    .user-info p {
+        margin: 0;
+        color: #6c757d;
+    }
+    
+    /* Card styling */
+    .stCard {
+        padding: 1.5rem;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        background-color: white;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Main title with styling
-st.title("User Profile")
-
-# Create tabs
+# Tabs
 tab1, tab2, tab3, tab4 = st.tabs(["Profile", "Subscription", "Usage", "Settings"])
 
 with tab1:
-    st.subheader("Profile")
-    st.caption("Manage your profile information")
+    # Profile Section
+    st.markdown("### Profile")
+    st.markdown("Manage your profile information")
     
-    # Avatar and user info in columns
+    # Profile header with avatar and name
     col1, col2 = st.columns([1, 3])
     
     with col1:
@@ -65,91 +127,89 @@ with tab1:
                 st.warning("Using default avatar")
         except Exception:
             st.warning("Unable to load avatar")
-    
+            
     with col2:
         st.markdown(f"### {st.session_state.user_data['name']}")
-        st.caption("SaaS User")
+        st.markdown("<p style='color: #6c757d;'>SaaS User</p>", unsafe_allow_html=True)
     
     # Profile form
     with st.form("profile_form"):
-        name = st.text_input("Name", value=st.session_state.user_data["name"])
-        email = st.text_input("Email", value=st.session_state.user_data["email"], type="default")
+        st.text_input("Name", value=st.session_state.user_data["name"], key="name")
+        st.text_input("Email", value=st.session_state.user_data["email"], key="email")
         
-        submit = st.form_submit_button("Update Profile", type="primary")
+        col1, col2, col3 = st.columns([3, 3, 1])
+        with col3:
+            submit = st.form_submit_button("Update Profile")
+        
         if submit:
             st.session_state.user_data.update({
-                "name": name,
-                "email": email
+                "name": st.session_state.name,
+                "email": st.session_state.email
             })
             st.success("Profile updated successfully!")
 
 with tab2:
-    st.subheader("Subscription Details")
-    st.caption("Manage your subscription plan")
+    st.markdown("### Subscription Details")
+    st.markdown("Manage your subscription plan")
     
-    # Current plan and status
     col1, col2 = st.columns([3, 1])
     with col1:
-        st.markdown("##### Current Plan")
+        st.markdown("**Current Plan**")
         st.markdown(f"### {st.session_state.user_data['subscription']['plan']}")
     with col2:
-        status = st.session_state.user_data['subscription']['status']
         st.markdown(
             f"""<div style='background-color: #d4edda; 
-            color: #155724; padding: 10px; 
-            border-radius: 4px; text-align: center;'>
-            {status}</div>""", 
+            color: #155724; padding: 8px 16px; 
+            border-radius: 4px; text-align: center; 
+            margin-top: 1rem;'>
+            {st.session_state.user_data['subscription']['status']}</div>""", 
             unsafe_allow_html=True
         )
     
     st.markdown("---")
     
-    # Subscription details
     st.markdown("📅 Renews on " + st.session_state.user_data['subscription']['renewal_date'])
     st.markdown("💳 Visa ending in 1234")
     
     st.button("Upgrade Plan", type="primary", use_container_width=True)
 
 with tab3:
-    st.subheader("Usage Statistics")
-    st.caption("Monitor your resource usage")
+    st.markdown("### Usage Statistics")
+    st.markdown("Monitor your resource usage")
     
     # Storage usage
     col1, col2 = st.columns([4, 1])
     with col1:
-        st.markdown("##### Storage")
+        st.markdown("**Storage**")
         st.progress(st.session_state.user_data["usage"]["storage"] / 100)
     with col2:
-        st.markdown("")  # Spacing
         st.markdown(f"{st.session_state.user_data['usage']['storage']}%")
     
     # API calls
     col1, col2 = st.columns([4, 1])
     with col1:
-        st.markdown("##### API Calls")
+        st.markdown("**API Calls**")
         st.progress(st.session_state.user_data["usage"]["api_calls"] / 10000)
     with col2:
-        st.markdown("")  # Spacing
         st.markdown(f"{st.session_state.user_data['usage']['api_calls']}/10000")
     
     # Projects
     col1, col2 = st.columns([4, 1])
     with col1:
-        st.markdown("##### Projects")
+        st.markdown("**Projects**")
         st.progress(st.session_state.user_data["usage"]["projects"] / 15)
     with col2:
-        st.markdown("")  # Spacing
         st.markdown(f"{st.session_state.user_data['usage']['projects']}/15")
 
 with tab4:
-    st.subheader("Account Settings")
-    st.caption("Manage your account preferences")
+    st.markdown("### Account Settings")
+    st.markdown("Manage your account preferences")
     
     # Two-Factor Authentication
     col1, col2 = st.columns([3, 1])
     with col1:
-        st.markdown("##### Two-Factor Authentication")
-        st.caption("Add an extra layer of security to your account")
+        st.markdown("**Two-Factor Authentication**")
+        st.markdown("Add an extra layer of security to your account")
     with col2:
         st.button("Enable", key="2fa_enable")
     
@@ -158,8 +218,8 @@ with tab4:
     # Email Notifications
     col1, col2 = st.columns([3, 1])
     with col1:
-        st.markdown("##### Email Notifications")
-        st.caption("Receive updates about your account activity")
+        st.markdown("**Email Notifications**")
+        st.markdown("Receive updates about your account activity")
     with col2:
         st.button("Configure", key="email_config")
     
@@ -168,7 +228,7 @@ with tab4:
     # Delete Account
     col1, col2 = st.columns([3, 1])
     with col1:
-        st.markdown("##### Delete Account")
-        st.caption("Permanently remove your account and all data")
+        st.markdown("**Delete Account**")
+        st.markdown("Permanently remove your account and all data")
     with col2:
         st.button("Delete", key="delete_account", type="secondary")
