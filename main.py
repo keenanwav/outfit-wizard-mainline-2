@@ -1,7 +1,6 @@
 import streamlit as st
 import os
 from PIL import Image, ImageDraw, ImageFont
-from auth import render_login_ui, init_auth, logout, check_admin_role
 import numpy as np
 import pandas as pd
 from collections import Counter
@@ -201,78 +200,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize authentication and session state
-init_auth()
-
-def main_page():
-    """Display main page with outfit generation"""
-    load_custom_css()
-    st.title("Outfit Wizard")
-    
-    # Initialize session state for various UI states
-    if 'show_prices' not in st.session_state:
-        st.session_state.show_prices = True
-    if 'editing_color' not in st.session_state:
-        st.session_state.editing_color = None
-    if 'color_preview' not in st.session_state:
-        st.session_state.color_preview = None
-        
-    if 'current_outfit' not in st.session_state:
-        st.session_state.current_outfit = None
-        
-    # Load clothing items
-    items_df = load_clothing_items()
-    
-    if items_df.empty:
-        st.warning("Please add some clothing items in the 'My Items' section first!")
-        return
-    
-    # Add tabs for different features
-    tab1, tab2 = st.tabs(["📋 Generate Outfit", "🎯 Smart Style Assistant"])
-    
-    with tab1:
-        col1, col2, col3 = st.columns([2, 2, 1])
-        
-        with col1:
-            size = st.selectbox("Size", ["S", "M", "L", "XL"])
-            style = st.selectbox("Style", ["Casual", "Formal", "Sport", "Beach"])
-        
-        with col2:
-            gender = st.selectbox("Gender", ["Male", "Female", "Unisex"])
-            
-        with col3:
-            st.write("")
-            st.write("")
-            if st.button("Toggle Prices" if st.session_state.show_prices else "Show Prices"):
-                st.session_state.show_prices = not st.session_state.show_prices
-                st.rerun()
-
-# Add authentication controls to sidebar
-with st.sidebar:
-    if 'authenticated' in st.session_state and st.session_state.authenticated:
-        st.write(f"Welcome, {st.session_state.user_info['email']}")
-        if st.button("Logout"):
-            logout()
-        
-        if check_admin_role():
-            st.success("Admin access granted")
-    else:
-        if st.button("Login/Sign Up"):
-            st.session_state.show_login_page = True
-            st.rerun()
-
-# Handle login page state
-authenticated, user_info = render_login_ui()
-
-# Only show the main application if we're not on the login page and user is authenticated
-if st.session_state.get('show_login_page', False):
-    # Don't show anything else when on login page
-    pass
-elif authenticated:
-    main_page()
-else:
-    st.title("Welcome to Outfit Wizard")
-    st.write("Please log in or sign up to continue.")
+# Initialize session state for various UI states
+if 'show_prices' not in st.session_state:
+    st.session_state.show_prices = True
+if 'editing_color' not in st.session_state:
+    st.session_state.editing_color = None
+if 'color_preview' not in st.session_state:
+    st.session_state.color_preview = None
 
 # Load custom CSS
 def load_custom_css():
@@ -602,7 +536,7 @@ def main_page():
         <div style="text-align: center; margin-bottom: 30px;">
             <h2>
                 <span class="magic-wand">🪄</span>
-                Smart Style Assistant (BETA)
+                Smart Style Assistant
                 <span class="magic-wand">✨</span>
             </h2>
         </div>
@@ -732,124 +666,6 @@ def main_page():
                                 mime="image/png"
                             )
                     else:
-def render_recycle_bin():
-    """Render the recycle bin interface"""
-    st.title("🗑️ Recycle Bin")
-    
-    from data_manager import list_recycle_bin_items, restore_item_from_recycle_bin, permanently_delete_from_recycle_bin
-    
-    # Get items from recycle bin
-    items = list_recycle_bin_items()
-    
-    if not items:
-        st.info("Recycle bin is empty")
-        return
-    
-    # Create a grid layout for items
-    cols = st.columns(3)
-    for idx, item in enumerate(items):
-        with cols[idx % 3]:
-            with st.container():
-                st.markdown(f"### {item['type'].capitalize()}")
-                if item['image_path'] and os.path.exists(item['image_path']):
-                    st.image(item['image_path'], use_column_width=True)
-                
-                # Item details
-                st.write(f"Style: {item['style']}")
-                st.write(f"Color: {item['color']}")
-                st.write(f"Deleted at: {item['deleted_at']}")
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button(f"♻️ Restore", key=f"restore_{item['id']}"):
-                        success, message = restore_item_from_recycle_bin(item['id'])
-                        if success:
-                            st.success(message)
-                            time.sleep(1)
-                            st.rerun()
-                        else:
-                            st.error(message)
-                
-                with col2:
-                    if st.button("🗑️ Delete Permanently", key=f"delete_{item['id']}"):
-                        if st.checkbox("Confirm permanent deletion", key=f"confirm_{item['id']}"):
-                            success, message = permanently_delete_from_recycle_bin(item['id'])
-                            if success:
-                                st.success(message)
-                                time.sleep(1)
-                                st.rerun()
-                            else:
-                                st.error(message)
-
-def cleanup_status_dashboard():
-    """Display cleanup status dashboard with manual controls"""
-    st.title("Cleanup Status Dashboard")
-    
-    from data_manager import get_cleanup_statistics
-    stats = get_cleanup_statistics()
-    
-    if not stats:
-        st.warning("No cleanup settings found. Please configure cleanup settings first.")
-        return
-    
-    # Display current settings
-    st.header("📊 Cleanup Settings")
-    settings = stats['settings']
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Maximum File Age", f"{settings['max_age_hours']} hours")
-    
-    with col2:
-        st.metric("Batch Size", str(settings['batch_size']))
-        
-    # Display last cleanup time
-    st.header("⏱️ Last Cleanup")
-    if settings['last_cleanup']:
-        last_cleanup = settings['last_cleanup']
-        time_since = datetime.now() - last_cleanup
-        hours_since = time_since.total_seconds() / 3600
-        
-        st.write(f"Last cleanup: {last_cleanup.strftime('%Y-%m-%d %H:%M:%S')}")
-        st.write(f"Time since last cleanup: {int(hours_since)} hours")
-    else:
-        st.info("No cleanup has been performed yet")
-    
-    # Add manual cleanup controls
-    st.header("🧹 Manual Cleanup Controls")
-    
-    st.warning("""
-        **Note**: Deleted items will be moved to the recycle bin where they can be restored if needed.
-        Items in the recycle bin can be accessed through the Recycle Bin page.
-    """)
-    
-    # Add options for what to clean
-    st.subheader("Cleanup Options")
-    cleanup_options = {
-        "merged_outfits": st.checkbox("Clean merged outfit files", value=True),
-        "unused_images": st.checkbox("Clean unused image files", value=False),
-    }
-    
-    age_hours = st.slider("Clean files older than (hours)", 
-                         min_value=1, 
-                         max_value=168,  # 1 week
-                         value=24)
-    
-    # Manual cleanup button
-    if st.button("Run Manual Cleanup", type="primary"):
-        if not any(cleanup_options.values()):
-            st.error("Please select at least one cleanup option")
-            return
-            
-        with st.spinner("Running cleanup..."):
-            cleaned_count = 0
-            if cleanup_options["merged_outfits"]:
-                from outfit_generator import cleanup_merged_outfits
-                cleaned_count += cleanup_merged_outfits(manual_age_hours=age_hours)
-            
-            st.success(f"Cleanup completed. {cleaned_count} files moved to recycle bin.")
-            time.sleep(2)
-            st.rerun()
                         st.error("Failed to generate style recipe image")
                     
                 # Keep the text version in an expander for accessibility
@@ -1508,10 +1324,7 @@ if __name__ == "__main__":
     check_cleanup_needed()
     
     st.sidebar.title("Navigation")
-    pages = ["Home", "My Items", "Saved Outfits", "Cleanup Status"]
-    if check_admin_role():
-        pages.append("Recycle Bin")
-    page = st.sidebar.radio("Go to", pages)
+    page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits", "Cleanup Status"])
     
     if page == "Home":
         main_page()
@@ -1521,5 +1334,3 @@ if __name__ == "__main__":
         saved_outfits_page()
     elif page == "Cleanup Status":
         cleanup_status_dashboard()
-    elif page == "Recycle Bin":
-        render_recycle_bin()
