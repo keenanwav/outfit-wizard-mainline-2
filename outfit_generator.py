@@ -43,12 +43,12 @@ def delete_file_batch(file_batch: List[str]) -> Tuple[int, List[str]]:
 def cleanup_merged_outfits(force_cleanup=False):
     """Clean up old unsaved outfit files and orphaned database entries
     Args:
-        force_cleanup (bool): If True, forces a manual cleanup regardless of timing
+        force_cleanup (bool): If True, forces a manual cleanup. Default is False for safety.
     """
     try:
-        # Skip cleanup unless manually triggered
+        # Always skip unless explicitly forced
         if not force_cleanup:
-            logging.info("Automatic cleanup disabled. Use manual cleanup instead.")
+            logging.info("Cleanup requires manual trigger. Use force_cleanup=True to run cleanup.")
             return
             
         # Create backup before cleanup
