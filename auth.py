@@ -151,7 +151,37 @@ def render_login_ui():
     
     # If not authenticated and login page is requested
     if not st.session_state.authenticated and st.session_state.show_login_page:
-        # Clear any existing content
+        # Apply custom CSS
+        st.markdown("""
+            <style>
+                .stButton button {
+                    width: 100%;
+                    background-color: #1E1E1E;
+                    color: white;
+                    border: 1px solid #333;
+                    padding: 0.75rem;
+                    border-radius: 4px;
+                }
+                .stButton button:hover {
+                    background-color: #333;
+                }
+                .stTextInput input {
+                    background-color: #2D2D2D;
+                    color: white;
+                    border: 1px solid #333;
+                }
+                .stTextInput input:focus {
+                    border-color: #ff4b4b;
+                }
+                div[data-testid="stVerticalBlock"] {
+                    background: #1E1E1E;
+                    padding: 2rem;
+                    border-radius: 8px;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        # Clear any existing content and set up the auth page
         st.empty()
         
         # Center the content
