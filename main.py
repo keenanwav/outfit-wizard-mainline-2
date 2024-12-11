@@ -16,7 +16,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
 from color_utils import get_color_palette, display_color_palette, rgb_to_hex, parse_color_string, get_color_name
-from outfit_generator import generate_outfit, is_valid_image
+from outfit_generator import generate_outfit, cleanup_merged_outfits, is_valid_image
 from datetime import datetime, timedelta
 from style_assistant import get_style_recommendation, format_clothing_items
 import time
@@ -304,7 +304,20 @@ def show_first_visit_tips():
                 st.session_state.show_tips = False
                 st.rerun()
 
-
+def check_cleanup_needed():
+    """Check if cleanup is needed based on configured interval"""
+    try:
+        from data_manager import get_cleanup_settings
+        settings = get_cleanup_settings()
+        
+        if not settings or not settings['last_cleanup']:
+            cleanup_merged_outfits()
+        else:
+            time_since_cleanup = datetime.now() - settings['last_cleanup']
+            if time_since_cleanup.total_seconds() > (settings['cleanup_interval_hours'] * 3600):
+                cleanup_merged_outfits()
+    except Exception as e:
+        logging.error(f"Error checking cleanup status: {str(e)}")
 
 def main_page():
     """Display main page with outfit generation"""
