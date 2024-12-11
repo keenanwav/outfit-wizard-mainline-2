@@ -124,26 +124,6 @@ def create_user_items_table():
                 )
             ''')
             
-            # Create recycle bin table
-            cur.execute('''
-                CREATE TABLE IF NOT EXISTS recycle_bin (
-                    id SERIAL PRIMARY KEY,
-                    original_id INTEGER,
-                    type VARCHAR(50),
-                    color VARCHAR(50),
-                    style VARCHAR(255),
-                    gender VARCHAR(50),
-                    size VARCHAR(50),
-                    image_path VARCHAR(255),
-                    hyperlink VARCHAR(255),
-                    tags TEXT[],
-                    season VARCHAR(10),
-                    notes TEXT,
-                    price DECIMAL(10, 2),
-                    deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
             # Add indexes for frequently queried columns
             cur.execute('CREATE INDEX IF NOT EXISTS idx_type ON user_clothing_items(type)')
             cur.execute('CREATE INDEX IF NOT EXISTS idx_style ON user_clothing_items(style)')
@@ -425,109 +405,60 @@ def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink, price=
 
 @retry_on_error()
 def delete_clothing_item(item_id, permanent=False):
-    """Move item to recycle bin instead of permanent deletion"""
+    """Move clothing item to recycle bin or permanently delete it"""
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
             item_id = int(item_id) if hasattr(item_id, 'item') else item_id
             
-            # Get all item details before deletion
+            # Get full item details before deletion
             cur.execute("""
-                SELECT type, color, style, gender, size, image_path, hyperlink, tags, season, notes, price 
-                FROM user_clothing_items WHERE id = %s
+                SELECT id, type, color, style, gender, size, image_path, hyperlink, 
+                       tags, season, notes, price
+                FROM user_clothing_items 
+                WHERE id = %s
             """, (item_id,))
             item = cur.fetchone()
             
             if not item:
                 return False, f"Item with ID {item_id} not found"
-            
-            if not permanent:
-                # Move to recycle bin
+                
+            if permanent:
+                # Permanently delete the image file
+                if item[6] and os.path.exists(item[6]):  # item[6] is image_path
+                    os.remove(item[6])
+                    
+                cur.execute(PREPARED_STATEMENTS['delete_item'], (item_id,))
+                conn.commit()
+                return True, f"Item with ID {item_id} permanently deleted"
+            else:
+                # Move item to recycle bin
                 cur.execute("""
                     INSERT INTO recycle_bin 
-                    (original_id, type, color, style, gender, size, image_path, hyperlink, tags, season, notes, price)
+                    (original_id, type, color, style, gender, size, image_path, 
+                     hyperlink, tags, season, notes, price)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (item_id,) + item)
+                """, item)
+                
+                # Move the image to a backup location
+                if item[6] and os.path.exists(item[6]):  # item[6] is image_path
+                    backup_dir = os.path.join('user_images', 'deleted')
+                    os.makedirs(backup_dir, exist_ok=True)
+                    backup_path = os.path.join(backup_dir, os.path.basename(item[6]))
+                    os.rename(item[6], backup_path)
+                    
+                    # Update the backup path in recycle bin
+                    cur.execute("""
+                        UPDATE recycle_bin 
+                        SET image_path = %s 
+                        WHERE original_id = %s
+                    """, (backup_path, item_id))
+                
+                # Remove from active items
+                cur.execute(PREPARED_STATEMENTS['delete_item'], (item_id,))
+                conn.commit()
+                return True, f"Item with ID {item_id} moved to recycle bin"
             
-            # Remove from main table
-            cur.execute(PREPARED_STATEMENTS['delete_item'], (item_id,))
-            conn.commit()
-            
-            return True, f"Item with ID {item_id} {'permanently ' if permanent else ''}deleted successfully"
-        finally:
-            cur.close()
-
-@retry_on_error()
-def restore_item_from_recycle_bin(item_id):
-    """Restore an item from the recycle bin"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            # Get item details from recycle bin
-            cur.execute("""
-                SELECT original_id, type, color, style, gender, size, image_path, hyperlink, tags, season, notes, price
-                FROM recycle_bin WHERE id = %s
-            """, (item_id,))
-            item = cur.fetchone()
-            
-            if not item:
-                return False, "Item not found in recycle bin"
-            
-            # Restore to main table
-            cur.execute("""
-                INSERT INTO user_clothing_items 
-                (id, type, color, style, gender, size, image_path, hyperlink, tags, season, notes, price)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (id) DO UPDATE SET
-                    type = EXCLUDED.type,
-                    color = EXCLUDED.color,
-                    style = EXCLUDED.style,
-                    gender = EXCLUDED.gender,
-                    size = EXCLUDED.size,
-                    image_path = EXCLUDED.image_path,
-                    hyperlink = EXCLUDED.hyperlink,
-                    tags = EXCLUDED.tags,
-                    season = EXCLUDED.season,
-                    notes = EXCLUDED.notes,
-                    price = EXCLUDED.price
-            """, item)
-            
-            # Remove from recycle bin
-            cur.execute("DELETE FROM recycle_bin WHERE id = %s", (item_id,))
-            conn.commit()
-            
-            return True, f"Item restored successfully"
-        finally:
-            cur.close()
-
-@retry_on_error()
-def list_recycle_bin_items():
-    """List all items in the recycle bin"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            cur.execute("""
-                SELECT id, type, color, style, gender, size, image_path, hyperlink, price, deleted_at
-                FROM recycle_bin
-                ORDER BY deleted_at DESC
-            """)
-            items = cur.fetchall()
-            
-            return [
-                {
-                    'id': item[0],
-                    'type': item[1],
-                    'color': item[2],
-                    'style': item[3],
-                    'gender': item[4],
-                    'size': item[5],
-                    'image_path': item[6],
-                    'hyperlink': item[7],
-                    'price': item[8],
-                    'deleted_at': item[9].strftime("%Y-%m-%d %H:%M:%S")
-                }
-                for item in items
-            ]
         finally:
             cur.close()
 
@@ -832,7 +763,54 @@ def get_color_history(item_id):
             return cur.fetchall()
         finally:
             cur.close()
-# Function has been moved up and consolidated with previous definition
+# Update the edit_clothing_item function to include price history
+@retry_on_error()
+def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink, price=None):
+    """Edit clothing item with prepared statement, price and color history tracking"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            # Get current color before update
+            cur.execute("SELECT color FROM user_clothing_items WHERE id = %s", (item_id,))
+            result = cur.fetchone()
+            if result:
+                old_color = result[0]
+                new_color = f"{color[0]},{color[1]},{color[2]}"
+                
+                # Record color change if different
+                if old_color != new_color:
+                    record_color_change(item_id, old_color, new_color)
+            
+            # Record price change if price is provided and different
+            if price is not None:
+                record_price_change(item_id, price)
+            
+            cur.execute(PREPARED_STATEMENTS['update_item'], (
+                f"{color[0]},{color[1]},{color[2]}",
+                ','.join(styles),
+                ','.join(genders),
+                ','.join(sizes),
+                hyperlink,
+                price,
+                int(item_id) if hasattr(item_id, 'item') else item_id
+            ))
+            
+            if cur.fetchone():
+                conn.commit()
+                return True, f"Item with ID {item_id} updated successfully"
+            return False, f"Item with ID {item_id} not found"
+        finally:
+            cur.close()
+
+# Update add_user_clothing_item to include initial price history
+@retry_on_error()
+def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file, hyperlink="", price=None):
+    """Add clothing item with prepared statement and initial price history"""
+    if not os.path.exists("user_images"):
+        os.makedirs("user_images", exist_ok=True)
+    
+    image_filename = f"{item_type}_{uuid.uuid4()}.png"
+    image_path = os.path.join("user_images", image_filename)
     
     with Image.open(image_file) as img:
         img.save(image_path)
@@ -857,83 +835,6 @@ def get_color_history(item_id):
                 hyperlink,
                 price
             ))
-            new_id = cur.fetchone()[0]
-            
-            # Record initial price if provided
-            if price is not None:
-                cur.execute("""
-                    INSERT INTO item_price_history (item_id, price)
-                    VALUES (%s, %s)
-                """, (new_id, price))
-            
-            conn.commit()
-            return True, f"New {item_type} added successfully with ID: {new_id}"
-        except Exception as e:
-            conn.rollback()
-            return False, str(e)
-        finally:
-            cur.close()
-
-@retry_on_error()
-def move_orphaned_to_recycle_bin():
-    """Move orphaned entries to recycle bin instead of deletion"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            # Find orphaned entries (items with missing images)
-            cur.execute("""
-                SELECT id, type, color, style, gender, size, image_path, hyperlink, tags, season, notes, price
-                FROM user_clothing_items
-                WHERE image_path IS NOT NULL 
-                AND NOT EXISTS (
-                    SELECT 1 FROM saved_outfits 
-                    WHERE saved_outfits.image_path = user_clothing_items.image_path
-                )
-            """)
-            orphaned_items = cur.fetchall()
-            
-            moved_count = 0
-            for item in orphaned_items:
-                # Move to recycle bin
-                cur.execute("""
-                    INSERT INTO recycle_bin 
-                    (original_id, type, color, style, gender, size, image_path, hyperlink, tags, season, notes, price)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, item)
-                moved_count += 1
-            
-            if moved_count > 0:
-                conn.commit()
-                return True, f"Moved {moved_count} orphaned items to recycle bin"
-            return True, "No orphaned items found"
-            
-        except Exception as e:
-            conn.rollback()
-            logging.error(f"Error moving orphaned items to recycle bin: {str(e)}")
-            return False, str(e)
-        finally:
-            cur.close()
-
-@retry_on_error()
-def restore_backup(backup_dir):
-    """Restore items from a backup directory"""
-    if not os.path.exists(backup_dir):
-        return False, f"Backup directory {backup_dir} not found"
-        
-    try:
-        restored_count = 0
-        for filename in os.listdir(backup_dir):
-            src_path = os.path.join(backup_dir, filename)
-            dst_path = os.path.join('merged_outfits', filename)
-            if os.path.isfile(src_path):
-                import shutil
-                shutil.copy2(src_path, dst_path)
-                restored_count += 1
-                
-        return True, f"Restored {restored_count} items from backup"
-    except Exception as e:
-        logging.error(f"Error restoring from backup: {str(e)}")
-        return False, str(e)
             new_id = cur.fetchone()[0]
             
             # Record initial price if provided
@@ -976,6 +877,113 @@ def update_item_image(item_id: int, new_image_path: str) -> Tuple[bool, str]:
                 
                 # Save the new image
                 with Image.open(new_image_path) as img:
+@retry_on_error()
+def list_recycle_bin_items():
+    """List all items in the recycle bin"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT id, original_id, type, color, style, gender, size, 
+                       image_path, hyperlink, tags, season, notes, price, deleted_at
+                FROM recycle_bin
+                ORDER BY deleted_at DESC
+            """)
+            items = cur.fetchall()
+            return [{
+                'id': item[0],
+                'original_id': item[1],
+                'type': item[2],
+                'color': item[3],
+                'style': item[4],
+                'gender': item[5],
+                'size': item[6],
+                'image_path': item[7],
+                'hyperlink': item[8],
+                'tags': item[9] if item[9] else [],
+                'season': item[10],
+                'notes': item[11],
+                'price': float(item[12]) if item[12] else 0,
+                'deleted_at': item[13].strftime("%Y-%m-%d %H:%M:%S")
+            } for item in items]
+        finally:
+            cur.close()
+
+@retry_on_error()
+def restore_item_from_recycle_bin(recycle_id: int) -> Tuple[bool, str]:
+    """Restore an item from the recycle bin"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            # Get item details from recycle bin
+            cur.execute("""
+                SELECT type, color, style, gender, size, image_path, 
+                       hyperlink, tags, season, notes, price
+                FROM recycle_bin
+                WHERE id = %s
+            """, (recycle_id,))
+            item = cur.fetchone()
+            
+            if not item:
+                return False, f"Item with ID {recycle_id} not found in recycle bin"
+            
+            # Restore the image file if it exists
+            if item[5] and os.path.exists(item[5]):  # item[5] is image_path
+                restored_path = os.path.join('user_images', os.path.basename(item[5]))
+                os.rename(item[5], restored_path)
+                image_path = restored_path
+            else:
+                image_path = item[5]
+            
+            # Insert item back into user_clothing_items
+            cur.execute(PREPARED_STATEMENTS['insert_item'], (
+                item[0],  # type
+                item[1],  # color
+                item[2],  # style
+                item[3],  # gender
+                item[4],  # size
+                image_path,
+                item[6],  # hyperlink
+                item[10]  # price
+            ))
+            
+            # Remove from recycle bin
+            cur.execute("DELETE FROM recycle_bin WHERE id = %s", (recycle_id,))
+            
+            conn.commit()
+            return True, "Item restored successfully"
+        except Exception as e:
+            conn.rollback()
+            return False, f"Error restoring item: {str(e)}"
+        finally:
+            cur.close()
+
+@retry_on_error()
+def permanently_delete_from_recycle_bin(recycle_id: int) -> Tuple[bool, str]:
+    """Permanently delete an item from the recycle bin"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            # Get image path before deletion
+            cur.execute("SELECT image_path FROM recycle_bin WHERE id = %s", (recycle_id,))
+            result = cur.fetchone()
+            
+            if not result:
+                return False, f"Item with ID {recycle_id} not found in recycle bin"
+            
+            # Delete the image file if it exists
+            if result[0] and os.path.exists(result[0]):
+                os.remove(result[0])
+            
+            # Remove from recycle bin
+            cur.execute("DELETE FROM recycle_bin WHERE id = %s", (recycle_id,))
+            conn.commit()
+            return True, f"Item permanently deleted from recycle bin"
+        except Exception as e:
+            conn.rollback()
+            return False, f"Error deleting item: {str(e)}"
+        finally:
+            cur.close()
                     img.save(final_image_path)
                 
                 # Update the database with new image path

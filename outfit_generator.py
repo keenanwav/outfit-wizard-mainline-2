@@ -24,69 +24,40 @@ def is_valid_image(image_path: str) -> bool:
         logging.debug(f"Invalid image file {image_path}: {str(e)}")
         return False
 
-def move_to_recycle_bin(file_batch: List[str]) -> Tuple[int, List[str]]:
-    """Move a batch of files to recycle bin and return success count and errors"""
+def delete_file_batch(file_batch: List[str]) -> Tuple[int, List[str]]:
+    """Delete a batch of files and return success count and errors"""
     success_count = 0
     errors = []
     
     for file_path in file_batch:
         try:
-            # Generate timestamped filename to prevent overwrites
-            filename = f"{int(time.time())}_{os.path.basename(file_path)}"
-            dest_path = os.path.join('recycle_bin', filename)
-            
-            # Move file to recycle bin
-            import shutil
-            shutil.move(file_path, dest_path)
+            os.remove(file_path)
             success_count += 1
-            logging.debug(f"Moved file to recycle bin: {os.path.basename(file_path)}")
+            logging.debug(f"Successfully deleted file: {os.path.basename(file_path)}")
         except Exception as e:
-            errors.append(f"Error moving {file_path}: {str(e)}")
-            logging.error(f"Failed to move file {file_path}: {str(e)}")
+            errors.append(f"Error deleting {file_path}: {str(e)}")
+            logging.error(f"Failed to delete file {file_path}: {str(e)}")
     
     return success_count, errors
 
 def cleanup_merged_outfits(force_cleanup=False):
-    """Clean up old unsaved outfit files and orphaned database entries by moving them to recycle bin
-    Args:
-        force_cleanup (bool): If True, forces a manual cleanup. Default is False for safety.
-    """
+    """Clean up old unsaved outfit files and orphaned database entries"""
     try:
-        # Always skip unless explicitly forced
-        if not force_cleanup:
-            logging.info("Cleanup requires manual trigger. Use force_cleanup=True to run cleanup.")
-            return
-
-        # Create recycle bin directory if it doesn't exist
-        recycle_bin = 'recycle_bin'
-        if not os.path.exists(recycle_bin):
-            os.makedirs(recycle_bin)
-            
-        # Create backup before cleanup
-        backup_dir = f'outfits_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
-        if not os.path.exists(backup_dir):
-            os.makedirs(backup_dir)
-            
-        # First, backup existing files
-        if os.path.exists('merged_outfits'):
-            for filename in os.listdir('merged_outfits'):
-                src_path = os.path.join('merged_outfits', filename)
-                dst_path = os.path.join(backup_dir, filename)
-                if os.path.isfile(src_path):
-                    import shutil
-                    shutil.copy2(src_path, dst_path)
-            logging.info(f"Created backup in {backup_dir}")
-            
-        # Move orphaned entries to recycle bin instead of deletion
-        from data_manager import move_orphaned_to_recycle_bin
-        success, message = move_orphaned_to_recycle_bin()
+        # First, clean up orphaned database entries
+        from data_manager import cleanup_orphaned_entries
+        success, message = cleanup_orphaned_entries()
         if not success:
-            logging.error(f"Failed to move orphaned entries to recycle bin: {message}")
+            logging.error(f"Failed to clean up orphaned entries: {message}")
         else:
-            logging.info(f"Orphaned entries moved to recycle bin: {message}")
+            logging.info(f"Orphaned entries cleanup: {message}")
 
         if not os.path.exists('merged_outfits'):
             logging.info("Merged outfits directory does not exist. No cleanup needed.")
+            return
+            
+        # Only proceed with cleanup if force_cleanup is True
+        if not force_cleanup:
+            logging.info("Automatic cleanup is disabled. Use manual cleanup instead.")
             return
             
         # Get cleanup settings from database
@@ -95,15 +66,6 @@ def cleanup_merged_outfits(force_cleanup=False):
         settings = get_cleanup_settings()
         if not settings:
             logging.error("Failed to get cleanup settings from database")
-            return
-            
-        current_time = datetime.now()
-        last_cleanup = settings['last_cleanup']
-        cleanup_interval = timedelta(hours=settings['cleanup_interval_hours'])
-        
-        # Check if cleanup is needed based on interval
-        if last_cleanup and (current_time - last_cleanup) < cleanup_interval:
-            logging.info(f"Cleanup not needed yet. Next cleanup in {cleanup_interval - (current_time - last_cleanup)}")
             return
             
         stats = {
@@ -162,9 +124,9 @@ def cleanup_merged_outfits(force_cleanup=False):
                 batches = [files_to_delete[i:i + settings['batch_size']] 
                           for i in range(0, len(files_to_delete), settings['batch_size'])]
                 
-                # Submit batch jobs to move files to recycle bin
+                # Submit batch jobs
                 future_to_batch = {
-                    executor.submit(move_to_recycle_bin, batch): batch 
+                    executor.submit(delete_file_batch, batch): batch 
                     for batch in batches
                 }
                 
@@ -224,7 +186,7 @@ def generate_outfit(clothing_items, size, style, gender):
     if not os.path.exists('merged_outfits'):
         os.makedirs('merged_outfits')
     
-    # Cleanup is now manual-only, removed automatic call
+    cleanup_merged_outfits()
     
     # Add a small delay for better user experience
     time.sleep(0.5)
