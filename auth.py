@@ -150,18 +150,36 @@ def render_login_ui():
     # If not authenticated and login page is requested
     if not st.session_state.authenticated and st.session_state.show_login_page:
         st.empty()  # Clear any existing content
-        st.title("Welcome to Outfit Wizard")
+        
+        # Center align the welcome message
+        st.markdown("""
+            <h1 style='text-align: center; color: #333; margin-bottom: 2rem;'>
+                Welcome to Outfit Wizard ✨
+            </h1>
+        """, unsafe_allow_html=True)
         
         # Create a container for the login form
         with st.container():
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
-                tab1, tab2 = st.tabs(["Login", "Sign Up"])
+                st.markdown("""
+                    <div class="login-container">
+                """, unsafe_allow_html=True)
+                
+                # Add custom CSS class for tabs
+                st.markdown('<div class="auth-tabs">', unsafe_allow_html=True)
+                tab1, tab2 = st.tabs(["🔑 Login", "✨ Sign Up"])
                 
                 with tab1:
-                    st.subheader("Login")
-                    login_email = st.text_input("Email", key="login_email")
-                    login_password = st.text_input("Password", type="password", key="login_password")
+                    st.markdown('<div class="auth-form">', unsafe_allow_html=True)
+                    login_email = st.text_input("📧 Email", key="login_email", placeholder="Enter your email")
+                    login_password = st.text_input("🔒 Password", type="password", key="login_password", placeholder="Enter your password")
+                    
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        st.checkbox("Remember me", key="remember_me")
+                    with col2:
+                        st.markdown('<div style="text-align: right;"><a href="#" style="color: #4ecdc4; text-decoration: none;">Forgot Password?</a></div>', unsafe_allow_html=True)
                     
                     if st.button("Login", key="login_button", use_container_width=True):
                         if login_email and login_password:
@@ -170,21 +188,22 @@ def render_login_ui():
                                 st.session_state.authenticated = True
                                 st.session_state.user_info = user_info
                                 st.session_state.show_login_page = False
-                                st.success("Login successful!")
+                                st.success("Login successful! 🎉")
                                 st.rerun()
                             else:
                                 st.error("Invalid email or password")
                         else:
                             st.warning("Please enter both email and password")
+                    st.markdown('</div>', unsafe_allow_html=True)
                 
                 with tab2:
-                    st.subheader("Sign Up")
-                    signup_email = st.text_input("Email", key="signup_email")
-                    signup_password = st.text_input("Password", type="password", key="signup_password")
-                    confirm_password = st.text_input("Confirm Password", type="password", key="confirm_password")
-                    role = st.selectbox("Role", ["user", "admin"], key="signup_role")
+                    st.markdown('<div class="auth-form">', unsafe_allow_html=True)
+                    signup_email = st.text_input("📧 Email", key="signup_email", placeholder="Enter your email")
+                    signup_password = st.text_input("🔒 Password", type="password", key="signup_password", placeholder="Choose a strong password")
+                    confirm_password = st.text_input("🔒 Confirm Password", type="password", key="confirm_password", placeholder="Confirm your password")
+                    role = st.selectbox("👤 Role", ["user", "admin"], key="signup_role")
                     
-                    if st.button("Sign Up", key="signup_button", use_container_width=True):
+                    if st.button("Create Account", key="signup_button", use_container_width=True):
                         if signup_email and signup_password and confirm_password:
                             if signup_password != confirm_password:
                                 st.error("Passwords do not match")
