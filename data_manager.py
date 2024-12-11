@@ -124,6 +124,26 @@ def create_user_items_table():
                 )
             ''')
             
+            # Create recycle bin table
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS recycle_bin (
+                    id SERIAL PRIMARY KEY,
+                    original_id INTEGER,
+                    type VARCHAR(50),
+                    color VARCHAR(50),
+                    style VARCHAR(255),
+                    gender VARCHAR(50),
+                    size VARCHAR(50),
+                    image_path VARCHAR(255),
+                    hyperlink VARCHAR(255),
+                    tags TEXT[],
+                    season VARCHAR(10),
+                    notes TEXT,
+                    price DECIMAL(10, 2),
+                    deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
             # Add indexes for frequently queried columns
             cur.execute('CREATE INDEX IF NOT EXISTS idx_type ON user_clothing_items(type)')
             cur.execute('CREATE INDEX IF NOT EXISTS idx_style ON user_clothing_items(style)')
@@ -812,54 +832,7 @@ def get_color_history(item_id):
             return cur.fetchall()
         finally:
             cur.close()
-# Update the edit_clothing_item function to include price history
-@retry_on_error()
-def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink, price=None):
-    """Edit clothing item with prepared statement, price and color history tracking"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            # Get current color before update
-            cur.execute("SELECT color FROM user_clothing_items WHERE id = %s", (item_id,))
-            result = cur.fetchone()
-            if result:
-                old_color = result[0]
-                new_color = f"{color[0]},{color[1]},{color[2]}"
-                
-                # Record color change if different
-                if old_color != new_color:
-                    record_color_change(item_id, old_color, new_color)
-            
-            # Record price change if price is provided and different
-            if price is not None:
-                record_price_change(item_id, price)
-            
-            cur.execute(PREPARED_STATEMENTS['update_item'], (
-                f"{color[0]},{color[1]},{color[2]}",
-                ','.join(styles),
-                ','.join(genders),
-                ','.join(sizes),
-                hyperlink,
-                price,
-                int(item_id) if hasattr(item_id, 'item') else item_id
-            ))
-            
-            if cur.fetchone():
-                conn.commit()
-                return True, f"Item with ID {item_id} updated successfully"
-            return False, f"Item with ID {item_id} not found"
-        finally:
-            cur.close()
-
-# Update add_user_clothing_item to include initial price history
-@retry_on_error()
-def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file, hyperlink="", price=None):
-    """Add clothing item with prepared statement and initial price history"""
-    if not os.path.exists("user_images"):
-        os.makedirs("user_images", exist_ok=True)
-    
-    image_filename = f"{item_type}_{uuid.uuid4()}.png"
-    image_path = os.path.join("user_images", image_filename)
+# Function has been moved up and consolidated with previous definition
     
     with Image.open(image_file) as img:
         img.save(image_path)
