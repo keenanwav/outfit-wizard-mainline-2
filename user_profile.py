@@ -24,9 +24,9 @@ st.set_page_config(
 st.markdown("""
     <style>
     /* Global styles */
-    body {
-        background-color: #1a1f2e;
-        color: white;
+    .stApp {
+        background-color: #1a1f2e !important;
+        color: #ffffff !important;
     }
     
     /* Main container styling */
@@ -37,50 +37,56 @@ st.markdown("""
     }
     
     /* Form styling */
-    .stTextInput > div > div, .stTextArea > div > div {
-        background-color: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 4px;
-        color: white;
-    }
-    
-    .stTextInput input, .stTextArea textarea {
+    .stTextInput > div > div, .stTextArea > div > div, .stSelectbox > div > div {
+        background-color: #2a2f3e !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 4px !important;
         color: white !important;
     }
     
+    .stTextInput input, .stTextArea textarea, .stSelectbox select {
+        color: white !important;
+    }
+    
+    /* Button styling */
     .stButton > button {
         width: 100%;
         padding: 0.75rem 1.5rem;
-        background-color: #2D7FF9;
-        color: white;
-        border-radius: 4px;
+        background-color: #2D7FF9 !important;
+        color: white !important;
+        border-radius: 4px !important;
         margin-top: 1rem;
-        border: none;
+        border: none !important;
         font-weight: 500;
+        transition: background-color 0.3s ease;
     }
     
     .stButton > button:hover {
-        background-color: #2567cc;
+        background-color: #2567cc !important;
+        transform: translateY(-1px);
     }
     
     /* Profile container */
     .profile-container {
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(42, 47, 62, 0.95) !important;
         backdrop-filter: blur(10px);
         padding: 2rem;
         border-radius: 8px;
         border: 1px solid rgba(255, 255, 255, 0.1);
         margin-top: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
     
     /* Section styling */
     .section-header {
-        color: white;
+        color: #ffffff !important;
         font-size: 1.2rem;
-        font-weight: 500;
-        margin-bottom: 1rem;
+        font-weight: 600;
+        margin: 2rem 0 1rem;
         padding-bottom: 0.5rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        border-bottom: 2px solid #2D7FF9;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
     
     /* Profile picture */
@@ -92,39 +98,75 @@ st.markdown("""
         display: block;
         object-fit: cover;
         border: 3px solid #2D7FF9;
+        box-shadow: 0 0 20px rgba(45, 127, 249, 0.3);
     }
     
     /* Stats container */
     .stats-container {
-        background: rgba(45, 127, 249, 0.1);
+        background: rgba(45, 127, 249, 0.1) !important;
         border-radius: 8px;
-        padding: 1rem;
-        margin: 1rem 0;
+        padding: 1.5rem;
+        margin: 1.5rem 0;
+        border: 1px solid rgba(45, 127, 249, 0.2);
     }
     
-    /* Labels */
-    .stSelectbox label, .stTextInput label {
-        color: rgba(255, 255, 255, 0.8);
+    /* Labels and text */
+    .stSelectbox label, .stTextInput label, .stTextArea label {
+        color: #ffffff !important;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    /* Metrics styling */
+    .css-1wivap2 {
+        background-color: rgba(42, 47, 62, 0.95) !important;
+        border: 1px solid rgba(45, 127, 249, 0.2) !important;
+        padding: 1rem !important;
+        border-radius: 8px !important;
+    }
+    
+    .css-1wivap2 label {
+        color: #ffffff !important;
+    }
+    
+    .css-1wivap2 .css-81oif8 {
+        color: #2D7FF9 !important;
+        font-size: 1.5rem !important;
     }
     
     /* Error message */
     .error-msg {
         color: #ff4d4d;
-        padding: 0.5rem;
-        margin: 0.5rem 0;
+        padding: 0.75rem;
+        margin: 0.75rem 0;
         font-size: 0.9rem;
         background: rgba(255, 77, 77, 0.1);
         border-radius: 4px;
+        border-left: 4px solid #ff4d4d;
     }
     
     /* Success message */
     .success-msg {
         color: #4ecdc4;
-        padding: 0.5rem;
-        margin: 0.5rem 0;
+        padding: 0.75rem;
+        margin: 0.75rem 0;
         font-size: 0.9rem;
         background: rgba(78, 205, 196, 0.1);
         border-radius: 4px;
+        border-left: 4px solid #4ecdc4;
+    }
+    
+    /* Additional UI improvements */
+    .stMarkdown {
+        color: #ffffff !important;
+    }
+    
+    .streamlit-expanderHeader {
+        background-color: #2a2f3e !important;
+        color: #ffffff !important;
     }
     </style>
 """, unsafe_allow_html=True)
