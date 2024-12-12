@@ -207,6 +207,10 @@ if 'editing_color' not in st.session_state:
     st.session_state.editing_color = None
 if 'color_preview' not in st.session_state:
     st.session_state.color_preview = None
+if 'editing_item' not in st.session_state:
+    st.session_state.editing_item = None
+if 'editing_image' not in st.session_state:
+    st.session_state.editing_image = None
 
 # Load custom CSS
 def load_custom_css():
