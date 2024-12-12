@@ -709,6 +709,197 @@ def personal_wardrobe_page():
         st.session_state.editing_image = None
     if 'editing_color' not in st.session_state:
         st.session_state.editing_color = None
+
+def user_profile_page():
+    """Display and manage user profile settings"""
+    st.title("User Profile")
+    
+    # Initialize session state
+    if 'user_data' not in st.session_state:
+        st.session_state.user_data = {
+            "name": "Alex Johnson",
+            "email": "alex@example.com",
+            "avatar_url": "https://api.dicebear.com/6.x/avataaars/svg?seed=Alex",
+            "subscription": {
+                "plan": "Pro",
+                "status": "Active",
+                "renewal_date": "2023-12-31"
+            },
+            "usage": {
+                "storage": 75,
+                "api_calls": 8500,
+                "projects": 12
+            }
+        }
+
+    # Custom CSS for styling
+    st.markdown("""
+        <style>
+        /* Profile section styling */
+        .profile-section {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        /* Tabs styling */
+        .stTabs {
+            background-color: #f8f9fa;
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+        
+        /* Form styling */
+        .stTextInput > div > div {
+            background-color: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+        }
+        
+        .stButton > button {
+            background-color: black;
+            color: white;
+            border-radius: 4px;
+            padding: 0.5rem 1.5rem;
+        }
+        
+        /* Usage progress bars */
+        .stProgress > div > div {
+            background-color: #4ecdc4;
+        }
+        
+        /* Card styling */
+        .card {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 1rem;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # Create tabs
+    tab1, tab2, tab3, tab4 = st.tabs(["Profile", "Subscription", "Usage", "Settings"])
+    
+    with tab1:
+        st.markdown("### Profile")
+        st.markdown("Manage your profile information")
+        
+        # Profile header with avatar
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            try:
+                response = requests.get(st.session_state.user_data["avatar_url"])
+                if response.status_code == 200:
+                    st.image(st.session_state.user_data["avatar_url"], width=100)
+                else:
+                    st.warning("Using default avatar")
+            except Exception:
+                st.warning("Unable to load avatar")
+        
+        with col2:
+            st.markdown(f"### {st.session_state.user_data['name']}")
+            st.markdown("<p style='color: #6c757d;'>SaaS User</p>", unsafe_allow_html=True)
+        
+        # Profile form
+        with st.form("profile_form"):
+            name = st.text_input("Name", value=st.session_state.user_data["name"])
+            email = st.text_input("Email", value=st.session_state.user_data["email"])
+            submit = st.form_submit_button("Update Profile")
+            
+            if submit:
+                st.session_state.user_data.update({
+                    "name": name,
+                    "email": email
+                })
+                st.success("Profile updated successfully!")
+    
+    with tab2:
+        st.markdown("### Subscription Details")
+        st.markdown("Manage your subscription plan")
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("**Current Plan**")
+            st.markdown(f"### {st.session_state.user_data['subscription']['plan']}")
+        with col2:
+            st.markdown(
+                f"""<div style='background-color: #d4edda; 
+                color: #155724; padding: 8px 16px; 
+                border-radius: 4px; text-align: center; 
+                margin-top: 1rem;'>
+                {st.session_state.user_data['subscription']['status']}</div>""", 
+                unsafe_allow_html=True
+            )
+        
+        st.markdown("---")
+        st.markdown("📅 Renews on " + st.session_state.user_data['subscription']['renewal_date'])
+        st.markdown("💳 Visa ending in 1234")
+        st.button("Upgrade Plan", type="primary", use_container_width=True)
+    
+    with tab3:
+        st.markdown("### Usage Statistics")
+        st.markdown("Monitor your resource usage")
+        
+        # Storage usage
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.markdown("**Storage**")
+            st.progress(st.session_state.user_data["usage"]["storage"] / 100)
+        with col2:
+            st.markdown(f"{st.session_state.user_data['usage']['storage']}%")
+        
+        # API calls
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.markdown("**API Calls**")
+            st.progress(st.session_state.user_data["usage"]["api_calls"] / 10000)
+        with col2:
+            st.markdown(f"{st.session_state.user_data['usage']['api_calls']}/10000")
+        
+        # Projects
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.markdown("**Projects**")
+            st.progress(st.session_state.user_data["usage"]["projects"] / 15)
+        with col2:
+            st.markdown(f"{st.session_state.user_data['usage']['projects']}/15")
+    
+    with tab4:
+        st.markdown("### Account Settings")
+        st.markdown("Manage your account preferences")
+        
+        # Two-Factor Authentication
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("**Two-Factor Authentication**")
+            st.markdown("Add an extra layer of security to your account")
+        with col2:
+            st.button("Enable", key="2fa_enable")
+        
+        st.markdown("---")
+        
+        # Email Notifications
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("**Email Notifications**")
+            st.markdown("Receive updates about your account activity")
+        with col2:
+            st.button("Configure", key="email_config")
+        
+        st.markdown("---")
+        
+        # Delete Account
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("**Delete Account**")
+            st.markdown("Permanently remove your account and all data")
+        with col2:
+            st.button("Delete", key="delete_account", type="secondary")
     if 'edit_success' not in st.session_state:
         st.session_state.edit_success = False
     if 'form_errors' not in st.session_state:
@@ -1264,7 +1455,7 @@ if __name__ == "__main__":
     show_first_visit_tips()
     
     st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits"])
+    page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits", "User Profile"])
     
     if page == "Home":
         main_page()
@@ -1272,3 +1463,5 @@ if __name__ == "__main__":
         personal_wardrobe_page()
     elif page == "Saved Outfits":
         saved_outfits_page()
+    elif page == "User Profile":
+        user_profile_page()
