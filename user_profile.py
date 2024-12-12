@@ -5,12 +5,8 @@ from datetime import datetime
 # Initialize session states
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
-if 'editing_item' not in st.session_state:
-    st.session_state.editing_item = None
-if 'editing_image' not in st.session_state:
-    st.session_state.editing_image = None
-if 'editing_color' not in st.session_state:
-    st.session_state.editing_color = None
+if 'profile_edit_mode' not in st.session_state:
+    st.session_state.profile_edit_mode = False
 
 # Page configuration
 st.set_page_config(
@@ -172,52 +168,90 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def user_profile():
+    if not st.session_state.logged_in:
+        st.warning("Please log in to view your profile")
+        return
+
     st.markdown('<div class="profile-container">', unsafe_allow_html=True)
     
     # Profile Header
     st.markdown("<h1 style='text-align: center; margin-bottom: 2rem;'>My Profile</h1>", unsafe_allow_html=True)
     
-    # Profile Picture
+    # Profile Picture Section
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.image("static/default_profile.png", use_column_width=True, caption="Profile Picture")
-        st.button("Change Profile Picture")
+        st.image("static/default_profile.png", width=150, caption="Profile Picture")
+        if st.button("Change Profile Picture", key="change_pic"):
+            st.info("Profile picture upload feature coming soon!")
+    
+    # Edit/View Mode Toggle
+    edit_mode = st.toggle("Edit Profile", value=st.session_state.profile_edit_mode)
+    st.session_state.profile_edit_mode = edit_mode
     
     # Personal Information Section
     st.markdown("<div class='section-header'>Personal Information</div>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
-    with col1:
-        st.text_input("Full Name", value="John Doe")
-        st.text_input("Email", value="john@example.com")
-    with col2:
-        st.text_input("Username", value="johndoe")
-        st.text_input("Phone", value="+1 234 567 8900")
     
-    # Preferences Section
+    with col1:
+        if edit_mode:
+            full_name = st.text_input("Full Name", value="John Doe", key="name_edit")
+            email = st.text_input("Email", value="john@example.com", key="email_edit")
+        else:
+            st.markdown("**Full Name:** John Doe")
+            st.markdown("**Email:** john@example.com")
+            
+    with col2:
+        if edit_mode:
+            username = st.text_input("Username", value="johndoe", key="username_edit")
+            phone = st.text_input("Phone", value="+1 234 567 8900", key="phone_edit")
+        else:
+            st.markdown("**Username:** johndoe")
+            st.markdown("**Phone:** +1 234 567 8900")
+    
+    # Style Preferences Section
     st.markdown("<div class='section-header'>Style Preferences</div>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
-    with col1:
-        st.selectbox("Preferred Style", ["Casual", "Formal", "Sport", "Beach"])
-        st.selectbox("Size", ["S", "M", "L", "XL"])
-    with col2:
-        st.selectbox("Gender", ["Male", "Female", "Unisex"])
-        st.text_area("Additional Notes", "I prefer dark colors and comfortable fits.")
     
-    # Statistics Section
-    st.markdown("<div class='section-header'>Wardrobe Statistics</div>", unsafe_allow_html=True)
+    with col1:
+        if edit_mode:
+            preferred_style = st.selectbox("Preferred Style", 
+                                         ["Casual", "Formal", "Sport", "Beach"],
+                                         key="style_edit")
+            size = st.selectbox("Size", ["S", "M", "L", "XL"], key="size_edit")
+        else:
+            st.markdown("**Preferred Style:** Casual")
+            st.markdown("**Size:** M")
+            
+    with col2:
+        if edit_mode:
+            gender = st.selectbox("Gender", 
+                                ["Male", "Female", "Unisex"],
+                                key="gender_edit")
+            notes = st.text_area("Additional Notes", 
+                               "I prefer dark colors and comfortable fits.",
+                               key="notes_edit")
+        else:
+            st.markdown("**Gender:** Male")
+            st.markdown("**Additional Notes:** I prefer dark colors and comfortable fits.")
+    
+    # Account Statistics (Read-only)
+    st.markdown("<div class='section-header'>Account Statistics</div>", unsafe_allow_html=True)
     st.markdown('<div class="stats-container">', unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Total Items", "42")
+        st.metric("Wardrobe Items", "42")
     with col2:
         st.metric("Outfits Created", "15")
     with col3:
-        st.metric("Favorite Style", "Casual")
+        st.metric("Days Active", "30")
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Save Changes Button
-    if st.button("Save Changes"):
-        st.success("Profile updated successfully!")
+    # Save Changes Button (only in edit mode)
+    if edit_mode:
+        if st.button("Save Changes", type="primary"):
+            st.success("Profile updated successfully!")
+            st.session_state.profile_edit_mode = False
+            st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
 
