@@ -245,6 +245,7 @@ if not st.session_state.user and st.session_state.get('show_auth', False):
                 new_email = st.text_input("Email", key="signup_email")
                 new_password = st.text_input("Password", type="password", key="signup_password")
                 confirm_password = st.text_input("Confirm Password", type="password", key="signup_confirm")
+                role = st.selectbox("Role", options=['user', 'admin'], key="signup_role")
                 signup_submitted = st.form_submit_button("Sign Up")
                 
                 if signup_submitted:
@@ -253,7 +254,7 @@ if not st.session_state.user and st.session_state.get('show_auth', False):
                     elif len(new_password) < 8:
                         st.error("Password must be at least 8 characters long")
                     else:
-                        if create_user(new_username, new_email, new_password):
+                        if create_user(new_username, new_email, new_password, role):
                             success, user_data = authenticate_user(new_email, new_password)
                             if success:
                                 st.session_state.user = user_data
