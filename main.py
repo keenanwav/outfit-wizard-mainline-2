@@ -1318,13 +1318,59 @@ def redo_edit(item_id):
         return False, "No edits to redo"
 
 # Update the main sidebar menu to include the new dashboard
+def bulk_delete_page():
+    """Display the bulk delete interface for managing uploaded items"""
+    st.title("Bulk Delete Items")
+    
+    # Fetch all user items
+    from data_manager import get_db_connection
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, type, color, style, gender, size, hyperlink, price, image_path 
+            FROM user_clothing_items 
+            ORDER BY type, id
+        """)
+        items = cur.fetchall()
+        
+    if not items:
+        st.info("No items found in your wardrobe.")
+        return
+        
+    # Create a DataFrame for better display
+    df = pd.DataFrame(items, columns=[
+        'id', 'type', 'color', 'style', 'gender', 
+        'size', 'hyperlink', 'price', 'image_path'
+    ])
+    
+    # Group items by type for better organization
+    st.write("Select items to delete:")
+    selected_items = []
+    
+    for item_type in df['type'].unique():
+        with st.expander(f"{item_type.title()} Items"):
+            type_items = df[df['type'] == item_type]
+            for _, item in type_items.iterrows():
+                col1, col2 = st.columns([1, 4])
+                with col1:
+                    if st.checkbox("", key=f"delete_{item['id']}"):
+                        selected_items.append(item['id'])
+                with col2:
+                    st.write(f"Color: {item['color']}, Style: {item['style']}, Size: {item['size']}")
+    
+    if selected_items:
+        if st.button("Delete Selected Items", type="primary"):
+            if bulk_delete_clothing_items(selected_items):
+                st.success("Selected items have been deleted.")
+                time.sleep(1)
+                st.rerun()
+
 if __name__ == "__main__":
     create_user_items_table()
     show_first_visit_tips()
-    check_cleanup_needed()
     
     st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits", "Cleanup Status"])
+    page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits", "Bulk Delete"])
     
     if page == "Home":
         main_page()
@@ -1332,5 +1378,5 @@ if __name__ == "__main__":
         personal_wardrobe_page()
     elif page == "Saved Outfits":
         saved_outfits_page()
-    elif page == "Cleanup Status":
-        cleanup_status_dashboard()
+    elif page == "Bulk Delete":
+        bulk_delete_page()
