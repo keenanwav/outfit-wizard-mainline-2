@@ -784,6 +784,48 @@ def personal_wardrobe_page():
     """Display and manage personal wardrobe items"""
     st.title("My Items")
     
+    # Load existing items
+    items_df = load_clothing_items()
+    
+    if not items_df.empty:
+        # Group items by type and display
+        for item_type in ["shirt", "pants", "shoes"]:
+            type_items = items_df[items_df['type'] == item_type]
+            if not type_items.empty:
+                st.markdown(f"### {item_type.capitalize()}s")
+                
+                # Create grid layout (3 items per row)
+                cols = st.columns(3)
+                for idx, item in type_items.iterrows():
+                    col = cols[int(idx) % 3]
+                    with col:
+                        if item.get('image_path') and os.path.exists(item['image_path']):
+                            st.image(item['image_path'], use_column_width=True)
+                            
+                            # Show current color
+                            current_color = parse_color_string(item['color'])
+                            st.markdown("**Color:**")
+                            st.markdown(f'''
+                                <div style="
+                                    background-color: rgb({current_color[0]}, {current_color[1]}, {current_color[2]});
+                                    width: 50px;
+                                    height: 50px;
+                                    border-radius: 8px;
+                                    margin: 8px auto;
+                                "></div>
+                            ''', unsafe_allow_html=True)
+                            
+                            # Display item details
+                            st.markdown(f"**Style:** {item['style']}")
+                            st.markdown(f"**Size:** {item['size']}")
+                            if item['price']:
+                                st.markdown(f"**Price:** ${float(item['price']):.2f}")
+                            
+                            # Add a separator between items
+                            st.markdown("---")
+    else:
+        st.info("Your wardrobe is empty. Start by adding some items!")
+    
 def bulk_delete_page():
     """Display bulk delete and edit interface for clothing items"""
     st.title("Bulk Item Management")
