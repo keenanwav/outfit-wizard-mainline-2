@@ -279,11 +279,26 @@ def main_page():
         col1, col2, col3 = st.columns([2, 2, 1])
         
         with col1:
-            size = st.selectbox("Size", ["S", "M", "L", "XL"])
-            style = st.selectbox("Style", ["Casual", "Formal", "Sport", "Beach"])
+            size = st.selectbox(
+                "Size",
+                ["S", "M", "L", "XL"],
+                key="size_select",
+                help="Select your preferred size"
+            )
+            style = st.selectbox(
+                "Style",
+                ["Casual", "Formal", "Sport", "Beach"],
+                key="style_select",
+                help="Choose your preferred style"
+            )
         
         with col2:
-            gender = st.selectbox("Gender", ["Male", "Female", "Unisex"])
+            gender = st.selectbox(
+                "Gender",
+                ["Male", "Female", "Unisex"],
+                key="gender_select",
+                help="Select your gender preference"
+            )
             
         with col3:
             st.write("")
