@@ -1033,7 +1033,8 @@ def bulk_delete_page():
                                     st.session_state.editing_color = item
                             
                             with del_col:
-                                if st.button("🗑️", key=f"delete_{idx}"):
+                                unique_key = f"delete_{item['type']}_{item['id']}_{idx}"
+                                if st.button("🗑️", key=unique_key):
                                     if delete_clothing_item(item['id']):
                                         st.success(f"Item deleted successfully!")
                                         st.rerun()
