@@ -784,6 +784,76 @@ def personal_wardrobe_page():
     """Display and manage personal wardrobe items"""
     st.title("My Items")
     
+    # Upload new item form
+    with st.expander("Upload New Item", expanded=False):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            item_type = st.selectbox("Type", ["Shirt", "Pants", "Shoes"])
+            styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"])
+            sizes = st.multiselect("Size", ["S", "M", "L", "XL"])
+            price = st.number_input("Price ($)", min_value=0.0, step=0.01, format="%.2f")
+        
+        with col2:
+            genders = st.multiselect("Gender", ["Male", "Female", "Unisex"])
+            uploaded_file = st.file_uploader("Upload Image", type=['png', 'jpg', 'jpeg'], key="new_item_upload")
+            hyperlink = st.text_input("Shopping Link (optional)", 
+                                    help="Add a link to where this item can be purchased")
+        
+        # Form validation
+        is_valid = True
+        validation_messages = []
+        
+        if not styles:
+            is_valid = False
+            validation_messages.append("Please select at least one style")
+        if not sizes:
+            is_valid = False
+            validation_messages.append("Please select at least one size")
+        if not genders:
+            is_valid = False
+            validation_messages.append("Please select at least one gender")
+        
+        for message in validation_messages:
+            st.markdown(f'<p class="validation-error">{message}</p>', unsafe_allow_html=True)
+        
+        if uploaded_file and is_valid:
+            # Validate file type
+            if not uploaded_file.name.lower().endswith('.png'):
+                st.error("Only PNG files are allowed. Please upload a PNG image.")
+                return
+
+            # Extract color after image upload
+            temp_path = f"temp_{uploaded_file.name}"
+            with open(temp_path, "wb") as f:
+                f.write(uploaded_file.getvalue())
+            
+            # Validate the image file
+            if not is_valid_image(temp_path):
+                os.remove(temp_path)
+                st.error("The uploaded file is not a valid PNG image. Please try again with a valid image file.")
+                return
+            
+            colors = get_color_palette(temp_path)
+            if colors is not None:
+                st.write("Extracted Color:")
+                display_color_palette(colors)
+                
+                if st.button("Add Item"):
+                    success, message = add_user_clothing_item(
+                        item_type.lower(), colors[0], styles, genders, sizes, 
+                        temp_path, hyperlink, price if price > 0 else None
+                    )
+                    if success:
+                        st.success(message)
+                        st.rerun()
+                    else:
+                        st.error(message)
+            else:
+                st.error("Could not extract colors from the image. Please try a different image.")
+            
+            os.remove(temp_path)
+    
     # Load existing items
     items_df = load_clothing_items()
     
