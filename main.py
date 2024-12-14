@@ -1548,4 +1548,4 @@ if __name__ == "__main__":
     elif page == "Saved Outfits":
         saved_outfits_page()
     elif page == "Bulk Delete":
-        pass
+        bulk_delete_page()
