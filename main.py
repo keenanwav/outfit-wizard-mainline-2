@@ -1319,6 +1319,56 @@ def redo_edit(item_id):
 
 # Update the main sidebar menu to include the new dashboard
 def bulk_delete_page():
+# Update the main sidebar menu to include the new dashboard
+def bulk_delete_page():
+    """Display the bulk delete interface for managing uploaded items"""
+    st.title("Bulk Delete Items")
+    
+    # Fetch all user items
+    from data_manager import get_db_connection
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, type, color, style, gender, size, hyperlink, price, image_path 
+            FROM user_clothing_items 
+            ORDER BY type, id
+        """)
+        items = cur.fetchall()
+        
+    if not items:
+        st.info("No items found in your wardrobe.")
+        return
+        
+    # Create a DataFrame for better display
+    df = pd.DataFrame(items, columns=[
+        'id', 'type', 'color', 'style', 'gender', 
+        'size', 'hyperlink', 'price', 'image_path'
+    ])
+    
+    # Group items by type for better organization
+    st.write("Select items to delete:")
+    selected_items = []
+    
+    for item_type in df['type'].unique():
+        with st.expander(f"{item_type.title()} Items"):
+            type_items = df[df['type'] == item_type]
+            for _, item in type_items.iterrows():
+                col1, col2 = st.columns([1, 4])
+                with col1:
+                    if st.checkbox("", key=f"delete_{item['id']}"):
+                        selected_items.append(item['id'])
+                with col2:
+                    st.write(f"Color: {item['color']}, Style: {item['style']}, Size: {item['size']}")
+    
+    if selected_items:
+        if st.button("Delete Selected Items", type="primary"):
+            success, message, stats = bulk_delete_items(selected_items)
+            if success:
+                st.success(message)
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error(f"{message}\nErrors: {', '.join(stats.get('errors', []))}")
     """Display the bulk delete interface for managing uploaded items"""
     st.title("Bulk Delete Items")
     
