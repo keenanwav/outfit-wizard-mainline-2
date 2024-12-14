@@ -1524,7 +1524,7 @@ def bulk_delete_page():
                 col1, col2 = st.columns([1, 4])
                 with col1:
                     checkbox_key = f"delete_{item_type}_{item['id']}_{hash(str(item['image_path']))}"
-                    if st.checkbox("", key=checkbox_key, label=f"Select {item_type} item"):
+                    if st.checkbox(label=f"Select {item_type} item", key=checkbox_key):
                         selected_items.append(item['id'])
                 with col2:
                     st.write(f"Color: {item['color']}, Style: {item['style']}, Size: {item['size']}")
