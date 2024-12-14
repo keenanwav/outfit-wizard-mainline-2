@@ -194,6 +194,86 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
+import pandas as pd
+from auth_utils import get_db_connection
+
+def load_clothing_items():
+    """Load clothing items from database"""
+    if not st.session_state.user:
+        return pd.DataFrame()  # Return empty DataFrame if user not logged in
+        
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, type, style, color, image_path, season, tags
+                    FROM clothing_items
+                    WHERE user_id = %s
+                    ORDER BY created_at DESC
+                """, (st.session_state.user['id'],))
+                
+                columns = ['id', 'type', 'style', 'color', 'image_path', 'season', 'tags']
+                data = cur.fetchall()
+                
+                return pd.DataFrame(data, columns=columns)
+    except Exception as e:
+        st.error(f"Error loading items: {str(e)}")
+        return pd.DataFrame()
+
+def save_clothing_item(item_data):
+    """Save a clothing item to database"""
+    if not st.session_state.user:
+        return False
+        
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO clothing_items 
+                    (type, style, color, image_path, season, tags, user_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                """, (
+                    item_data['type'],
+                    item_data['style'],
+                    item_data['color'],
+                    item_data['image_path'],
+                    item_data['season'],
+                    item_data['tags'],
+                    st.session_state.user['id']
+                ))
+                conn.commit()
+                return True
+    except Exception as e:
+        st.error(f"Error saving item: {str(e)}")
+        return False
+
+def delete_clothing_item(item_id):
+    """Delete a clothing item from database"""
+    if not st.session_state.user:
+        return False
+        
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    DELETE FROM clothing_items 
+                    WHERE id = %s AND user_id = %s
+                    RETURNING image_path
+                """, (item_id, st.session_state.user['id']))
+                
+                result = cur.fetchone()
+                conn.commit()
+                
+                if result and result[0]:
+                    image_path = result[0]
+                    if os.path.exists(image_path):
+                        os.remove(image_path)
+                        
+                return True
+    except Exception as e:
+        st.error(f"Error deleting item: {str(e)}")
+        return False
 st.set_page_config(
     page_title="Outfit Wizard",
     page_icon="👕",
