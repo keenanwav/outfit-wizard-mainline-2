@@ -784,9 +784,32 @@ def personal_wardrobe_page():
     """Display and manage personal wardrobe items"""
     st.title("My Items")
     
-    # Upload new item form
-    with st.expander("Upload New Item", expanded=False):
-        col1, col2 = st.columns(2)
+    # Load existing items
+    items_df = load_clothing_items()
+    
+    # Create tabs for List View and Statistics
+    list_view, statistics = st.tabs(["List View", "📊 Statistics"])
+    
+    with statistics:
+        if not items_df.empty:
+            st.markdown("### Items by Type")
+            # Count items by type
+            type_counts = items_df['type'].value_counts()
+            st.bar_chart(type_counts)
+            
+            st.markdown("### Items by Style")
+            # Count items by style (handle multiple styles per item)
+            style_counts = pd.Series([style.strip() 
+                                    for styles in items_df['style'].str.split(',')
+                                    for style in styles]).value_counts()
+            st.bar_chart(style_counts)
+        else:
+            st.info("Add some items to see statistics!")
+    
+    with list_view:
+        # Upload new item form
+        with st.expander("Upload New Item", expanded=False):
+            col1, col2 = st.columns(2)
         
         with col1:
             item_type = st.selectbox("Type", ["Shirt", "Pants", "Shoes"])
