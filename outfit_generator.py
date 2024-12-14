@@ -41,95 +41,6 @@ def delete_file_batch(file_batch: List[str]) -> Tuple[int, List[str]]:
     return success_count, errors
 
 def bulk_delete_items(item_ids: List[int]) -> Tuple[bool, str, Dict]:
-def bulk_delete_items(item_ids: List[int]) -> Tuple[bool, str, Dict]:
-    """Delete multiple clothing items in bulk with their associated files
-    
-    Args:
-        item_ids: List of item IDs to delete
-        
-    Returns:
-        Tuple containing:
-        - Success status (bool)
-        - Status message (str)
-        - Statistics dictionary with counts of successes and failures
-    """
-    if not item_ids:
-        return True, "No items to delete", {"deleted": 0, "failed": 0}
-        
-    stats = {
-        "deleted": 0,
-        "failed": 0,
-        "errors": []
-    }
-    
-    # Process deletions in batches using thread pool
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        # Split into reasonable batch sizes
-        batch_size = 10
-        batches = [item_ids[i:i + batch_size] for i in range(0, len(item_ids), batch_size)]
-        
-        # Process each batch
-        for batch in batches:
-            try:
-                from data_manager import get_db_connection
-                
-                with get_db_connection() as conn:
-                    cur = conn.cursor()
-                    try:
-                        # Get image paths for the batch
-                        placeholders = ','.join(['%s'] * len(batch))
-                        cur.execute(f"""
-                            SELECT id, image_path 
-                            FROM user_clothing_items 
-                            WHERE id IN ({placeholders})
-                        """, tuple(batch))
-                        items = cur.fetchall()
-                        
-                        for item_id, image_path in items:
-                            try:
-                                # Delete the image file if it exists
-                                if image_path and os.path.exists(image_path):
-                                    os.remove(image_path)
-                                
-                                # Delete from database
-                                cur.execute("""
-                                    DELETE FROM user_clothing_items 
-                                    WHERE id = %s
-                                """, (item_id,))
-                                
-                                stats["deleted"] += 1
-                                logging.info(f"Successfully deleted item {item_id}")
-                                
-                            except Exception as e:
-                                stats["failed"] += 1
-                                error_msg = f"Failed to delete item {item_id}: {str(e)}"
-                                stats["errors"].append(error_msg)
-                                logging.error(error_msg)
-                        
-                        conn.commit()
-                    except Exception as e:
-                        conn.rollback()
-                        raise
-                    finally:
-                        cur.close()
-                        
-            except Exception as e:
-                batch_error = f"Batch processing error: {str(e)}"
-                stats["errors"].append(batch_error)
-                logging.error(batch_error)
-                stats["failed"] += len(batch)
-    
-    # Prepare result message
-    message = f"Deleted {stats['deleted']} items"
-    if stats["failed"] > 0:
-        message += f", {stats['failed']} failed"
-    
-    success = stats["failed"] == 0
-    
-    if stats["errors"]:
-        logging.warning("Bulk delete errors:\n" + "\n".join(stats["errors"]))
-    
-    return success, message, stats
     """Delete multiple clothing items in bulk with their associated files
     
     Args:
@@ -311,12 +222,12 @@ def generate_outfit(clothing_items, size, style, gender):
                         # Draw color swatch
                         swatch_y = palette_y + (i * (swatch_size + swatch_margin))
                         draw.rectangle(
-                            [
+                            (
                                 palette_x,
                                 swatch_y,
                                 palette_x + swatch_size,
                                 swatch_y + swatch_size
-                            ],
+                            ),
                             fill=color,
                             outline=(255, 255, 255),
                             width=2
