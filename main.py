@@ -781,6 +781,23 @@ def main_page():
                     st.markdown('</div>', unsafe_allow_html=True)
 
 def personal_wardrobe_page():
+    # Initialize session state for editing
+    if 'editing_item' not in st.session_state:
+        st.session_state.editing_item = None
+    if 'editing_image' not in st.session_state:
+        st.session_state.editing_image = None
+    if 'editing_color' not in st.session_state:
+        st.session_state.editing_color = None
+    if 'edit_success' not in st.session_state:
+        st.session_state.edit_success = False
+    if 'form_errors' not in st.session_state:
+        st.session_state.form_errors = {}
+    if 'edit_history' not in st.session_state:
+        st.session_state.edit_history = {}
+    if 'undo_stack' not in st.session_state:
+        st.session_state.undo_stack = {}
+    if 'redo_stack' not in st.session_state:
+        st.session_state.redo_stack = {}
     """Display and manage personal wardrobe items"""
     st.title("My Items")
     
@@ -936,6 +953,151 @@ def personal_wardrobe_page():
                             if item['price']:
                                 st.markdown(f"**Price:** ${float(item['price']):.2f}")
                             
+                            # Edit/Delete/Color buttons
+                            edit_col, color_col, del_col = st.columns([2, 2, 1])
+                            
+                            with edit_col:
+                                if st.button(f"Edit Details {idx}"):
+                                    st.session_state.editing_item = item
+                                    st.session_state.edit_success = False
+                            
+                            with color_col:
+                                if st.button("🎨", key=f"color_{idx}"):
+                                    st.session_state.editing_color = item
+                            
+                            with del_col:
+                                unique_key = f"delete_{item['type']}_{item['id']}_{idx}"
+                                if st.button("🗑️", key=unique_key):
+                                    if delete_clothing_item(item['id']):
+                                        st.success(f"Item deleted successfully!")
+                                        st.rerun()
+                                        
+                            # Quick color edit interface
+                            if st.session_state.editing_color is not None and st.session_state.editing_color['id'] == item['id']:
+                                st.markdown("### Quick Color Edit")
+                                current_color = parse_color_string(item['color'])
+                                hex_color = rgb_to_hex(current_color)
+                                
+                                col1, col2 = st.columns([3, 1])
+                                with col1:
+                                    new_color = st.color_picker("Pick a new color", hex_color, key=f"color_picker_{idx}")
+                                    # Convert hex to RGB for preview
+                                    r = int(new_color[1:3], 16)
+                                    g = int(new_color[3:5], 16)
+                                    b = int(new_color[5:7], 16)
+                                    preview_rgb = (r, g, b)
+                                    
+                                    # Show color preview
+                                    st.markdown("### Preview")
+                                    st.markdown(f'''
+                                        <div style="
+                                            background-color: rgb({preview_rgb[0]}, {preview_rgb[1]}, {preview_rgb[2]});
+                                            width: 50px;
+                                            height: 50px;
+                                            border-radius: 8px;
+                                            margin: 8px auto;
+                                        "></div>
+                                    ''', unsafe_allow_html=True)
+                                    st.markdown(f"Color Name: **{get_color_name(preview_rgb)}**")
+                                
+                                with col2:
+                                    st.markdown("### Current")
+                                    st.markdown(f'''
+                                        <div style="
+                                            background-color: rgb({current_color[0]}, {current_color[1]}, {current_color[2]});
+                                            width: 50px;
+                                            height: 50px;
+                                            border-radius: 8px;
+                                            margin: 8px auto;
+                                        "></div>
+                                    ''', unsafe_allow_html=True)
+                                    st.markdown(f"Color Name: **{get_color_name(current_color)}**")
+                                
+                                save_col, cancel_col = st.columns(2)
+                                with save_col:
+                                    if st.button("💾 Save Color", key=f"save_color_{idx}", type="primary"):
+                                        success, message = edit_clothing_item(
+                                            item['id'],
+                                            preview_rgb,
+                                            item['style'].split(','),
+                                            item['gender'].split(','),
+                                            item['size'].split(','),
+                                            item['hyperlink'],
+                                            float(item['price']) if item['price'] else None
+                                        )
+                                        
+                                        if success:
+                                            st.session_state.editing_color = None
+                                            st.success("Color updated successfully!")
+                                            st.rerun()
+                                        else:
+                                            st.error(message)
+                                
+                                with cancel_col:
+                                    if st.button("❌ Cancel", key=f"cancel_color_{idx}"):
+                                        st.session_state.editing_color = None
+                                        st.rerun()
+                            
+                            # Edit form
+                            if st.session_state.editing_item is not None and st.session_state.editing_item['id'] == item['id']:
+                                with st.form(key=f"edit_form_{idx}"):
+                                    st.markdown("### Edit Item Details")
+                                    
+                                    # Split current values
+                                    current_styles = item['style'].split(',') if item['style'] else []
+                                    current_sizes = item['size'].split(',') if item['size'] else []
+                                    current_genders = item['gender'].split(',') if item['gender'] else []
+                                    
+                                    # Edit fields
+                                    new_styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"], 
+                                                              default=current_styles)
+                                    new_sizes = st.multiselect("Size", ["S", "M", "L", "XL"], 
+                                                             default=current_sizes)
+                                    new_genders = st.multiselect("Gender", ["Male", "Female", "Unisex"], 
+                                                               default=current_genders)
+                                    new_hyperlink = st.text_input("Shopping Link", 
+                                                                value=item['hyperlink'] if item['hyperlink'] else "")
+                                    new_price = st.number_input("Price ($)", 
+                                                              value=float(item['price']) if item['price'] else 0.0,
+                                                              min_value=0.0, 
+                                                              step=0.01, 
+                                                              format="%.2f")
+                                    
+                                    # Form validation
+                                    is_valid = True
+                                    if not new_styles:
+                                        is_valid = False
+                                        st.markdown('<p class="validation-error">Please select at least one style</p>', 
+                                                  unsafe_allow_html=True)
+                                    if not new_sizes:
+                                        is_valid = False
+                                        st.markdown('<p class="validation-error">Please select at least one size</p>', 
+                                                  unsafe_allow_html=True)
+                                    if not new_genders:
+                                        is_valid = False
+                                        st.markdown('<p class="validation-error">Please select at least one gender</p>', 
+                                                  unsafe_allow_html=True)
+                                    
+                                    submitted = st.form_submit_button("Save Changes")
+                                    if submitted and is_valid:
+                                        # Get current color
+                                        color = parse_color_string(item['color'])
+                                        success, message = edit_clothing_item(
+                                            item['id'],
+                                            color,
+                                            new_styles,
+                                            new_genders,
+                                            new_sizes,
+                                            new_hyperlink,
+                                            new_price if new_price > 0 else None
+                                        )
+                                        if success:
+                                            st.session_state.edit_success = True
+                                            st.success(message)
+                                            st.rerun()
+                                        else:
+                                            st.error(message)
+                                            
                             # Add a separator between items
                             st.markdown("---")
     else:
