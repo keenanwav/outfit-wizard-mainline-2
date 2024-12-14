@@ -40,138 +40,95 @@ def delete_file_batch(file_batch: List[str]) -> Tuple[int, List[str]]:
     
     return success_count, errors
 
-def cleanup_merged_outfits():
-    """Clean up old unsaved outfit files and orphaned database entries"""
-    try:
-        # First, clean up orphaned database entries
-        from data_manager import cleanup_orphaned_entries
-        success, message = cleanup_orphaned_entries()
-        if not success:
-            logging.error(f"Failed to clean up orphaned entries: {message}")
-        else:
-            logging.info(f"Orphaned entries cleanup: {message}")
-
-        if not os.path.exists('merged_outfits'):
-            logging.info("Merged outfits directory does not exist. No cleanup needed.")
-            return
-            
-        # Get cleanup settings from database
-        from data_manager import get_cleanup_settings, update_last_cleanup_time
+def bulk_delete_items(item_ids: List[int]) -> Tuple[bool, str, Dict]:
+    """Delete multiple clothing items in bulk with their associated files
+    
+    Args:
+        item_ids: List of item IDs to delete
         
-        settings = get_cleanup_settings()
-        if not settings:
-            logging.error("Failed to get cleanup settings from database")
-            return
-            
-        current_time = datetime.now()
-        last_cleanup = settings['last_cleanup']
-        cleanup_interval = timedelta(hours=settings['cleanup_interval_hours'])
+    Returns:
+        Tuple containing:
+        - Success status (bool)
+        - Status message (str)
+        - Statistics dictionary with counts of successes and failures
+    """
+    if not item_ids:
+        return True, "No items to delete", {"deleted": 0, "failed": 0}
         
-        # Check if cleanup is needed based on interval
-        if last_cleanup and (current_time - last_cleanup) < cleanup_interval:
-            logging.info(f"Cleanup not needed yet. Next cleanup in {cleanup_interval - (current_time - last_cleanup)}")
-            return
-            
-        stats = {
-            'total_files': 0,
-            'cleaned_count': 0,
-            'skipped_files': 0,
-            'error_count': 0,
-            'batches_processed': 0
-        }
-        all_errors = []
+    stats = {
+        "deleted": 0,
+        "failed": 0,
+        "errors": []
+    }
+    
+    # Process deletions in batches using thread pool
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        # Split into reasonable batch sizes
+        batch_size = 10
+        batches = [item_ids[i:i + batch_size] for i in range(0, len(item_ids), batch_size)]
         
-        # Get list of saved outfits from database to avoid deleting them
-        from data_manager import get_db_connection
-        
-        with get_db_connection() as conn:
-            cur = conn.cursor()
+        # Process each batch
+        for batch in batches:
             try:
-                cur.execute("SELECT image_path FROM saved_outfits WHERE image_path IS NOT NULL")
-                saved_paths = set(path[0] for path in cur.fetchall())
-                logging.info(f"Found {len(saved_paths)} saved outfits to preserve")
-            finally:
-                cur.close()
-        
-        # Get all files to delete
-        files_to_delete = []
-        for filename in os.listdir('merged_outfits'):
-            stats['total_files'] += 1
-            file_path = os.path.join('merged_outfits', filename)
-            
-            # Skip if file is in saved outfits
-            if file_path in saved_paths:
-                stats['skipped_files'] += 1
-                logging.debug(f"Skipping saved outfit file: {filename}")
-                continue
+                from data_manager import get_db_connection
                 
-            # Check file age
-            try:
-                file_time = datetime.fromtimestamp(os.path.getctime(file_path))
-                age = current_time - file_time
-                
-                if age > timedelta(hours=settings['max_age_hours']):
-                    files_to_delete.append(file_path)
-                    logging.debug(f"Marking file for deletion: {filename} (Age: {age})")
-                else:
-                    stats['skipped_files'] += 1
-                    logging.debug(f"File {filename} is not old enough for cleanup (Age: {age})")
-            except OSError as e:
-                logging.error(f"Error checking file age for {file_path}: {str(e)}")
-                stats['error_count'] += 1
-                continue
-        
-        # Process files in batches using thread pool
-        if files_to_delete:
-            with ThreadPoolExecutor(max_workers=settings['max_workers']) as executor:
-                # Split files into batches
-                batches = [files_to_delete[i:i + settings['batch_size']] 
-                          for i in range(0, len(files_to_delete), settings['batch_size'])]
-                
-                # Submit batch jobs
-                future_to_batch = {
-                    executor.submit(delete_file_batch, batch): batch 
-                    for batch in batches
-                }
-                
-                # Process completed batches
-                for future in as_completed(future_to_batch):
-                    batch = future_to_batch[future]
+                with get_db_connection() as conn:
+                    cur = conn.cursor()
                     try:
-                        success_count, errors = future.result()
-                        stats['cleaned_count'] += success_count
-                        stats['error_count'] += len(errors)
-                        all_errors.extend(errors)
-                        stats['batches_processed'] += 1
+                        # Get image paths for the batch
+                        placeholders = ','.join(['%s'] * len(batch))
+                        cur.execute(f"""
+                            SELECT id, image_path 
+                            FROM user_clothing_items 
+                            WHERE id IN ({placeholders})
+                        """, tuple(batch))
+                        items = cur.fetchall()
                         
-                        # Log batch completion
-                        logging.info(f"Batch completed: {success_count}/{len(batch)} files deleted successfully")
-                        if errors:
-                            logging.warning(f"Batch errors: {len(errors)} errors occurred")
+                        for item_id, image_path in items:
+                            try:
+                                # Delete the image file if it exists
+                                if image_path and os.path.exists(image_path):
+                                    os.remove(image_path)
+                                
+                                # Delete from database
+                                cur.execute("""
+                                    DELETE FROM user_clothing_items 
+                                    WHERE id = %s
+                                """, (item_id,))
+                                
+                                stats["deleted"] += 1
+                                logging.info(f"Successfully deleted item {item_id}")
+                                
+                            except Exception as e:
+                                stats["failed"] += 1
+                                error_msg = f"Failed to delete item {item_id}: {str(e)}"
+                                stats["errors"].append(error_msg)
+                                logging.error(error_msg)
+                        
+                        conn.commit()
                     except Exception as e:
-                        logging.error(f"Batch processing error: {str(e)}")
-                        stats['error_count'] += len(batch)
-        
-        # Update last cleanup time
-        update_last_cleanup_time()
-        
-        # Log final cleanup statistics
-        logging.info(
-            f"Cleanup Summary: "
-            f"Total files: {stats['total_files']}, "
-            f"Cleaned: {stats['cleaned_count']}, "
-            f"Skipped: {stats['skipped_files']}, "
-            f"Errors: {stats['error_count']}, "
-            f"Batches: {stats['batches_processed']}"
-        )
-        
-        if all_errors:
-            logging.warning(f"Cleanup Errors:\n" + "\n".join(all_errors))
-        
-        return stats['cleaned_count']
-    except Exception as e:
-        logging.error(f"Error during outfit cleanup: {str(e)}")
-        return 0
+                        conn.rollback()
+                        raise
+                    finally:
+                        cur.close()
+                        
+            except Exception as e:
+                batch_error = f"Batch processing error: {str(e)}"
+                stats["errors"].append(batch_error)
+                logging.error(batch_error)
+                stats["failed"] += len(batch)
+    
+    # Prepare result message
+    message = f"Deleted {stats['deleted']} items"
+    if stats["failed"] > 0:
+        message += f", {stats['failed']} failed"
+    
+    success = stats["failed"] == 0
+    
+    if stats["errors"]:
+        logging.warning("Bulk delete errors:\n" + "\n".join(stats["errors"]))
+    
+    return success, message, stats
 
 def calculate_outfit_total_price(outfit: Dict) -> float:
     """Calculate the total price of an outfit"""
@@ -188,9 +145,7 @@ def generate_outfit(clothing_items, size, style, gender):
     missing_items = []
     
     if not os.path.exists('merged_outfits'):
-        os.makedirs('merged_outfits')
-    
-    cleanup_merged_outfits()
+        os.makedirs('merged_outfits', exist_ok=True)
     
     # Add a small delay for better user experience
     time.sleep(0.5)
