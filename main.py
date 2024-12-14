@@ -784,6 +784,149 @@ def personal_wardrobe_page():
     """Display and manage personal wardrobe items"""
     st.title("My Items")
     
+    # Load clothing items
+    items_df = load_clothing_items()
+    
+    if items_df.empty:
+        st.info("Your wardrobe is empty! Add some items to get started.")
+        st.markdown("""
+        ### Getting Started 👕
+        1. Use the "Add New Item" form below to add clothing to your wardrobe
+        2. Add details like type, color, and style
+        3. Upload a clear image of your item
+        """)
+    else:
+        # Create tabs for different views
+        list_tab, grid_tab, stats_tab = st.tabs(["📋 List View", "🎯 Grid View", "📊 Statistics"])
+        
+        with list_tab:
+            for _, item in items_df.iterrows():
+                with st.container():
+                    col1, col2, col3 = st.columns([1, 2, 1])
+                    
+                    with col1:
+                        if os.path.exists(item['image_path']):
+                            st.image(item['image_path'], width=150)
+                    
+                    with col2:
+                        st.markdown(f"**Type:** {item['type'].capitalize()}")
+                        st.markdown(f"**Style:** {item['style']}")
+                        st.markdown(f"**Color:**")
+                        color = parse_color_string(str(item['color']))
+                        display_color_palette([color], use_columns=False)
+                        if item.get('season'):
+                            st.markdown(f"**Season:** {item['season']}")
+                    
+                    with col3:
+                        if st.button("🗑️", key=f"delete_{item['id']}"):
+                            if delete_clothing_item(item['id']):
+                                st.success("Item deleted successfully!")
+                                st.rerun()
+                        if st.button("✏️", key=f"edit_{item['id']}"):
+                            st.session_state.editing_item = item['id']
+                            st.rerun()
+                    
+                    st.markdown("---")
+        
+        with grid_tab:
+            cols = st.columns(3)
+            for idx, (_, item) in enumerate(items_df.iterrows()):
+                with cols[idx % 3]:
+                    if os.path.exists(item['image_path']):
+                        st.image(item['image_path'], use_column_width=True)
+                    st.markdown(f"**{item['type'].capitalize()}**")
+                    st.markdown(f"Style: {item['style']}")
+                    color = parse_color_string(str(item['color']))
+                    display_color_palette([color], use_columns=False)
+        
+        with stats_tab:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("Items by Type")
+                type_counts = items_df['type'].value_counts()
+                st.bar_chart(type_counts)
+            
+            with col2:
+                st.subheader("Items by Style")
+                style_counts = items_df['style'].value_counts()
+                st.bar_chart(style_counts)
+    
+    # Add New Item Form
+    st.markdown("### 👕 Add New Item")
+    with st.form("new_item_form"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            item_type = st.selectbox(
+                "Type",
+                ["shirt", "pants", "shoes"],
+                key="new_item_type"
+            )
+            style = st.selectbox(
+                "Style",
+                ["Casual", "Formal", "Sport", "Beach"],
+                key="new_item_style"
+            )
+            season = st.selectbox(
+                "Season",
+                ["Spring", "Summer", "Fall", "Winter"],
+                key="new_item_season"
+            )
+        
+        with col2:
+            uploaded_file = st.file_uploader("Upload Image (PNG only)", type="png")
+            if uploaded_file:
+                st.image(uploaded_file)
+                
+            tags = st.text_input(
+                "Tags (comma-separated)",
+                key="new_item_tags",
+                help="Add searchable tags like 'cotton, favorite, work'"
+            )
+        
+        submit_button = st.form_submit_button("Add Item")
+        
+        if submit_button:
+            if not uploaded_file:
+                st.error("Please upload an image for the item")
+            else:
+                # Save the uploaded file
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                file_path = os.path.join('user_images', f'{item_type}_{timestamp}.png')
+                
+                # Ensure directory exists
+                os.makedirs('user_images', exist_ok=True)
+                
+                # Save the file
+                with open(file_path, 'wb') as f:
+                    f.write(uploaded_file.getbuffer())
+                
+                # Process the image to extract color
+                colors = get_color_palette(file_path, n_colors=1)
+                if colors is not None and len(colors) > 0:
+                    color_str = ','.join(map(str, colors[0]))
+                else:
+                    color_str = '128,128,128'  # Default gray if color extraction fails
+                
+                # Save item to database
+                item_data = {
+                    'type': item_type,
+                    'style': style,
+                    'color': color_str,
+                    'image_path': file_path,
+                    'season': season,
+                    'tags': tags
+                }
+                
+                if save_clothing_item(item_data):
+                    st.success("Item added successfully!")
+                    st.rerun()
+                else:
+                    st.error("Error saving item")
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+    
 def bulk_delete_page():
     """Display bulk delete and edit interface for clothing items"""
     st.title("Bulk Item Management")
