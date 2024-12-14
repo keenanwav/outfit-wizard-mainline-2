@@ -805,8 +805,11 @@ def personal_wardrobe_page():
                     col1, col2, col3 = st.columns([1, 2, 1])
                     
                     with col1:
-                        if os.path.exists(item['image_path']):
-                            st.image(item['image_path'], width=150)
+                        image_path = item.get('image_path')
+                        if image_path and os.path.exists(image_path):
+                            st.image(image_path, width=150)
+                        else:
+                            st.markdown("🖼️ No image available")
                     
                     with col2:
                         st.markdown(f"**Type:** {item['type'].capitalize()}")
@@ -832,8 +835,11 @@ def personal_wardrobe_page():
             cols = st.columns(3)
             for idx, (_, item) in enumerate(items_df.iterrows()):
                 with cols[idx % 3]:
-                    if os.path.exists(item['image_path']):
-                        st.image(item['image_path'], use_column_width=True)
+                    image_path = item.get('image_path')
+                    if image_path and os.path.exists(image_path):
+                        st.image(image_path, use_column_width=True)
+                    else:
+                        st.markdown("🖼️ No image available")
                     st.markdown(f"**{item['type'].capitalize()}**")
                     st.markdown(f"Style: {item['style']}")
                     color = parse_color_string(str(item['color']))
