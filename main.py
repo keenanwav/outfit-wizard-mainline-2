@@ -717,6 +717,112 @@ def personal_wardrobe_page():
     """Display and manage personal wardrobe items"""
     st.title("My Items")
     
+def bulk_delete_page():
+    """Display bulk delete and edit interface for clothing items"""
+    st.title("Bulk Item Management")
+    
+    # Load all clothing items
+    items_df = load_clothing_items()
+    
+    if items_df.empty:
+        st.warning("No items available in your wardrobe.")
+        return
+        
+    with st.form("bulk_management_form"):
+        # Create formatted options for multiselect
+        item_options = [
+            f"{row['id']} - {row['type'].capitalize()} ({row['color']}, {row['style']})"
+            for _, row in items_df.iterrows()
+        ]
+        
+        selected_items = st.multiselect(
+            "Select Items to Manage",
+            options=item_options,
+            help="Choose multiple items to delete or edit"
+        )
+        
+        # Extract IDs from selected items
+        selected_ids = [int(item.split(' - ')[0]) for item in selected_items]
+        
+        # Only show bulk edit options if items are selected
+        if selected_ids:
+            st.subheader("Bulk Edit Options")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                new_style = st.selectbox(
+                    "Update Style",
+                    options=["", "Casual", "Formal", "Sport", "Beach"],
+                    help="Leave empty to keep current styles"
+                )
+                
+                new_season = st.selectbox(
+                    "Update Season",
+                    options=["", "Spring", "Summer", "Fall", "Winter"],
+                    help="Leave empty to keep current seasons"
+                )
+            
+            with col2:
+                new_gender = st.selectbox(
+                    "Update Gender",
+                    options=["", "Male", "Female", "Unisex"],
+                    help="Leave empty to keep current gender settings"
+                )
+                
+                new_size = st.selectbox(
+                    "Update Size",
+                    options=["", "S", "M", "L", "XL"],
+                    help="Leave empty to keep current sizes"
+                )
+        
+        # Action buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            delete_button = st.form_submit_button("🗑️ Delete Selected Items")
+        with col2:
+            update_button = st.form_submit_button("✨ Update Selected Items")
+            
+    # Handle delete action
+    if delete_button and selected_ids:
+        if st.session_state.get('confirm_delete', False):
+            success, message, stats = bulk_delete_items(selected_ids)
+            if success:
+                st.success(f"Successfully deleted {stats['deleted']} items!")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error(f"Error during deletion: {message}")
+                if stats.get('errors'):
+                    with st.expander("View Error Details"):
+                        for error in stats['errors']:
+                            st.write(error)
+            st.session_state.confirm_delete = False
+        else:
+            st.warning(f"⚠️ Are you sure you want to delete {len(selected_ids)} items?")
+            if st.button("Yes, Delete Items"):
+                st.session_state.confirm_delete = True
+                st.rerun()
+                
+    # Handle update action
+    if update_button and selected_ids:
+        try:
+            updates = {}
+            if new_style: updates['style'] = new_style
+            if new_season: updates['season'] = new_season
+            if new_gender: updates['gender'] = new_gender
+            if new_size: updates['size'] = new_size
+            
+            if updates:
+                with st.spinner("Updating items..."):
+                    for item_id in selected_ids:
+                        update_item_details(item_id, updates)
+                st.success(f"Successfully updated {len(selected_ids)} items!")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.info("No updates selected. Choose at least one attribute to update.")
+        except Exception as e:
+            st.error(f"Error updating items: {str(e)}")
     # Initialize session state for editing
     if 'editing_item' not in st.session_state:
         st.session_state.editing_item = None
