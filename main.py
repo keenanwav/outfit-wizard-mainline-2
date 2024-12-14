@@ -803,6 +803,13 @@ def personal_wardrobe_page():
                                     for styles in items_df['style'].str.split(',')
                                     for style in styles]).value_counts()
             st.bar_chart(style_counts)
+            
+            st.markdown("### Items by Gender")
+            # Count items by gender (handle multiple genders per item)
+            gender_counts = pd.Series([gender.strip() 
+                                     for genders in items_df['gender'].str.split(',')
+                                     for gender in genders]).value_counts()
+            st.bar_chart(gender_counts)
         else:
             st.info("Add some items to see statistics!")
     
