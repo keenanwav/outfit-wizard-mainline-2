@@ -4,6 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import pandas as pd
 from collections import Counter
+from auth_utils import init_auth_tables, init_session_state, create_user, authenticate_user, logout_user
 from data_manager import (
     load_clothing_items, save_outfit, load_saved_outfits,
     edit_clothing_item, delete_clothing_item, create_user_items_table,
@@ -199,6 +200,71 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Initialize authentication
+init_auth_tables()
+init_session_state()
+
+# Add login/signup button to sidebar
+with st.sidebar:
+    if st.session_state.user:
+        st.write(f"👤 Welcome, {st.session_state.user['username']}!")
+        if st.button("📤 Logout"):
+            logout_user()
+            st.rerun()
+    else:
+        if st.button("👤 Login/Signup"):
+            st.session_state.show_auth = True
+            st.rerun()
+
+# Show authentication dialog when requested
+if not st.session_state.user and st.session_state.get('show_auth', False):
+    auth_container = st.container()
+    with auth_container:
+        st.markdown("## 🔐 Authentication")
+        tab1, tab2 = st.tabs(["🔑 Login", "📝 Sign Up"])
+        
+        with tab1:
+            with st.form("login_form"):
+                login_email = st.text_input("Email", key="login_email")
+                login_password = st.text_input("Password", type="password", key="login_password")
+                login_submitted = st.form_submit_button("Login")
+                
+                if login_submitted:
+                    success, user_data = authenticate_user(login_email, login_password)
+                    if success:
+                        st.session_state.user = user_data
+                        st.session_state.show_auth = False
+                        st.rerun()
+                    else:
+                        st.error("Invalid email or password")
+        
+        with tab2:
+            with st.form("signup_form"):
+                new_username = st.text_input("Username", key="signup_username")
+                new_email = st.text_input("Email", key="signup_email")
+                new_password = st.text_input("Password", type="password", key="signup_password")
+                confirm_password = st.text_input("Confirm Password", type="password", key="signup_confirm")
+                signup_submitted = st.form_submit_button("Sign Up")
+                
+                if signup_submitted:
+                    if new_password != confirm_password:
+                        st.error("Passwords do not match")
+                    elif len(new_password) < 8:
+                        st.error("Password must be at least 8 characters long")
+                    else:
+                        if create_user(new_username, new_email, new_password):
+                            success, user_data = authenticate_user(new_email, new_password)
+                            if success:
+                                st.session_state.user = user_data
+                                st.session_state.show_auth = False
+                                st.rerun()
+                        else:
+                            st.error("Username or email already exists")
+        
+        if st.button("✖️ Close"):
+            st.session_state.show_auth = False
+            st.rerun()
 
 # Initialize session state for various UI states
 if 'show_prices' not in st.session_state:
