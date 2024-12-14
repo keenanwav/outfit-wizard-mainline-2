@@ -1317,9 +1317,7 @@ def redo_edit(item_id):
     else:
         return False, "No edits to redo"
 
-# Update the main sidebar menu to include the new dashboard
-def bulk_delete_page():
-# Update the main sidebar menu to include the new dashboard
+# Update the main sidebar menu to include the bulk delete page
 def bulk_delete_page():
     """Display the bulk delete interface for managing uploaded items"""
     st.title("Bulk Delete Items")
