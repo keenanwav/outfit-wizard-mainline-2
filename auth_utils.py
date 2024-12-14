@@ -38,6 +38,21 @@ def init_auth_tables():
                     CHECK (role IN ('admin', 'user'))
                 )
             """)
+            
+            # Create clothing items table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS clothing_items (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id),
+                    type VARCHAR(20) NOT NULL,
+                    style VARCHAR(20) NOT NULL,
+                    color VARCHAR(50),
+                    image_path VARCHAR(255),
+                    season VARCHAR(20),
+                    tags TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             conn.commit()
 
 def hash_password(password: str) -> bytes:
