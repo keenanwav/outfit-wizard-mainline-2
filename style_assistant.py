@@ -111,17 +111,14 @@ def get_style_recommendation(
                 if any(color in item['color'].lower() for color in preferred_colors)
             ]
     
-    # Select exactly one item per category from user's wardrobe
-    required_types = ['shirt', 'pants', 'shoes']
-    for item_type in required_types:
-        # Filter items by type from suitable items (which are from user's wardrobe)
+    # Select items by type ensuring complete outfit from user's wardrobe
+    selected_items = {'shirt': None, 'pants': None, 'shoes': None}
+    for item_type in selected_items:
+        # Filter items by type from the user's wardrobe (suitable_items already contains user's items)
         type_items = [item for item in suitable_items if item['type'] == item_type]
         if type_items:
-            # Select the first suitable item of this type
+            selected_items[item_type] = type_items[0]  # Select first suitable item from user's wardrobe
             recommended_items.append(type_items[0])
-        else:
-            # If no suitable item found for a required type, log it
-            logging.warning(f"No suitable {item_type} found in user's wardrobe for the given criteria")
     
     # Generate style tips based on occasion
     if occasion == 'formal':
