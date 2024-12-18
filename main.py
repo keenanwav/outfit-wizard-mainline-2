@@ -197,9 +197,20 @@ logging.basicConfig(
 st.set_page_config(
     page_title="Outfit Wizard",
     page_icon="👕",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
+
+# Add PWA meta tags
+st.markdown("""
+    <head>
+        <link rel="manifest" href="/static/manifest.json">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black">
+        <meta name="apple-mobile-web-app-title" content="Outfit Wizard">
+        <link rel="apple-touch-icon" href="/static/icon-192.png">
+    </head>
+""", unsafe_allow_html=True)
 
 # Initialize authentication
 init_auth_tables()
