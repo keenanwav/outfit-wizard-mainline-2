@@ -1,4 +1,3 @@
-```python
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
@@ -15,7 +14,7 @@ class FitPredictor:
         self.feature_names = ['type', 'style', 'color', 'size']
         self.model_path = 'models/fit_predictor.joblib'
         self.initialize_model()
-    
+
     def initialize_model(self):
         """Initialize or load the existing model"""
         if os.path.exists(self.model_path):
@@ -43,7 +42,7 @@ class FitPredictor:
             value = str(item.get(feature, '')).lower()
             if feature not in self.label_encoders:
                 self.label_encoders[feature] = LabelEncoder()
-            
+
             # Fit the encoder if it's a new value
             try:
                 encoded = self.label_encoders[feature].transform([value])[0]
@@ -51,7 +50,7 @@ class FitPredictor:
                 # If new category encountered, refit the encoder
                 self.label_encoders[feature].fit(list(self.label_encoders[feature].classes_) + [value])
                 encoded = self.label_encoders[feature].transform([value])[0]
-            
+
             features.append(encoded)
         return np.array(features)
 
@@ -90,12 +89,12 @@ class FitPredictor:
         try:
             outfit_features = []
             item_scores = {}
-            
+
             for item_type in ['shirt', 'pants', 'shoes']:
                 if item_type in outfit:
                     item_features = self.preprocess_item(outfit[item_type])
                     outfit_features.extend(item_features)
-                    
+
                     # Calculate individual item scores
                     item_prediction = self.model.predict_proba(item_features.reshape(1, -1))
                     item_scores[item_type] = float(item_prediction[0][1])
@@ -109,7 +108,7 @@ class FitPredictor:
             fit_score = float(prediction[0][1])  # Probability of good fit
 
             return fit_score, item_scores
-            
+
         except Exception as e:
             logging.error(f"Error predicting fit: {str(e)}")
             return 0.0, {}
@@ -117,11 +116,10 @@ class FitPredictor:
     def update_feedback(self, outfit_id: str, feedback_score: float):
         """Update model with new feedback"""
         from data_manager import get_outfit_details
-        
+
         outfit = get_outfit_details(outfit_id)
         if outfit:
             self.train([outfit], [feedback_score])
             logging.info(f"Updated model with feedback for outfit {outfit_id}")
             return True
         return False
-```
