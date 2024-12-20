@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Tuple, Dict
 import psycopg2
+from fit_predictor import FitPredictor
 
 def is_valid_image(image_path: str) -> bool:
     """Validate if an image file exists and can be opened"""
@@ -139,47 +140,55 @@ def calculate_outfit_total_price(outfit: Dict) -> float:
                 total_price += float(item['price'])
     return total_price
 
+# Initialize fit predictor
+fit_predictor = FitPredictor()
+
 def generate_outfit(clothing_items, size, style, gender):
-    """Generate an outfit based on given criteria"""
+    """Generate an outfit based on given criteria with fit prediction"""
     selected_outfit = {}
     missing_items = []
-    
+
     if not os.path.exists('merged_outfits'):
         os.makedirs('merged_outfits', exist_ok=True)
-    
+
     # Add a small delay for better user experience
     time.sleep(0.5)
-    
+
     # Filter items based on criteria
     filtered_items = clothing_items[
         (clothing_items['size'].str.contains(size, na=False)) &
         (clothing_items['style'].str.contains(style, na=False)) &
         (clothing_items['gender'].str.contains(gender, na=False))
     ]
-    
+
     # Select one item of each type, ensuring images are valid
     for item_type in ['shirt', 'pants', 'shoes']:
         type_items = filtered_items[filtered_items['type'] == item_type]
-        
+
         # Filter out items with invalid images
         valid_items = type_items[type_items['image_path'].apply(lambda x: is_valid_image(x))]
-        
+
         if not valid_items.empty:
             selected_item = valid_items.sample(n=1).iloc[0]
             selected_outfit[item_type] = {
                 'image_path': selected_item['image_path'],
                 'color': selected_item['color'],
                 'price': float(selected_item['price']) if selected_item['price'] else 0,
-                'hyperlink': selected_item['hyperlink'] if selected_item['hyperlink'] else None
+                'hyperlink': selected_item['hyperlink'] if selected_item['hyperlink'] else None,
+                'style': selected_item['style'],
+                'size': selected_item['size'],
+                'type': item_type
             }
         else:
             missing_items.append(item_type)
-    
+
     if len(selected_outfit) == 3:  # We have all three items
         try:
-            # Add a small delay before image processing
-            time.sleep(0.5)
-            
+            # Get fit prediction
+            fit_score, item_scores = fit_predictor.predict_fit(selected_outfit)
+            selected_outfit['fit_score'] = fit_score
+            selected_outfit['item_fit_scores'] = item_scores
+
             # Increase template dimensions for larger display
             template_width = 750  # Reduced by 25% from 1000
             template_height = 900  # Reduced by 25% from 1200
@@ -286,5 +295,9 @@ def generate_outfit(clothing_items, size, style, gender):
         except Exception as e:
             logging.error(f"Error creating merged outfit image: {str(e)}")
             return {}, ['Error creating outfit image']
-    
+
     return selected_outfit, missing_items
+
+def update_outfit_feedback(outfit_id: str, feedback_score: float):
+    """Update fit predictor with user feedback"""
+    return fit_predictor.update_feedback(outfit_id, feedback_score)
