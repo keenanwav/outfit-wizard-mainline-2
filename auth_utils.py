@@ -7,6 +7,7 @@ from psycopg2.pool import SimpleConnectionPool
 from contextlib import contextmanager
 import time
 import logging
+import functools
 
 # Configure logging
 logging.basicConfig(
@@ -168,6 +169,29 @@ def authenticate_user(email: str, password: str) -> tuple[bool, dict]:
         logging.error(f"Error authenticating user: {str(e)}")
         st.error(f"Error authenticating user: {str(e)}")
         return False, {}
+
+def require_admin(func):
+    """Decorator to require admin role for accessing certain pages"""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if not st.session_state.user:
+            st.error("Please log in to access this page")
+            st.stop()
+        elif st.session_state.user.get('role') != 'admin':
+            st.error("You don't have permission to access this page")
+            st.stop()
+        return func(*args, **kwargs)
+    return wrapper
+
+def require_auth(func):
+    """Decorator to require authentication for accessing pages"""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if not st.session_state.user:
+            st.error("Please log in to access this page")
+            st.stop()
+        return func(*args, **kwargs)
+    return wrapper
 
 def init_session_state():
     """Initialize session state variables for authentication"""
