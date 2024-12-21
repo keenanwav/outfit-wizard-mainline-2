@@ -14,6 +14,9 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
+# Declare global connection pool
+connection_pool = None
+
 # Initialize connection pool with retry logic
 def create_connection_pool(max_retries=3, retry_delay=5):
     """Create database connection pool with retry logic"""
@@ -44,6 +47,7 @@ def create_connection_pool(max_retries=3, retry_delay=5):
     logging.error(f"Database connection timeout: {str(last_exception)}")
     raise last_exception
 
+# Initialize the connection pool
 try:
     connection_pool = create_connection_pool()
 except Exception as e:
@@ -53,6 +57,8 @@ except Exception as e:
 @contextmanager
 def get_db_connection():
     """Context manager for database connections with retry logic"""
+    global connection_pool
+
     if connection_pool is None:
         raise RuntimeError("Database connection pool not initialized")
 
@@ -63,7 +69,6 @@ def get_db_connection():
     except psycopg2.OperationalError as e:
         logging.error(f"Database operation failed: {str(e)}")
         # Try to reinitialize the connection pool
-        global connection_pool
         try:
             connection_pool = create_connection_pool()
             conn = connection_pool.getconn()
