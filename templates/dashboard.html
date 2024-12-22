@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 style="text-align: center;">Welcome, {{ user.username }}!</h2>
+<p style="text-align: center;">You have successfully logged in.</p>
+<div style="text-align: center; margin-top: 20px;">
+    <a href="{{ url_for('logout') }}" style="color: #1877f2; text-decoration: none;">Logout</a>
+</div>
+{% endblock %}
