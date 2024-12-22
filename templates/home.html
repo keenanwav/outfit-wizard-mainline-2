@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 style="text-align: center;">Welcome to Digital Wardrobe</h2>
+<div style="text-align: center; margin-top: 30px;">
+    <button onclick="window.location.href='{{ url_for('login') }}'" style="max-width: 200px;">Login</button>
+    <div class="links" style="margin-top: 15px;">
+        <a href="{{ url_for('register') }}">New user? Register here</a>
+    </div>
+</div>
+{% endblock %}
