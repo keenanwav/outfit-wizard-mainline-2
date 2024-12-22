@@ -7,9 +7,8 @@ from psycopg2.pool import SimpleConnectionPool
 from contextlib import contextmanager
 from typing import Optional, Dict, Tuple
 import pyotp
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 import random
 import string
 
@@ -30,47 +29,47 @@ def create_connection_pool():
 connection_pool = create_connection_pool()
 
 def send_verification_email(email: str, code: str) -> bool:
-    """Send verification email with the provided code"""
+    """Send verification email with the provided code using SendGrid"""
     try:
+        sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
         sender_email = os.environ.get('EMAIL_SENDER')
-        sender_password = os.environ.get('EMAIL_PASSWORD')
 
-        if not sender_email or not sender_password:
-            st.error("Email configuration is missing. Please check EMAIL_SENDER and EMAIL_PASSWORD environment variables.")
+        if not sendgrid_api_key or not sender_email:
+            st.error("SendGrid configuration is missing. Please check SENDGRID_API_KEY and EMAIL_SENDER environment variables.")
             return False
 
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = email
-        msg['Subject'] = 'Digital Wardrobe - Email Verification'
+        message = Mail(
+            from_email=sender_email,
+            to_emails=email,
+            subject='Digital Wardrobe - Email Verification',
+            plain_text_content=f"""
+Welcome to Digital Wardrobe!
 
-        body = f"""
-        Welcome to Digital Wardrobe!
+Your verification code is: {code}
 
-        Your verification code is: {code}
+Please enter this code in the application to verify your email address.
+This code will expire in 10 minutes.
 
-        Please enter this code in the application to verify your email address.
-        This code will expire in 10 minutes.
-
-        If you didn't request this code, please ignore this email.
-        """
-        msg.attach(MIMEText(body, 'plain'))
+If you didn't request this code, please ignore this email.
+            """
+        )
 
         # Add debug logging
         st.info(f"Attempting to send verification email to {email}")
 
         try:
-            # Use SSL/TLS connection
-            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-                server.login(sender_email, sender_password)
-                server.send_message(msg)
+            sg = SendGridAPIClient(sendgrid_api_key)
+            response = sg.send(message)
+
+            if response.status_code in [200, 201, 202]:
                 st.success(f"Verification email sent successfully to {email}")
                 return True
-        except smtplib.SMTPAuthenticationError:
-            st.error("Failed to authenticate with email server. Please check if you've enabled 'Less secure app access' in your Gmail account.")
-            return False
-        except smtplib.SMTPException as smtp_error:
-            st.error(f"SMTP error occurred: {str(smtp_error)}")
+            else:
+                st.error(f"Failed to send email. Status code: {response.status_code}")
+                return False
+
+        except Exception as e:
+            st.error(f"SendGrid error: {str(e)}")
             return False
 
     except Exception as e:
@@ -460,26 +459,28 @@ def logout_user():
     st.session_state.auth_status = None
 
 def test_email_configuration() -> bool:
-    """Test email configuration by sending a test email"""
+    """Test SendGrid email configuration"""
     try:
+        sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
         sender_email = os.environ.get('EMAIL_SENDER')
-        sender_password = os.environ.get('EMAIL_PASSWORD')
 
-        if not sender_email or not sender_password:
-            st.error("Email configuration is missing")
+        if not sendgrid_api_key or not sender_email:
+            st.error("SendGrid configuration is missing")
             return False
 
-        # Try to establish connection
+        # Try to initialize SendGrid client
         try:
-            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-                server.login(sender_email, sender_password)
-                st.success("Email configuration is valid")
+            sg = SendGridAPIClient(sendgrid_api_key)
+            # Verify API key by making a simple request
+            response = sg.client.suppression.bounces.get()
+            if response.status_code == 200:
+                st.success("SendGrid configuration is valid")
                 return True
-        except smtplib.SMTPAuthenticationError:
-            st.error("Email authentication failed. Please check your credentials and Gmail settings")
-            return False
+            else:
+                st.error(f"SendGrid API test failed with status code: {response.status_code}")
+                return False
         except Exception as e:
-            st.error(f"Failed to connect to email server: {str(e)}")
+            st.error(f"SendGrid configuration test failed: {str(e)}")
             return False
 
     except Exception as e:
