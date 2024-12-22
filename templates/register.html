@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+{% block content %}
+<h1>Register</h1>
+<form method="POST">
+    <div class="form-group">
+        <label for="email">Email (Gmail only):</label>
+        <input type="email" id="email" name="email" required>
+    </div>
+    <div class="form-group">
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+        <small>
+            Password must:
+            <ul>
+                <li>Be 5-16 characters long</li>
+                <li>Contain at least one uppercase letter</li>
+                <li>Contain at least one lowercase letter</li>
+                <li>Contain at least one number</li>
+                <li>Contain at least one special character</li>
+            </ul>
+        </small>
+    </div>
+    <button type="submit">Register</button>
+</form>
+<p>Already have an account? <a href="{{ url_for('login') }}">Login here</a></p>
+{% endblock %}
