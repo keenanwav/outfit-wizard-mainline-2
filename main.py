@@ -4,7 +4,6 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import pandas as pd
 from collections import Counter
-from auth_utils import init_auth_tables, init_session_state, create_user, authenticate_user, logout_user
 from data_manager import (
     load_clothing_items, save_outfit, load_saved_outfits,
     edit_clothing_item, delete_clothing_item, create_user_items_table,
@@ -20,6 +19,7 @@ from outfit_generator import generate_outfit, bulk_delete_items, is_valid_image
 from datetime import datetime, timedelta
 from style_assistant import get_style_recommendation, format_clothing_items
 import time
+
 def create_mannequin_outfit_image(recommended_items, weather=None, template_size=(800, 1000)):
     """Create a visualization of the outfit using the mannequin template and clothing templates"""
     from clothing_templates import get_template_for_item, apply_color_to_template, get_item_position, parse_color_string
@@ -201,44 +201,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize authentication
-init_auth_tables()
-init_session_state()
-
-# Add login/signup button to sidebar
-with st.sidebar:
-    if st.session_state.user:
-        st.write(f"👤 Welcome, {st.session_state.user['username']}!")
-        if st.button("📤 Logout"):
-            logout_user()
-            st.rerun()
-    else:
-        if st.button("👤 Login"):
-            st.session_state.show_auth = True
-            st.rerun()
-
-# Show authentication dialog when requested
-if not st.session_state.user and st.session_state.get('show_auth', False):
-    auth_container = st.container()
-    with auth_container:
-        st.markdown("## 🔐 Login")
-        with st.form("login_form"):
-            login_email = st.text_input("Email", key="login_email")
-            login_password = st.text_input("Password", type="password", key="login_password")
-            login_submitted = st.form_submit_button("Login")
-
-            if login_submitted:
-                success, user_data = authenticate_user(login_email, login_password)
-                if success:
-                    st.session_state.user = user_data
-                    st.session_state.show_auth = False
-                    st.rerun()
-                else:
-                    st.error("Invalid email or password")
-
-        if st.button("✖️ Close"):
-            st.session_state.show_auth = False
-            st.rerun()
 
 # Initialize session state for various UI states
 if 'show_prices' not in st.session_state:
@@ -435,8 +397,8 @@ def main_page():
                 if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
                     # Add custom filename input
                     custom_name = st.text_input("Enter a name for your outfit (optional)", 
-                                             placeholder="e.g., summer_casual_outfit",
-                                             key="outfit_name")
+                                                 placeholder="e.g., summer_casual_outfit",
+                                                 key="outfit_name")
                     
                     # Generate filename using custom name if provided, otherwise use timestamp
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -609,8 +571,8 @@ def main_page():
         
         with col2:
             preferences = st.text_area("🎯 Style preferences?",
-                                    placeholder="E.g., prefer dark colors, need to look professional",
-                                    height=122)
+                                   placeholder="E.g., prefer dark colors, need to look professional",
+                                   height=122)
         
         generate_col, _ = st.columns([2, 3])
         with generate_col:
@@ -1023,18 +985,18 @@ def personal_wardrobe_page():
                                     
                                     # Edit fields
                                     new_styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"], 
-                                                              default=current_styles)
+                                                               default=current_styles)
                                     new_sizes = st.multiselect("Size", ["S", "M", "L", "XL"], 
-                                                             default=current_sizes)
+                                                                default=current_sizes)
                                     new_genders = st.multiselect("Gender", ["Male", "Female", "Unisex"], 
-                                                               default=current_genders)
+                                                                default=current_genders)
                                     new_hyperlink = st.text_input("Shopping Link", 
                                                                 value=item['hyperlink'] if item['hyperlink'] else "")
                                     new_price = st.number_input("Price ($)", 
-                                                              value=float(item['price']) if item['price'] else 0.0,
-                                                              min_value=0.0, 
-                                                              step=0.01, 
-                                                              format="%.2f")
+                                                               value=float(item['price']) if item['price'] else 0.0,
+                                                               min_value=0.0, 
+                                                               step=0.01, 
+                                                               format="%.2f")
                                     
                                     # Form validation
                                     is_valid = True
@@ -1485,18 +1447,18 @@ def bulk_delete_page():
                                     
                                     # Edit fields
                                     new_styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"], 
-                                                              default=current_styles)
+                                                               default=current_styles)
                                     new_sizes = st.multiselect("Size", ["S", "M", "L", "XL"], 
-                                                             default=current_sizes)
+                                                                default=current_sizes)
                                     new_genders = st.multiselect("Gender", ["Male", "Female", "Unisex"], 
-                                                               default=current_genders)
+                                                                default=current_genders)
                                     new_hyperlink = st.text_input("Shopping Link", 
                                                                 value=item['hyperlink'] if item['hyperlink'] else "")
                                     new_price = st.number_input("Price ($)", 
-                                                              value=float(item['price']) if item['price'] else 0.0,
-                                                              min_value=0.0, 
-                                                              step=0.01, 
-                                                              format="%.2f")
+                                                               value=float(item['price']) if item['price'] else 0.0,
+                                                               min_value=0.0, 
+                                                               step=0.01, 
+                                                               format="%.2f")
                                     
                                     # Form validation
                                     is_valid = True
@@ -1560,7 +1522,7 @@ def bulk_delete_page():
         
     with st.form("bulk_management_form"):
         # Create formatted options for multiselect
-        item_options = [
+        itemoptions = [
             f"{row['id']} - {row['type'].capitalize()} ({row['color']}, {row['style']})"
             for _, row in items_df.iterrows()
         ]
@@ -1947,18 +1909,18 @@ def bulk_delete_page():
                                     
                                     # Edit fields
                                     new_styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"], 
-                                                              default=current_styles)
+                                                               default=current_styles)
                                     new_sizes = st.multiselect("Size", ["S", "M", "L", "XL"], 
-                                                             default=current_sizes)
+                                                                default=current_sizes)
                                     new_genders = st.multiselect("Gender", ["Male", "Female", "Unisex"], 
-                                                               default=current_genders)
+                                                                default=current_genders)
                                     new_hyperlink = st.text_input("Shopping Link", 
                                                                 value=item['hyperlink'] if item['hyperlink'] else "")
                                     new_price = st.number_input("Price ($)", 
-                                                              value=float(item['price']) if item['price'] else 0.0,
-                                                              min_value=0.0, 
-                                                              step=0.01, 
-                                                              format="%.2f")
+                                                               value=float(item['price']) if item['price'] else 0.0,
+                                                               min_value=0.0, 
+                                                               step=0.01, 
+                                                               format="%.2f")
                                     
                                     # Form validation
                                     is_valid = True
