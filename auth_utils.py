@@ -17,26 +17,34 @@ logging.basicConfig(
 # Declare global connection pool
 connection_pool = None
 
-# Initialize connection pool with retry logic
 def create_connection_pool(max_retries=3, retry_delay=5):
     """Create database connection pool with retry logic"""
+    global connection_pool
     retries = 0
     last_exception = None
 
     while retries < max_retries:
         try:
-            return SimpleConnectionPool(
+            if connection_pool is not None:
+                try:
+                    connection_pool.closeall()
+                except Exception:
+                    pass
+
+            connection_pool = SimpleConnectionPool(
                 minconn=1,
                 maxconn=10,
                 dsn=os.environ['DATABASE_URL'],
                 # Add SSL parameters for more reliable connections
-                sslmode='prefer',  # Changed from 'require' to 'prefer' for better compatibility
+                sslmode='prefer',
                 connect_timeout=10,
                 keepalives=1,
                 keepalives_idle=30,
                 keepalives_interval=10,
                 keepalives_count=5
             )
+            logging.info("Successfully created database connection pool")
+            return connection_pool
         except psycopg2.Error as e:
             last_exception = e
             logging.error(f"Database connection attempt {retries + 1} failed: {str(e)}")
@@ -44,44 +52,41 @@ def create_connection_pool(max_retries=3, retry_delay=5):
             if retries < max_retries:
                 time.sleep(retry_delay)
 
-    logging.error(f"Database connection timeout: {str(last_exception)}")
-    raise last_exception
-
-# Initialize the connection pool
-try:
-    connection_pool = create_connection_pool()
-except Exception as e:
-    logging.error(f"Failed to create connection pool: {str(e)}")
-    connection_pool = None
+    logging.error(f"Database connection timeout after {max_retries} attempts: {str(last_exception)}")
+    return None
 
 @contextmanager
 def get_db_connection():
     """Context manager for database connections with retry logic"""
     global connection_pool
-
-    if connection_pool is None:
-        raise RuntimeError("Database connection pool not initialized")
-
     conn = None
     try:
+        # Ensure pool exists
+        if connection_pool is None:
+            connection_pool = create_connection_pool()
+        if connection_pool is None:
+            raise RuntimeError("Failed to create database connection pool")
+
         conn = connection_pool.getconn()
         yield conn
+        if conn.closed == 0:  # If connection is still open
+            conn.commit()
     except psycopg2.OperationalError as e:
         logging.error(f"Database operation failed: {str(e)}")
+        if conn and not conn.closed:
+            conn.rollback()
         # Try to reinitialize the connection pool
-        try:
-            connection_pool = create_connection_pool()
-            conn = connection_pool.getconn()
-            yield conn
-        except Exception as e:
-            logging.error(f"Failed to reconnect to database: {str(e)}")
-            raise
+        connection_pool = create_connection_pool()
+        raise
+    except Exception as e:
+        logging.error(f"Database error: {str(e)}")
+        if conn and not conn.closed:
+            conn.rollback()
+        raise
     finally:
-        if conn:
-            try:
+        if conn is not None:
+            if not conn.closed:
                 connection_pool.putconn(conn)
-            except Exception as e:
-                logging.error(f"Error returning connection to pool: {str(e)}")
 
 def init_auth_tables():
     """Initialize authentication tables"""
@@ -101,6 +106,7 @@ def init_auth_tables():
                     )
                 """)
                 conn.commit()
+                logging.info("Successfully initialized auth tables")
     except Exception as e:
         logging.error(f"Failed to initialize auth tables: {str(e)}")
         raise
