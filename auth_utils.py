@@ -35,24 +35,44 @@ def send_verification_email(email: str, code: str) -> bool:
         sender_email = os.environ.get('EMAIL_SENDER')
         sender_password = os.environ.get('EMAIL_PASSWORD')
 
+        if not sender_email or not sender_password:
+            st.error("Email configuration is missing. Please check EMAIL_SENDER and EMAIL_PASSWORD environment variables.")
+            return False
+
         msg = MIMEMultipart()
         msg['From'] = sender_email
         msg['To'] = email
-        msg['Subject'] = 'Your Verification Code'
+        msg['Subject'] = 'Digital Wardrobe - Email Verification'
 
         body = f"""
+        Welcome to Digital Wardrobe!
+
         Your verification code is: {code}
 
+        Please enter this code in the application to verify your email address.
         This code will expire in 10 minutes.
+
         If you didn't request this code, please ignore this email.
         """
         msg.attach(MIMEText(body, 'plain'))
 
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
-        return True
+        # Add debug logging
+        st.info(f"Attempting to send verification email to {email}")
+
+        try:
+            # Use SSL/TLS connection
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+                server.login(sender_email, sender_password)
+                server.send_message(msg)
+                st.success(f"Verification email sent successfully to {email}")
+                return True
+        except smtplib.SMTPAuthenticationError:
+            st.error("Failed to authenticate with email server. Please check if you've enabled 'Less secure app access' in your Gmail account.")
+            return False
+        except smtplib.SMTPException as smtp_error:
+            st.error(f"SMTP error occurred: {str(smtp_error)}")
+            return False
+
     except Exception as e:
         st.error(f"Failed to send verification email: {str(e)}")
         return False
@@ -325,6 +345,7 @@ def create_user(username: str, email: str, password: str, role: str = 'user') ->
                     (email, username)
                 )
                 if cur.fetchone():
+                    st.error("Username or email already exists")
                     return False, -1
 
                 # Insert new user
@@ -341,12 +362,17 @@ def create_user(username: str, email: str, password: str, role: str = 'user') ->
 
                 # Generate and store verification code
                 code = generate_verification_code()
-                store_verification_code(user_id, code)
-
-                # Send verification email
-                if send_verification_email(email, code):
-                    return True, user_id
-                return False, -1
+                if store_verification_code(user_id, code):
+                    # Send verification email
+                    if send_verification_email(email, code):
+                        st.success("Account created successfully. Please check your email for verification code.")
+                        return True, user_id
+                    else:
+                        st.error("Account created but failed to send verification email. Please contact support.")
+                        return False, -1
+                else:
+                    st.error("Failed to generate verification code")
+                    return False, -1
             finally:
                 cur.close()
     except Exception as e:
@@ -432,3 +458,30 @@ def logout_user():
     """Log out the current user"""
     st.session_state.user = None
     st.session_state.auth_status = None
+
+def test_email_configuration() -> bool:
+    """Test email configuration by sending a test email"""
+    try:
+        sender_email = os.environ.get('EMAIL_SENDER')
+        sender_password = os.environ.get('EMAIL_PASSWORD')
+
+        if not sender_email or not sender_password:
+            st.error("Email configuration is missing")
+            return False
+
+        # Try to establish connection
+        try:
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+                server.login(sender_email, sender_password)
+                st.success("Email configuration is valid")
+                return True
+        except smtplib.SMTPAuthenticationError:
+            st.error("Email authentication failed. Please check your credentials and Gmail settings")
+            return False
+        except Exception as e:
+            st.error(f"Failed to connect to email server: {str(e)}")
+            return False
+
+    except Exception as e:
+        st.error(f"Error testing email configuration: {str(e)}")
+        return False
