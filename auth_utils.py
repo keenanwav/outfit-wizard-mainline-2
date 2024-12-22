@@ -6,6 +6,12 @@ import psycopg2
 from psycopg2.pool import SimpleConnectionPool
 from contextlib import contextmanager
 from typing import Optional, Dict, Tuple
+import pyotp
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import random
+import string
 
 # Initialize connection pool with better error handling
 def create_connection_pool():
@@ -22,6 +28,206 @@ def create_connection_pool():
 
 # Initialize connection pool
 connection_pool = create_connection_pool()
+
+def send_verification_email(email: str, code: str) -> bool:
+    """Send verification email with the provided code"""
+    try:
+        sender_email = os.environ.get('EMAIL_SENDER')
+        sender_password = os.environ.get('EMAIL_PASSWORD')
+
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = email
+        msg['Subject'] = 'Your Verification Code'
+
+        body = f"""
+        Your verification code is: {code}
+
+        This code will expire in 10 minutes.
+        If you didn't request this code, please ignore this email.
+        """
+        msg.attach(MIMEText(body, 'plain'))
+
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        st.error(f"Failed to send verification email: {str(e)}")
+        return False
+
+def generate_verification_code() -> str:
+    """Generate a 6-digit verification code"""
+    return ''.join(random.choices(string.digits, k=6))
+
+def store_verification_code(user_id: int, code: str) -> bool:
+    """Store verification code in database with expiration time"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                expiration = datetime.now() + timedelta(minutes=10)
+                cur.execute("""
+                    UPDATE users 
+                    SET verification_code = %s, verification_code_expires = %s
+                    WHERE id = %s
+                """, (code, expiration, user_id))
+                conn.commit()
+                return True
+            finally:
+                cur.close()
+    except Exception as e:
+        st.error(f"Error storing verification code: {str(e)}")
+        return False
+
+def verify_code(user_id: int, code: str) -> bool:
+    """Verify the provided code against stored code"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    SELECT verification_code, verification_code_expires
+                    FROM users
+                    WHERE id = %s
+                """, (user_id,))
+                result = cur.fetchone()
+
+                if not result:
+                    return False
+
+                stored_code, expiration = result
+
+                if (stored_code == code and 
+                    expiration and 
+                    expiration > datetime.now()):
+                    # Mark email as verified
+                    cur.execute("""
+                        UPDATE users
+                        SET email_verified = TRUE,
+                            verification_code = NULL,
+                            verification_code_expires = NULL
+                        WHERE id = %s
+                    """, (user_id,))
+                    conn.commit()
+                    return True
+                return False
+            finally:
+                cur.close()
+    except Exception as e:
+        st.error(f"Error verifying code: {str(e)}")
+        return False
+
+def setup_2fa(user_id: int) -> Tuple[bool, Optional[str]]:
+    """Set up 2FA for a user"""
+    try:
+        # Generate a random secret key
+        secret = pyotp.random_base32()
+
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    UPDATE users 
+                    SET two_factor_secret = %s, two_factor_enabled = TRUE
+                    WHERE id = %s
+                    RETURNING email
+                """, (secret, user_id))
+
+                result = cur.fetchone()
+                if result:
+                    conn.commit()
+                    return True, secret
+                return False, None
+            finally:
+                cur.close()
+    except Exception as e:
+        st.error(f"Error setting up 2FA: {str(e)}")
+        return False, None
+
+def verify_2fa(user_id: int, token: str) -> bool:
+    """Verify 2FA token"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    SELECT two_factor_secret
+                    FROM users
+                    WHERE id = %s AND two_factor_enabled = TRUE
+                """, (user_id,))
+
+                result = cur.fetchone()
+                if not result:
+                    return False
+
+                secret = result[0]
+                totp = pyotp.TOTP(secret)
+                return totp.verify(token)
+            finally:
+                cur.close()
+    except Exception as e:
+        st.error(f"Error verifying 2FA token: {str(e)}")
+        return False
+
+def disable_2fa(user_id: int) -> bool:
+    """Disable 2FA for a user"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    UPDATE users 
+                    SET two_factor_secret = NULL, two_factor_enabled = FALSE
+                    WHERE id = %s
+                    RETURNING id
+                """, (user_id,))
+
+                if cur.fetchone():
+                    conn.commit()
+                    return True
+                return False
+            finally:
+                cur.close()
+    except Exception as e:
+        st.error(f"Error disabling 2FA: {str(e)}")
+        return False
+
+# Keep existing functions but update authenticate_user to handle 2FA
+def authenticate_user(email: str, password: str) -> Tuple[bool, Dict]:
+    """Authenticate a user and handle 2FA if enabled"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    SELECT id, username, password_hash, role, two_factor_enabled, email_verified
+                    FROM users 
+                    WHERE email = %s
+                """, (email,))
+                result = cur.fetchone()
+
+                if result and verify_password(password, result[2]) and result[5]: #check email verification
+                    # Update last login time
+                    cur.execute(
+                        "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s",
+                        (result[0],)
+                    )
+                    conn.commit()
+
+                    return True, {
+                        "id": result[0],
+                        "username": result[1],
+                        "role": result[3],
+                        "requires_2fa": result[4]
+                    }
+                return False, {}
+            finally:
+                cur.close()
+    except Exception as e:
+        st.error(f"Authentication error: {str(e)}")
+        return False, {}
 
 @contextmanager
 def get_db_connection():
@@ -55,6 +261,11 @@ def init_auth_tables():
                     profile_picture_path VARCHAR(255),
                     preferences JSONB DEFAULT '{}',
                     last_login TIMESTAMP,
+                    verification_code VARCHAR(6),
+                    verification_code_expires TIMESTAMP,
+                    two_factor_secret VARCHAR(255),
+                    two_factor_enabled BOOLEAN DEFAULT FALSE,
+                    email_verified BOOLEAN DEFAULT FALSE,
                     CHECK (role IN ('admin', 'user'))
                 )
             """)
@@ -107,40 +318,6 @@ def create_user(username: str, email: str, password: str, role: str = 'user') ->
         st.error(f"Error creating user: {str(e)}")
         return False
 
-def authenticate_user(email: str, password: str) -> Tuple[bool, Dict]:
-    """Authenticate a user and update last login time"""
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            try:
-                cur.execute(
-                    """
-                    SELECT id, username, password_hash, role 
-                    FROM users 
-                    WHERE email = %s
-                    """,
-                    (email,)
-                )
-                result = cur.fetchone()
-
-                if result and verify_password(password, result[2]):
-                    # Update last login time
-                    cur.execute(
-                        "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s",
-                        (result[0],)
-                    )
-                    conn.commit()
-                    return True, {
-                        "id": result[0],
-                        "username": result[1],
-                        "role": result[3]
-                    }
-                return False, {}
-            finally:
-                cur.close()
-    except Exception as e:
-        st.error(f"Authentication error: {str(e)}")
-        return False, {}
 
 def update_user_profile(user_id: int, data: Dict) -> bool:
     """Update user profile information"""
