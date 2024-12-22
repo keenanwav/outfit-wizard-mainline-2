@@ -1,15 +1,17 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2 style="text-align: center;">Welcome to Digital Wardrobe</h2>
-<div style="text-align: center; margin-top: 30px;">
-    <button onclick="showModal('loginModal')" style="max-width: 200px; background-color: #1877f2; color: white; padding: 12px 24px; border: none; border-radius: 4px; font-size: 16px; cursor: pointer;">
-        Login to Your Account
-    </button>
-    <div class="links" style="margin-top: 20px;">
-        <a href="#" onclick="showModal('registerModal')" style="color: #1877f2; text-decoration: none; font-size: 14px;">
-            New user? Register here
-        </a>
+<div class="container" style="text-align: center; padding: 50px 20px;">
+    <h1>Welcome to Outfit Wizard</h1>
+    <p>Your personal wardrobe management assistant</p>
+    
+    <div style="margin-top: 30px;">
+        {% if not session.get('user_id') %}
+            <a href="{{ url_for('login') }}" class="btn btn-primary" style="display: inline-block; margin: 10px; padding: 10px 20px; background-color: #1877f2; color: white; text-decoration: none; border-radius: 5px;">Login</a>
+            <a href="{{ url_for('register') }}" class="btn btn-success" style="display: inline-block; margin: 10px; padding: 10px 20px; background-color: #42b72a; color: white; text-decoration: none; border-radius: 5px;">Register</a>
+        {% else %}
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary" style="display: inline-block; margin: 10px; padding: 10px 20px; background-color: #1877f2; color: white; text-decoration: none; border-radius: 5px;">Go to Dashboard</a>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

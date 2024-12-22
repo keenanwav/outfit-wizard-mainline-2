@@ -1,41 +1,40 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from extensions import db
-from models import User
-import re
+from werkzeug.utils import secure_filename
 import os
+import re
+from datetime import datetime
 import logging
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Initialize Flask app
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.urandom(24)
+app.secret_key = os.urandom(24)  # For session management
 
-# Ensure the instance folder exists
-instance_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'instance')
-if not os.path.exists(instance_path):
-    os.makedirs(instance_path, exist_ok=True)
-    logger.info(f"Created instance directory at {instance_path}")
-
-# Configure SQLite database
-database_path = os.path.join(instance_path, 'users.db')
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{database_path}'
+# Database configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Initialize the database with the app
+# Upload configuration
+UPLOAD_FOLDER = 'static/profile_pics'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Ensure upload folder exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Initialize database
+from extensions import db
 db.init_app(app)
 
-def init_db():
-    try:
-        with app.app_context():
-            logger.info("Creating database tables...")
-            db.create_all()
-            logger.info(f"Database tables created successfully at {database_path}")
-    except Exception as e:
-        logger.error(f"Error initializing database: {str(e)}")
-        raise
+# Import models after db initialization
+from models import User
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @app.route('/')
 def home():
@@ -62,7 +61,7 @@ def register():
                 flash('Email already registered', 'error')
                 return render_template('register.html')
 
-            # Validate password
+            # Validate password requirements
             if not (len(password) >= 5 and len(password) <= 16 and
                     re.search(r"[A-Z]", password) and
                     re.search(r"[a-z]", password) and
@@ -80,16 +79,11 @@ def register():
             db.session.commit()
             logger.info(f"New user registered: {username}")
 
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'status': 'success', 'message': 'Registration successful! Please login.', 'redirect': url_for('login')})
-
             flash('Registration successful! Please login.', 'success')
             return redirect(url_for('login'))
         except Exception as e:
             logger.error(f"Error during registration: {str(e)}")
             db.session.rollback()
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'status': 'error', 'message': 'An error occurred during registration'}), 500
             flash('An error occurred during registration', 'error')
             return render_template('register.html')
 
@@ -106,45 +100,156 @@ def login():
 
             if user and user.check_password(password):
                 session['user_id'] = user.id
+                user.update_last_login()
                 logger.info(f"User logged in: {username}")
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({'status': 'success', 'message': 'Login successful!', 'redirect': url_for('dashboard')})
                 flash('Login successful!', 'success')
                 return redirect(url_for('dashboard'))
             else:
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({'status': 'error', 'message': 'Invalid username or password'}), 401
                 flash('Invalid username or password', 'error')
         except Exception as e:
             logger.error(f"Error during login: {str(e)}")
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'status': 'error', 'message': 'An error occurred during login'}), 500
             flash('An error occurred during login', 'error')
 
     return render_template('login.html')
 
-@app.route('/dashboard')
-def dashboard():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    try:
-        user = User.query.get(session['user_id'])
-        if user:
-            return render_template('dashboard.html', user=user)
-        return redirect(url_for('login'))
-    except Exception as e:
-        logger.error(f"Error accessing dashboard: {str(e)}")
-        return redirect(url_for('login'))
-
 @app.route('/logout')
 def logout():
     session.pop('user_id', None)
-    return redirect(url_for('login'))
+    flash('You have been logged out.', 'success')
+    return redirect(url_for('home'))
+
+@app.route('/dashboard')
+def dashboard():
+    if 'user_id' not in session:
+        flash('Please login to access the dashboard', 'error')
+        return redirect(url_for('login'))
+
+    user = User.query.get(session['user_id'])
+    if not user:
+        session.pop('user_id', None)
+        flash('User not found', 'error')
+        return redirect(url_for('login'))
+
+    return render_template('dashboard.html', user=user)
+
+# Profile management routes
+@app.route('/profile')
+def profile():
+    if 'user_id' not in session:
+        flash('Please login to access your profile', 'error')
+        return redirect(url_for('login'))
+
+    user = User.query.get(session['user_id'])
+    if not user:
+        flash('User not found', 'error')
+        return redirect(url_for('login'))
+
+    return render_template('profile.html', current_user=user)
+
+@app.route('/update_profile', methods=['POST'])
+def update_profile():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Please login'}), 401
+
+    user = User.query.get(session['user_id'])
+    if not user:
+        return jsonify({'status': 'error', 'message': 'User not found'}), 404
+
+    try:
+        user.first_name = request.form.get('first_name', '').strip()
+        user.last_name = request.form.get('last_name', '').strip()
+        user.bio = request.form.get('bio', '').strip()
+
+        db.session.commit()
+        flash('Profile updated successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating profile: {str(e)}")
+        flash('An error occurred while updating your profile', 'error')
+
+    return redirect(url_for('profile'))
+
+@app.route('/upload_profile_picture', methods=['POST'])
+def upload_profile_picture():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Please login'}), 401
+
+    if 'profile_picture' not in request.files:
+        flash('No file selected', 'error')
+        return redirect(url_for('profile'))
+
+    file = request.files['profile_picture']
+    if file.filename == '':
+        flash('No file selected', 'error')
+        return redirect(url_for('profile'))
+
+    user = User.query.get(session['user_id'])
+    if file and allowed_file(file.filename):
+        try:
+            # Delete old profile picture if it exists and is not the default
+            if user.profile_picture != 'default.png':
+                old_picture = os.path.join(app.config['UPLOAD_FOLDER'], user.profile_picture)
+                if os.path.exists(old_picture):
+                    os.remove(old_picture)
+
+            # Save new profile picture
+            filename = secure_filename(f"user_{user.id}_{int(datetime.utcnow().timestamp())}.{file.filename.rsplit('.', 1)[1].lower()}")
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+            user.profile_picture = filename
+            db.session.commit()
+            flash('Profile picture updated successfully!', 'success')
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error uploading profile picture: {str(e)}")
+            flash('An error occurred while uploading your profile picture', 'error')
+    else:
+        flash('Invalid file type. Please use PNG, JPG, JPEG, or GIF', 'error')
+
+    return redirect(url_for('profile'))
+
+@app.route('/change_password', methods=['POST'])
+def change_password():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Please login'}), 401
+
+    user = User.query.get(session['user_id'])
+    if not user:
+        return jsonify({'status': 'error', 'message': 'User not found'}), 404
+
+    current_password = request.form.get('current_password')
+    new_password = request.form.get('new_password')
+    confirm_password = request.form.get('confirm_password')
+
+    if not user.check_password(current_password):
+        flash('Current password is incorrect', 'error')
+        return redirect(url_for('profile'))
+
+    if new_password != confirm_password:
+        flash('New passwords do not match', 'error')
+        return redirect(url_for('profile'))
+
+    # Password validation
+    if not (len(new_password) >= 5 and len(new_password) <= 16 and
+            re.search(r"[A-Z]", new_password) and
+            re.search(r"[a-z]", new_password) and
+            re.search(r"[0-9]", new_password) and
+            re.search(r"[!@#$%^&*(),.?\":{}|<>]", new_password)):
+        flash('Password does not meet requirements', 'error')
+        return redirect(url_for('profile'))
+
+    try:
+        user.set_password(new_password)
+        db.session.commit()
+        flash('Password changed successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error changing password: {str(e)}")
+        flash('An error occurred while changing your password', 'error')
+
+    return redirect(url_for('profile'))
 
 if __name__ == '__main__':
-    try:
-        init_db()
-        logger.info("Starting Flask server...")
-        app.run(host='0.0.0.0', port=5001, debug=True)
-    except Exception as e:
-        logger.error(f"Failed to start server: {str(e)}")
+    with app.app_context():
+        db.create_all()
+    app.run(host='0.0.0.0', port=5000, debug=True)

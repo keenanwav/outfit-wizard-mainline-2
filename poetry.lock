@@ -385,6 +385,16 @@ files = [
 ]
 
 [[package]]
+name = "extensions"
+version = "0.4"
+description = "Simple plugin system"
+optional = false
+python-versions = "*"
+files = [
+    {file = "extensions-0.4.tar.gz", hash = "sha256:02a6c12973f527fd09adad71792a8d70dfc94cb49fca67ceb201a4dfa5b18099"},
+]
+
+[[package]]
 name = "flask"
 version = "3.1.0"
 description = "A simple framework for building complex web applications."
@@ -2288,4 +2298,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "3ce50a7f9ad3c2551bbed9211a4e7b2e0aea3ab3f490f817f11f47032b708a6e"
+content-hash = "976f237cabe3a95459cd84c67d7638ab39e504f405c64b37b4229c03f6f06c94"
