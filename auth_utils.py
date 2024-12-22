@@ -208,21 +208,33 @@ def authenticate_user(email: str, password: str) -> Tuple[bool, Dict]:
                 """, (email,))
                 result = cur.fetchone()
 
-                if result and verify_password(password, result[2]) and result[5]: #check email verification
-                    # Update last login time
-                    cur.execute(
-                        "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s",
-                        (result[0],)
-                    )
-                    conn.commit()
+                if not result:
+                    st.error("User not found")
+                    return False, {}
 
-                    return True, {
-                        "id": result[0],
-                        "username": result[1],
-                        "role": result[3],
-                        "requires_2fa": result[4]
-                    }
-                return False, {}
+                user_id, username, stored_hash, role, requires_2fa, email_verified = result
+
+                if not verify_password(password, stored_hash):
+                    st.error("Invalid password")
+                    return False, {}
+
+                if not email_verified:
+                    st.error("Email not verified. Please check your email for verification code.")
+                    return False, {}
+
+                # Update last login time
+                cur.execute(
+                    "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s",
+                    (user_id,)
+                )
+                conn.commit()
+
+                return True, {
+                    "id": user_id,
+                    "username": username,
+                    "role": role,
+                    "requires_2fa": requires_2fa
+                }
             finally:
                 cur.close()
     except Exception as e:
@@ -283,18 +295,22 @@ def hash_password(password: str) -> bytes:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
 def verify_password(password: str, password_hash: bytes) -> bool:
-    """Verify a password against its hash with proper type handling"""
+    """Verify a password against its hash with proper type handling and logging"""
     try:
         # Convert memoryview to bytes if necessary
         if isinstance(password_hash, memoryview):
             password_hash = password_hash.tobytes()
+        elif isinstance(password_hash, str):
+            # Handle case where hash might have been stored as string
+            password_hash = password_hash.encode('utf-8')
+
         return bcrypt.checkpw(password.encode('utf-8'), password_hash)
     except Exception as e:
         st.error(f"Password verification error: {str(e)}")
         return False
 
-def create_user(username: str, email: str, password: str, role: str = 'user') -> bool:
-    """Create a new user with specified role"""
+def create_user(username: str, email: str, password: str, role: str = 'user') -> Tuple[bool, int]:
+    """Create a new user with specified role and return success status and user ID"""
     try:
         if role not in ('admin', 'user'):
             raise ValueError("Invalid role specified")
@@ -303,21 +319,39 @@ def create_user(username: str, email: str, password: str, role: str = 'user') ->
         with get_db_connection() as conn:
             cur = conn.cursor()
             try:
+                # Check if user already exists
                 cur.execute(
-                    "INSERT INTO users (username, email, password_hash, role) VALUES (%s, %s, %s, %s)",
+                    "SELECT id FROM users WHERE email = %s OR username = %s",
+                    (email, username)
+                )
+                if cur.fetchone():
+                    return False, -1
+
+                # Insert new user
+                cur.execute(
+                    """
+                    INSERT INTO users (username, email, password_hash, role)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING id
+                    """,
                     (username, email, password_hash, role)
                 )
+                user_id = cur.fetchone()[0]
                 conn.commit()
-                return True
-            except psycopg2.Error as e:
-                st.error(f"Database error: {str(e)}")
-                return False
+
+                # Generate and store verification code
+                code = generate_verification_code()
+                store_verification_code(user_id, code)
+
+                # Send verification email
+                if send_verification_email(email, code):
+                    return True, user_id
+                return False, -1
             finally:
                 cur.close()
     except Exception as e:
         st.error(f"Error creating user: {str(e)}")
-        return False
-
+        return False, -1
 
 def update_user_profile(user_id: int, data: Dict) -> bool:
     """Update user profile information"""
