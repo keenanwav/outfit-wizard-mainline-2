@@ -3,9 +3,13 @@
 {% block content %}
 <h2 style="text-align: center;">Welcome to Digital Wardrobe</h2>
 <div style="text-align: center; margin-top: 30px;">
-    <button onclick="window.location.href='{{ url_for('login') }}'" style="max-width: 200px;">Login</button>
-    <div class="links" style="margin-top: 15px;">
-        <a href="{{ url_for('register') }}">New user? Register here</a>
+    <button onclick="window.location.href='{{ url_for('login') }}'" style="max-width: 200px; background-color: #1877f2; color: white; padding: 12px 24px; border: none; border-radius: 4px; font-size: 16px; cursor: pointer;">
+        Login to Your Account
+    </button>
+    <div class="links" style="margin-top: 20px;">
+        <a href="{{ url_for('register') }}" style="color: #1877f2; text-decoration: none; font-size: 14px;">
+            New user? Register here
+        </a>
     </div>
 </div>
 {% endblock %}
