@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from extensions import db
 from models import User
@@ -50,11 +50,15 @@ def register():
         try:
             # Validate email format
             if not re.match(r"[^@]+@[^@]+\.[^@]+", username):
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'error', 'message': 'Invalid email format'}), 400
                 flash('Invalid email format', 'error')
                 return render_template('register.html')
 
             # Check if user already exists
             if User.query.filter_by(username=username).first():
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'error', 'message': 'Email already registered'}), 400
                 flash('Email already registered', 'error')
                 return render_template('register.html')
 
@@ -64,6 +68,8 @@ def register():
                     re.search(r"[a-z]", password) and
                     re.search(r"[0-9]", password) and
                     re.search(r"[!@#$%^&*(),.?\":{}|<>]", password)):
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'error', 'message': 'Password does not meet requirements'}), 400
                 flash('Password does not meet requirements', 'error')
                 return render_template('register.html')
 
@@ -74,11 +80,16 @@ def register():
             db.session.commit()
             logger.info(f"New user registered: {username}")
 
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'status': 'success', 'message': 'Registration successful! Please login.', 'redirect': url_for('login')})
+
             flash('Registration successful! Please login.', 'success')
             return redirect(url_for('login'))
         except Exception as e:
             logger.error(f"Error during registration: {str(e)}")
             db.session.rollback()
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'status': 'error', 'message': 'An error occurred during registration'}), 500
             flash('An error occurred during registration', 'error')
             return render_template('register.html')
 
@@ -96,12 +107,18 @@ def login():
             if user and user.check_password(password):
                 session['user_id'] = user.id
                 logger.info(f"User logged in: {username}")
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'success', 'message': 'Login successful!', 'redirect': url_for('dashboard')})
                 flash('Login successful!', 'success')
                 return redirect(url_for('dashboard'))
             else:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'error', 'message': 'Invalid username or password'}), 401
                 flash('Invalid username or password', 'error')
         except Exception as e:
             logger.error(f"Error during login: {str(e)}")
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'status': 'error', 'message': 'An error occurred during login'}), 500
             flash('An error occurred during login', 'error')
 
     return render_template('login.html')
