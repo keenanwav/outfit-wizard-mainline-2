@@ -213,7 +213,7 @@ with st.sidebar:
             logout_user()
             st.rerun()
     else:
-        if st.button("👤 Login/Signup"):
+        if st.button("👤 Login"):
             st.session_state.show_auth = True
             st.rerun()
 
@@ -221,48 +221,21 @@ with st.sidebar:
 if not st.session_state.user and st.session_state.get('show_auth', False):
     auth_container = st.container()
     with auth_container:
-        st.markdown("## 🔐 Authentication")
-        tab1, tab2 = st.tabs(["🔑 Login", "📝 Sign Up"])
-        
-        with tab1:
-            with st.form("login_form"):
-                login_email = st.text_input("Email", key="login_email")
-                login_password = st.text_input("Password", type="password", key="login_password")
-                login_submitted = st.form_submit_button("Login")
-                
-                if login_submitted:
-                    success, user_data = authenticate_user(login_email, login_password)
-                    if success:
-                        st.session_state.user = user_data
-                        st.session_state.show_auth = False
-                        st.rerun()
-                    else:
-                        st.error("Invalid email or password")
-        
-        with tab2:
-            with st.form("signup_form"):
-                new_username = st.text_input("Username", key="signup_username")
-                new_email = st.text_input("Email", key="signup_email")
-                new_password = st.text_input("Password", type="password", key="signup_password")
-                confirm_password = st.text_input("Confirm Password", type="password", key="signup_confirm")
-                role = st.selectbox("Role", options=['user', 'admin'], key="signup_role")
-                signup_submitted = st.form_submit_button("Sign Up")
-                
-                if signup_submitted:
-                    if new_password != confirm_password:
-                        st.error("Passwords do not match")
-                    elif len(new_password) < 8:
-                        st.error("Password must be at least 8 characters long")
-                    else:
-                        if create_user(new_username, new_email, new_password, role):
-                            success, user_data = authenticate_user(new_email, new_password)
-                            if success:
-                                st.session_state.user = user_data
-                                st.session_state.show_auth = False
-                                st.rerun()
-                        else:
-                            st.error("Username or email already exists")
-        
+        st.markdown("## 🔐 Login")
+        with st.form("login_form"):
+            login_email = st.text_input("Email", key="login_email")
+            login_password = st.text_input("Password", type="password", key="login_password")
+            login_submitted = st.form_submit_button("Login")
+
+            if login_submitted:
+                success, user_data = authenticate_user(login_email, login_password)
+                if success:
+                    st.session_state.user = user_data
+                    st.session_state.show_auth = False
+                    st.rerun()
+                else:
+                    st.error("Invalid email or password")
+
         if st.button("✖️ Close"):
             st.session_state.show_auth = False
             st.rerun()
@@ -475,7 +448,7 @@ def main_page():
                         if item_type in outfit and isinstance(outfit[item_type], dict):
                             item_color = parse_color_string(outfit[item_type]['color'])
                             colors[item_type] = item_color
-
+                    
                     if colors:
                         # Open the original image
                         with Image.open(outfit['merged_image_path']) as img:
@@ -519,7 +492,7 @@ def main_page():
                                     font = ImageFont.load_default()
                             except:
                                 font = ImageFont.load_default()
-
+                            
                             # Add item types and color blocks
                             x_start = margin + spacing  # Starting position for first block
                             for idx, item_type in enumerate(['shirt', 'pants', 'shoes']):
@@ -536,7 +509,7 @@ def main_page():
                                     text_y = y2 + 5  # Minimal spacing after block
                                     hex_code = rgb_to_hex(colors[item_type]).lower()  # Convert to lowercase
                                     color_name = get_color_name(colors[item_type])
-                                    # Format: "shirt - Olive #d8a918"
+                                    # Format: "shirt - Olive #d8a18"
                                     combined_text = f"{item_type} - {color_name} {hex_code}"
                                     draw.text((x1, text_y), combined_text, fill='black', font=font)
                             
@@ -636,8 +609,8 @@ def main_page():
         
         with col2:
             preferences = st.text_area("🎯 Style preferences?",
-                                     placeholder="E.g., prefer dark colors, need to look professional",
-                                     height=122)
+                                    placeholder="E.g., prefer dark colors, need to look professional",
+                                    height=122)
         
         generate_col, _ = st.columns([2, 3])
         with generate_col:
@@ -664,7 +637,7 @@ def main_page():
                         "Enable Manual Selection",
                         help="Manually select clothing items for visualization"
                     )
-
+                
                 # Manual selection interface
                 if manual_selection:
                     st.markdown("### 👕 Manual Item Selection")
@@ -706,7 +679,7 @@ def main_page():
                                 'style': item['style']
                             })
                         recommendation = {'recommended_items': selected_items}
-
+                
                 # Display visualization
                 col1, col2 = st.columns(2)
                 
@@ -793,7 +766,7 @@ def personal_wardrobe_page():
     if 'form_errors' not in st.session_state:
         st.session_state.form_errors = {}
     if 'edit_history' not in st.session_state:
-        st.session_state.edit_history = {}
+        st.session_state.edithistory = {}
     if 'undo_stack' not in st.session_state:
         st.session_state.undo_stack = {}
     if 'redo_stack' not in st.session_state:
@@ -869,7 +842,7 @@ def personal_wardrobe_page():
             if not uploaded_file.name.lower().endswith('.png'):
                 st.error("Only PNG files are allowed. Please upload a PNG image.")
                 return
-
+            
             # Extract color after image upload
             temp_path = f"temp_{uploaded_file.name}"
             with open(temp_path, "wb") as f:
@@ -1094,6 +1067,15 @@ def personal_wardrobe_page():
                                         if success:
                                             st.session_state.edit_success = True
                                             st.success(message)
+                                            # Add edit to history
+                                            add_to_edit_history(item['id'], {
+                                                'color': color,
+                                                'style': new_styles,
+                                                'gender': new_genders,
+                                                'size': new_sizes,
+                                                'hyperlink': new_hyperlink,
+                                                'price': new_price
+                                            })
                                             st.rerun()
                                         else:
                                             st.error(message)
@@ -1321,7 +1303,7 @@ def bulk_delete_page():
             if not uploaded_file.name.lower().endswith('.png'):
                 st.error("Only PNG files are allowed. Please upload a PNG image.")
                 return
-
+            
             # Extract color after image upload
             temp_path = f"temp_{uploaded_file.name}"
             with open(temp_path, "wb") as f:
@@ -1559,83 +1541,474 @@ def bulk_delete_page():
                                             st.rerun()
                                         else:
                                             st.error(message)
-                            
-                            # Image editing interface
-                            if st.session_state.editing_image is not None and st.session_state.editing_image['id'] == item['id']:
-                                st.markdown("### Update Image")
-                                new_image = st.file_uploader("Choose new image", 
-                                                           type=['png', 'jpg', 'jpeg'],
-                                                           key=f"edit_image_{idx}")
-                                
-                                if new_image:
-                                    preview_col, button_col = st.columns([3, 1])
-                                    with preview_col:
-                                        st.image(new_image, width=200)
-                                    with button_col:
-                                        if st.button("Save New Image"):
-                                            # Save new image
-                                            temp_path = f"temp_edit_{new_image.name}"
-                                            with open(temp_path, "wb") as f:
-                                                f.write(new_image.getvalue())
                                             
-                                            success = update_item_image(item['id'], temp_path)
-                                            if success:
-                                                st.success("Image updated successfully!")
-                                                st.rerun()
-                                            else:
-                                                st.error("Failed to update image")
-                                            
-                                            os.remove(temp_path)
+                            # Add a separator between items
+                            st.markdown("---")
+    else:
+        st.info("Your wardrobe is empty. Start by adding some items!")
+    
+def bulk_delete_page():
+    """Display bulk delete and edit interface for clothing items"""
+    st.title("Bulk Item Management")
+    
+    # Load all clothing items
+    items_df = load_clothing_items()
+    
+    if items_df.empty:
+        st.warning("No items available in your wardrobe.")
+        return
+        
+    with st.form("bulk_management_form"):
+        # Create formatted options for multiselect
+        item_options = [
+            f"{row['id']} - {row['type'].capitalize()} ({row['color']}, {row['style']})"
+            for _, row in items_df.iterrows()
+        ]
+        
+        selected_items = st.multiselect(
+            "Select Items to Manage",
+            options=item_options,
+            help="Choose multiple items to delete or edit"
+        )
+        
+        # Extract IDs from selected items
+        selected_ids = [int(item.split(' - ')[0]) for item in selected_items]
+        
+        # Only show bulk edit options if items are selected
+        if selected_ids:
+            st.subheader("Bulk Edit Options")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                new_style = st.selectbox(
+                    "Update Style",
+                    options=["", "Casual", "Formal", "Sport", "Beach"],
+                    help="Leave empty to keep current styles"
+                )
+                
+                new_season = st.selectbox(
+                    "Update Season",
+                    options=["", "Spring", "Summer", "Fall", "Winter"],
+                    help="Leave empty to keep current seasons"
+                )
+            
+            with col2:
+                new_gender = st.selectbox(
+                    "Update Gender",
+                    options=["", "Male", "Female", "Unisex"],
+                    help="Leave empty to keep current gender settings"
+                )
+                
+                new_size = st.selectbox(
+                    "Update Size",
+                    options=["", "S", "M", "L", "XL"],
+                    help="Leave empty to keep current sizes"
+                )
+        
+        # Action buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            delete_button = st.form_submit_button("🗑️ Delete Selected Items")
+        with col2:
+            update_button = st.form_submit_button("✨ Update Selected Items")
+            
+    # Handle delete action
+    if delete_button and selected_ids:
+        if st.session_state.get('confirm_delete', False):
+            success, message, stats = bulk_delete_items(selected_ids)
+            if success:
+                st.success(f"Successfully deleted {stats['deleted']} items!")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error(f"Error during deletion: {message}")
+                if stats.get('errors'):
+                    with st.expander("View Error Details"):
+                        for error in stats['errors']:
+                            st.write(error)
+            st.session_state.confirm_delete = False
+        else:
+            st.warning(f"⚠️ Are you sure you want to delete {len(selected_ids)} items?")
+            if st.button("Yes, Delete Items"):
+                st.session_state.confirm_delete = True
+                st.rerun()
+                
+    # Handle update action
+    if update_button and selected_ids:
+        try:
+            updates = {}
+            if new_style: updates['style'] = new_style
+            if new_season: updates['season'] = new_season
+            if new_gender: updates['gender'] = new_gender
+            if new_size: updates['size'] = new_size
+            
+            if updates:
+                with st.spinner("Updating items..."):
+                    for item_id in selected_ids:
+                        update_item_details(item_id, updates)
+                st.success(f"Successfully updated {len(selected_ids)} items!")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.info("No updates selected. Choose at least one attribute to update.")
+        except Exception as e:
+            st.error(f"Error updating items: {str(e)}")
+    # Initialize session state for editing
+    if 'editing_item' not in st.session_state:
+        st.session_state.editing_item = None
+    if 'editing_image' not in st.session_state:
+        st.session_state.editing_image = None
+    if 'editing_color' not in st.session_state:
+        st.session_state.editing_color = None
+    if 'edit_success' not in st.session_state:
+        st.session_state.edit_success = False
+    if 'form_errors' not in st.session_state:
+        st.session_state.form_errors = {}
+    if 'edit_history' not in st.session_state:
+        st.session_state.edit_history = {}
+    if 'undo_stack' not in st.session_state:
+        st.session_state.undo_stack = {}
+    if 'redo_stack' not in st.session_state:
+        st.session_state.redo_stack = {}
+    
+    # Load existing items
+    items_df = load_clothing_items()
+    
+    # Add custom CSS for styling
+    st.markdown("""
+        <style>
+        .item-container {
+            border: 1px solid #e0e0e0;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            background-color: #f8f9fa;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .item-details {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #ffffff;
+            border-radius: 5px;
+        }
+        .item-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .edit-form {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border: 1px solid #dee2e6;
+        }
+        .validation-error {
+            color: #dc3545;
+            font-size: 0.875em;
+            margin-top: 0.25rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.25rem;
+            background-color: rgba(220, 53, 69, 0.1);
+        }
+        .success-message {
+            color: #198754;
+            font-size: 0.875em;
+            margin-top: 0.25rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.25rem;
+            background-color: rgba(25, 135, 84, 0.1);
+        }
+        .separator {
+            margin: 30px 0;
+            border-top: 1px solid #dee2e6;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # Upload new item form
+    with st.expander("Upload New Item", expanded=False):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            item_type = st.selectbox("Type", ["Shirt", "Pants", "Shoes"])
+            styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"])
+            sizes = st.multiselect("Size", ["S", "M", "L", "XL"])
+            price = st.number_input("Price ($)", min_value=0.0, step=0.01, format="%.2f")
+        
+        with col2:
+            genders = st.multiselect("Gender", ["Male", "Female", "Unisex"])
+            uploaded_file = st.file_uploader("Upload Image", type=['png', 'jpg', 'jpeg'], key="new_item_upload")
+            hyperlink = st.text_input("Shopping Link (optional)", 
+                                    help="Add a link to where this item can be purchased")
+        
+        # Form validation
+        is_valid = True
+        validation_messages = []
+        
+        if not styles:
+            is_valid = False
+            validation_messages.append("Please select at least one style")
+        if not sizes:
+            is_valid = False
+            validation_messages.append("Please select at least one size")
+        if not genders:
+            is_valid = False
+            validation_messages.append("Please select at least one gender")
+        
+        for message in validation_messages:
+            st.markdown(f'<p class="validation-error">{message}</p>', unsafe_allow_html=True)
+        
+        if uploaded_file and is_valid:
+            # Validate file type
+            if not uploaded_file.name.lower().endswith('.png'):
+                st.error("Only PNG files are allowed. Please upload a PNG image.")
+                return
+            
+            # Extract color after image upload
+            temp_path = f"temp_{uploaded_file.name}"
+            with open(temp_path, "wb") as f:
+                f.write(uploaded_file.getvalue())
+            
+            # Validate the image file
+            if not is_valid_image(temp_path):
+                os.remove(temp_path)
+                st.error("The uploaded file is not a valid PNG image. Please try again with a valid image file.")
+                return
+            
+            colors = get_color_palette(temp_path)
+            if colors is not None:
+                st.write("Extracted Color:")
+                display_color_palette(colors)
+                
+                if st.button("Add Item"):
+                    success, message = add_user_clothing_item(
+                        item_type.lower(), colors[0], styles, genders, sizes, 
+                        temp_path, hyperlink, price if price > 0 else None
+                    )
+                    if success:
+                        st.success(message)
+                        st.rerun()
+                    else:
+                        st.error(message)
+            else:
+                st.error("Could not extract colors from the image. Please try a different image.")
+            
+            os.remove(temp_path)
+    
+    # Display existing items in grid
+    if not items_df.empty:
+        st.markdown("### Your Items")
+        
+        # Add filter dropdowns
+        col1, col2 = st.columns(2)
+        with col1:
+            selected_type = st.selectbox(
+                "Filter by Type",
+                ["All"] + ["shirt", "pants", "shoes"],
+                format_func=lambda x: x.capitalize() if x != "All" else x
+            )
+        with col2:
+            selected_gender = st.selectbox(
+                "Filter by Gender",
+                ["All", "Male", "Female", "Unisex"]
+            )
+        
+        # Apply filters
+        filtered_df = items_df.copy()
+        if selected_type != "All":
+            filtered_df = filtered_df[filtered_df['type'] == selected_type]
+        if selected_gender != "All":
+            filtered_df = filtered_df[filtered_df['gender'].str.contains(selected_gender, na=False)]
+        
+        # Group items by type
+        displayed_types = [selected_type] if selected_type != "All" else ["shirt", "pants", "shoes"]
+        for item_type in displayed_types:
+            type_items = filtered_df[filtered_df['type'] == item_type]
+            if not type_items.empty:
+                st.markdown(f"#### {item_type.capitalize()}s")
+                
+                # Create grid layout (3 items per row)
+                cols = st.columns(3)
+                for idx, item in type_items.iterrows():
+                    col = cols[int(idx) % 3]
+                    with col:
+                        if item.get('image_path') and os.path.exists(item['image_path']):
+                            st.image(item['image_path'], use_column_width=True)
                             
-                            # Color editing interface
+                            # Show current color
+                            current_color = parse_color_string(item['color'])
+                            st.markdown("**Current Color:**")
+                            st.markdown(f'''
+                                <div style="
+                                    background-color: rgb({current_color[0]}, {current_color[1]}, {current_color[2]});
+                                    width: 50px;
+                                    height: 50px;
+                                    border-radius: 8px;
+                                    margin: 8px auto;
+                                "></div>
+                            ''', unsafe_allow_html=True)
+                            
+                            # Edit/Delete/Color buttons
+                            edit_col, color_col, del_col = st.columns([2, 2, 1])
+                            
+                            with edit_col:
+                                if st.button(f"Edit Details {idx}"):
+                                    st.session_state.editing_item = item
+                                    st.session_state.edit_success = False
+                            
+                            with color_col:
+                                if st.button("🎨", key=f"color_{idx}"):
+                                    st.session_state.editing_color = item
+                            
+                            with del_col:
+                                unique_key = f"delete_{item['type']}_{item['id']}_{idx}"
+                                if st.button("🗑️", key=unique_key):
+                                    if delete_clothing_item(item['id']):
+                                        st.success(f"Item deleted successfully!")
+                                        st.rerun()
+                                        
+                            # Quick color edit interface
                             if st.session_state.editing_color is not None and st.session_state.editing_color['id'] == item['id']:
-                                st.markdown("### Edit Color")
-                                temp_path = item['image_path']
-                                colors = get_color_palette(temp_path)
+                                st.markdown("### Quick Color Edit")
+                                current_color = parse_color_string(item['color'])
+                                hex_color = rgb_to_hex(current_color)
                                 
-                                if colors is not None:
-                                    st.write("Available Colors:")
-                                    display_color_palette(colors)
+                                col1, col2 = st.columns([3, 1])
+                                with col1:
+                                    new_color = st.color_picker("Pick a new color", hex_color, key=f"color_picker_{idx}")
+                                    # Convert hex to RGB for preview
+                                    r = int(new_color[1:3], 16)
+                                    g = int(new_color[3:5], 16)
+                                    b = int(new_color[5:7], 16)
+                                    preview_rgb = (r, g, b)
                                     
-                                    if st.button("Update Color"):
+                                    # Show color preview
+                                    st.markdown("### Preview")
+                                    st.markdown(f'''
+                                        <div style="
+                                            background-color: rgb({preview_rgb[0]}, {preview_rgb[1]}, {preview_rgb[2]});
+                                            width: 50px;
+                                            height: 50px;
+                                            border-radius: 8px;
+                                            margin: 8px auto;
+                                        "></div>
+                                    ''', unsafe_allow_html=True)
+                                    st.markdown(f"Color Name: **{get_color_name(preview_rgb)}**")
+                                
+                                with col2:
+                                    st.markdown("### Current")
+                                    st.markdown(f'''
+                                        <div style="
+                                            background-color: rgb({current_color[0]}, {current_color[1]}, {current_color[2]});
+                                            width: 50px;
+                                            height: 50px;
+                                            border-radius: 8px;
+                                            margin: 8px auto;
+                                        "></div>
+                                    ''', unsafe_allow_html=True)
+                                    st.markdown(f"Color Name: **{get_color_name(current_color)}**")
+                                
+                                save_col, cancel_col = st.columns(2)
+                                with save_col:
+                                    if st.button("💾 Save Color", key=f"save_color_{idx}", type="primary"):
                                         success, message = edit_clothing_item(
                                             item['id'],
-                                            colors[0],
+                                            preview_rgb,
                                             item['style'].split(','),
                                             item['gender'].split(','),
                                             item['size'].split(','),
                                             item['hyperlink'],
                                             float(item['price']) if item['price'] else None
                                         )
+                                        
                                         if success:
+                                            st.session_state.editing_color = None
                                             st.success("Color updated successfully!")
                                             st.rerun()
                                         else:
                                             st.error(message)
+                                
+                                with cancel_col:
+                                    if st.button("❌ Cancel", key=f"cancel_color_{idx}"):
+                                        st.session_state.editing_color = None
+                                        st.rerun()
+                            
+                            # Edit form
+                            if st.session_state.editing_item is not None and st.session_state.editing_item['id'] == item['id']:
+                                with st.form(key=f"edit_form_{idx}"):
+                                    st.markdown("### Edit Item Details")
                                     
-                                    # Add undo/redo buttons
-                                    undo_col, redo_col = st.columns(2)
-                                    with undo_col:
-                                        if st.button(f"↩ Undo {idx}"):
-                                            success, message = undo_edit(item.id)
-                                            if success:
-                                                st.success(message)
-                                                st.rerun()
-                                            else:
-                                                st.warning(message)
+                                    # Split current values
+                                    current_styles = item['style'].split(',') if item['style'] else []
+                                    current_sizes = item['size'].split(',') if item['size'] else []
+                                    current_genders = item['gender'].split(',') if item['gender'] else []
                                     
-                                    with redo_col:
-                                        if st.button(f"↪ Redo {idx}"):
-                                            success, message = redo_edit(item.id)
-                                            if success:
-                                                st.success(message)
-                                                st.rerun()
-                                            else:
-                                                st.warning(message)
-
+                                    # Edit fields
+                                    new_styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"], 
+                                                              default=current_styles)
+                                    new_sizes = st.multiselect("Size", ["S", "M", "L", "XL"], 
+                                                             default=current_sizes)
+                                    new_genders = st.multiselect("Gender", ["Male", "Female", "Unisex"], 
+                                                               default=current_genders)
+                                    new_hyperlink = st.text_input("Shopping Link", 
+                                                                value=item['hyperlink'] if item['hyperlink'] else "")
+                                    new_price = st.number_input("Price ($)", 
+                                                              value=float(item['price']) if item['price'] else 0.0,
+                                                              min_value=0.0, 
+                                                              step=0.01, 
+                                                              format="%.2f")
+                                    
+                                    # Form validation
+                                    is_valid = True
+                                    if not new_styles:
+                                        is_valid = False
+                                        st.markdown('<p class="validation-error">Please select at least one style</p>', 
+                                                  unsafe_allow_html=True)
+                                    if not new_sizes:
+                                        is_valid = False
+                                        st.markdown('<p class="validation-error">Please select at least one size</p>', 
+                                                  unsafe_allow_html=True)
+                                    if not new_genders:
+                                        is_valid = False
+                                        st.markdown('<p class="validation-error">Please select at least one gender</p>', 
+                                                  unsafe_allow_html=True)
+                                    
+                                    submitted = st.form_submit_button("Save Changes")
+                                    if submitted and is_valid:
+                                        # Get current color
+                                        color = parse_color_string(item['color'])
+                                        success, message = edit_clothing_item(
+                                            item['id'],
+                                            color,
+                                            new_styles,
+                                            new_genders,
+                                            new_sizes,
+                                            new_hyperlink,
+                                            new_price if new_price > 0 else None
+                                        )
+                                        if success:
+                                            st.session_state.edit_success = True
+                                            st.success(message)
+                                            # Add edit to history
+                                            add_to_edit_history(item['id'], {
+                                                'color': color,
+                                                'style': new_styles,
+                                                'gender': new_genders,
+                                                'size': new_sizes,
+                                                'hyperlink': new_hyperlink,
+                                                'price': new_price
+                                            })
+                                            st.rerun()
+                                        else:
+                                            st.error(message)
+                                            
+                            # Add a separator between items
+                            st.markdown("---")
     else:
         st.info("Your wardrobe is empty. Start by adding some items!")
-
+    
 def saved_outfits_page():
     """Display saved outfits page"""
     st.title("Saved Outfits")
@@ -1704,7 +2077,7 @@ def saved_outfits_page():
                             st.rerun()
                         else:
                             st.error(message)
-
+                            
 def cleanup_status_dashboard():
     """Display cleanup status dashboard"""
     st.title("Cleanup Status Dashboard")
@@ -1827,54 +2200,6 @@ def redo_edit(item_id):
 
 # Update the main sidebar menu to include the bulk delete page
 def bulk_delete_page():
-    """Display the bulk delete interface for managing uploaded items"""
-    st.title("Bulk Delete Items")
-    
-    # Fetch all user items
-    from data_manager import get_db_connection
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT id, type, color, style, gender, size, hyperlink, price, image_path 
-            FROM user_clothing_items 
-            ORDER BY type, id
-        """)
-        items = cur.fetchall()
-        
-    if not items:
-        st.info("No items found in your wardrobe.")
-        return
-        
-    # Create a DataFrame for better display
-    df = pd.DataFrame(items, columns=[
-        'id', 'type', 'color', 'style', 'gender', 
-        'size', 'hyperlink', 'price', 'image_path'
-    ])
-    
-    # Group items by type for better organization
-    st.write("Select items to delete:")
-    selected_items = []
-    
-    for item_type in df['type'].unique():
-        with st.expander(f"{item_type.title()} Items"):
-            type_items = df[df['type'] == item_type]
-            for _, item in type_items.iterrows():
-                col1, col2 = st.columns([1, 4])
-                with col1:
-                    if st.checkbox("", key=f"delete_{item['id']}"):
-                        selected_items.append(item['id'])
-                with col2:
-                    st.write(f"Color: {item['color']}, Style: {item['style']}, Size: {item['size']}")
-    
-    if selected_items:
-        if st.button("Delete Selected Items", type="primary"):
-            success, message, stats = bulk_delete_items(selected_items)
-            if success:
-                st.success(message)
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error(f"{message}\nErrors: {', '.join(stats.get('errors', []))}")
     """Display the bulk delete interface for managing uploaded items"""
     st.title("Bulk Delete Items")
     
