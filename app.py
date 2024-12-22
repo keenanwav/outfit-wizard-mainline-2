@@ -16,10 +16,12 @@ app.config['SECRET_KEY'] = os.urandom(24)
 # Ensure the instance folder exists
 instance_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'instance')
 if not os.path.exists(instance_path):
-    os.makedirs(instance_path)
+    os.makedirs(instance_path, exist_ok=True)
     logger.info(f"Created instance directory at {instance_path}")
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/users.db'
+# Configure SQLite database
+database_path = os.path.join(instance_path, 'users.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{database_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize the database with the app
@@ -30,7 +32,7 @@ def init_db():
         with app.app_context():
             logger.info("Creating database tables...")
             db.create_all()
-            logger.info("Database tables created successfully")
+            logger.info(f"Database tables created successfully at {database_path}")
     except Exception as e:
         logger.error(f"Error initializing database: {str(e)}")
         raise
