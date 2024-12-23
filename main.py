@@ -19,6 +19,93 @@ from outfit_generator import generate_outfit, bulk_delete_items, is_valid_image
 from datetime import datetime, timedelta
 from style_assistant import get_style_recommendation, format_clothing_items
 import time
+from firebase_config import (
+    initialize_firebase, get_firebase_config,
+    verify_firebase_token, get_current_user,
+    set_current_user, clear_current_user
+)
+from auth_routes import handle_auth_callback, handle_logout
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Initialize Firebase
+if not initialize_firebase():
+    st.error("Failed to initialize Firebase. Please check your configuration.")
+    st.stop()
+
+# Configure Streamlit page
+st.set_page_config(
+    page_title="Outfit Wizard",
+    page_icon="👕",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Initialize session state for authentication
+if 'user' not in st.session_state:
+    st.session_state.user = None
+if 'auth_status' not in st.session_state:
+    st.session_state.auth_status = None
+
+def render_login_ui():
+    """Render the login UI component"""
+    st.markdown("""
+        <style>
+        .auth-container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background-color: white;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    with st.container():
+        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+        st.title("🔐 Welcome to Outfit Wizard")
+
+        # Add Sign in with Google button
+        if st.button("Sign in with Google", key="google_signin"):
+            firebase_config = get_firebase_config()
+            if firebase_config:
+                # Initialize Firebase in the frontend
+                st.markdown(
+                    f"""
+                    <script type="module">
+                        import {{ initializeApp }} from 'https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js';
+                        import {{ getAuth, signInWithRedirect, GoogleAuthProvider }} from 'https://www.gstatic.com/firebasejs/9.0.0/firebase-auth.js';
+
+                        const firebaseConfig = {firebase_config};
+                        const app = initializeApp(firebaseConfig);
+                        const auth = getAuth();
+                        const provider = new GoogleAuthProvider();
+                        signInWithRedirect(auth, provider);
+                    </script>
+                    """,
+                    unsafe_allow_html=True
+                )
+            else:
+                st.error("Firebase configuration is incomplete. Please check your environment variables.")
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+def handle_auth():
+    """Handle authentication state and protected routes"""
+    if not st.session_state.user:
+        render_login_ui()
+        return False
+    return True
+
+def show_user_profile():
+    """Display user profile in sidebar"""
+    if st.session_state.user:
+        with st.sidebar:
+            st.write(f"👤 Logged in as: {st.session_state.user.get('name', 'User')}")
+            if st.button("Logout"):
+                handle_logout()
 
 def create_mannequin_outfit_image(recommended_items, weather=None, template_size=(800, 1000)):
     """Create a visualization of the outfit using the mannequin template and clothing templates"""
@@ -189,18 +276,18 @@ def create_style_recipe_image(recommendation, template_size=(1000, 1200)):
     image.save(output_path)
     return output_path
 
+def show_user_profile():
+    """Display user profile in sidebar"""
+    if st.session_state.user:
+        with st.sidebar:
+            st.write(f"👤 Logged in as: {st.session_state.user.get('name', 'User')}")
+            if st.button("Logout"):
+                handle_logout()
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
-
-st.set_page_config(
-    page_title="Outfit Wizard",
-    page_icon="👕",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 
 # Initialize session state for various UI states
 if 'show_prices' not in st.session_state:
@@ -704,15 +791,14 @@ def main_page():
                                     st.image(item['image_path'], use_column_width=True)
                                     st.markdown(f"**{item['type'].capitalize()}** ✨")
                                     st.markdown(f"Style: {item['style']} 🎯")
-                                    
+
                                     # Display item color with enhanced visualization
                                     color = parse_color_string(str(item['color']))
-                                    st.markdown("**Color Palette**")
-                                    display_color_palette([color])
-                                    
-                                    # Add a subtle separator
-                                    st.markdown("---")
-                    
+                                    if color is not None:
+                                        display_color_palette([color])
+
+                                    st.markdown(f"Price: ${item.get('price', 'N/A')}")
+
                     st.markdown('</div>', unsafe_allow_html=True)
 
 def personal_wardrobe_page():
@@ -728,7 +814,7 @@ def personal_wardrobe_page():
     if 'form_errors' not in st.session_state:
         st.session_state.form_errors = {}
     if 'edit_history' not in st.session_state:
-        st.session_state.edithistory = {}
+        st.session_state.edit_history = {}
     if 'undo_stack' not in st.session_state:
         st.session_state.undo_stack = {}
     if 'redo_stack' not in st.session_state:
@@ -1057,7 +1143,7 @@ def bulk_delete_page():
     if items_df.empty:
         st.warning("No items available in your wardrobe.")
         return
-        
+    
     with st.form("bulk_management_form"):
         # Create formatted options for multiselect
         item_options = [
@@ -1443,7 +1529,7 @@ def bulk_delete_page():
                                     # Split current values
                                     current_styles = item['style'].split(',') if item['style'] else []
                                     current_sizes = item['size'].split(',') if item['size'] else []
-                                    current_genders = item['gender'].split(',') if item['gender'] else []
+                                    currentgenders = item['gender'].split(',') if item['gender'] else []
                                     
                                     # Edit fields
                                     new_styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"], 
@@ -1519,10 +1605,10 @@ def bulk_delete_page():
     if items_df.empty:
         st.warning("No items available in your wardrobe.")
         return
-        
+    
     with st.form("bulk_management_form"):
         # Create formatted options for multiselect
-        itemoptions = [
+        item_options = [
             f"{row['id']} - {row['type'].capitalize()} ({row['color']}, {row['style']})"
             for _, row in items_df.iterrows()
         ]
@@ -2100,14 +2186,14 @@ def cleanup_status_dashboard():
             cleaned_count = cleanup_merged_outfits()
             st.success(f"Cleanup completed. {cleaned_count} files removed.")
             st.rerun()
-
+            
 def add_to_edit_history(item_id, new_values):
     """Adds a new edit to the edit history for the given item"""
     if item_id not in st.session_state.edit_history:
         st.session_state.edit_history[item_id] = []
     
     st.session_state.edit_history[item_id].append(new_values)
-
+    
 def undo_edit(item_id):
     """Undoes the last edit for the given item"""
     if item_id in st.session_state.edit_history and st.session_state.edit_history[item_id]:
@@ -2133,7 +2219,7 @@ def undo_edit(item_id):
         return success, message
     else:
         return False, "No edits to undo"
-
+        
 def redo_edit(item_id):
     """Redoes the last undone edit for the given item"""
     if item_id in st.session_state.redo_stack and st.session_state.redo_stack[item_id]:
@@ -2159,7 +2245,7 @@ def redo_edit(item_id):
         return success, message
     else:
         return False, "No edits to redo"
-
+        
 # Update the main sidebar menu to include the bulk delete page
 def bulk_delete_page():
     """Display the bulk delete interface for managing uploaded items"""
@@ -2179,7 +2265,7 @@ def bulk_delete_page():
     if not items:
         st.info("No items found in your wardrobe.")
         return
-        
+    
     # Create a DataFrame for better display
     df = pd.DataFrame(items, columns=[
         'id', 'type', 'color', 'style', 'gender', 
@@ -2209,18 +2295,50 @@ def bulk_delete_page():
                 time.sleep(1)
                 st.rerun()
 
+def show_user_profile():
+    """Display user profile in sidebar"""
+    if st.session_state.user:
+        with st.sidebar:
+            st.write(f"👤 Logged in as: {st.session_state.user.get('name', 'User')}")
+            if st.button("Logout"):
+                handle_logout()
+
+def main():
+    """Main application entry point"""
+    try:
+        # Handle authentication callback if present
+        handle_auth_callback()
+        
+        # Show user profile if logged in
+        show_user_profile()
+        
+        # Initialize database tables
+        create_user_items_table()
+        
+        # Show first visit tips
+        show_first_visit_tips()
+        
+        # Check authentication before showing main content
+        if not handle_auth():
+            return
+        
+        # Show navigation
+        st.sidebar.title("Navigation")
+        navigation = st.sidebar.radio("Go to", ["My Items", "Smart Style Assistant", "Bulk Item Management", "Cleanup Status Dashboard", "Saved Outfits"])
+        
+        if navigation == "My Items":
+            personal_wardrobe_page()
+        elif navigation == "Smart Style Assistant":
+            main_page()
+        elif navigation == "Bulk Item Management":
+            bulk_delete_page()
+        elif navigation == "Cleanup Status Dashboard":
+            cleanup_status_dashboard()
+        elif navigation == "Saved Outfits":
+            saved_outfits_page()
+    except Exception as e:
+        logging.error(f"Application error: {str(e)}")
+        st.error("An error occurred. Please try again or contact support if the problem persists.")
+
 if __name__ == "__main__":
-    create_user_items_table()
-    show_first_visit_tips()
-    
-    st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits", "Bulk Delete"])
-    
-    if page == "Home":
-        main_page()
-    elif page == "My Items":
-        personal_wardrobe_page()
-    elif page == "Saved Outfits":
-        saved_outfits_page()
-    elif page == "Bulk Delete":
-        bulk_delete_page()
+    main()
