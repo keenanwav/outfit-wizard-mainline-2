@@ -15,6 +15,13 @@ from functools import wraps
 from typing import Tuple, Optional, Dict, Any, List
 import random
 
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger('data_manager')
+
 try:
     import pandas as pd
     import numpy as np
@@ -25,7 +32,7 @@ try:
     from sklearn.neighbors import NearestNeighbors
     import joblib
 except ImportError as e:
-    logging.error(f"Error importing scientific computing libraries: {str(e)}")
+    logger.error(f"Error importing scientific computing libraries: {str(e)}")
     pass
 
 # Initialize connection pool settings
@@ -34,16 +41,28 @@ MAX_CONNECTIONS = 10
 POOL_TIMEOUT = 30
 STATEMENT_TIMEOUT = 30000  # 30 seconds statement timeout
 
+def validate_connection(conn) -> bool:
+    """Validate database connection is still alive and usable"""
+    try:
+        with conn.cursor() as cur:
+            cur.execute('SELECT 1')
+            result = cur.fetchone()
+            return result is not None and result[0] == 1
+    except Exception as e:
+        logger.error(f"Connection validation failed: {str(e)}")
+        return False
+
 def create_connection_pool():
     """Create and return a connection pool with optimized settings"""
+    logger.info("Attempting to create new connection pool")
     try:
-        return SimpleConnectionPool(
+        pool = SimpleConnectionPool(
             MIN_CONNECTIONS,
             MAX_CONNECTIONS,
-            host=os.environ['PGHOST'],
-            database=os.environ['PGDATABASE'],
-            user=os.environ['PGUSER'],
-            password=os.environ['PGPASSWORD'],
+            host=os.environ.get('PGHOST'),
+            database=os.environ.get('PGDATABASE'),
+            user=os.environ.get('PGUSER'),
+            password=os.environ.get('PGPASSWORD'),
             sslmode='require',
             connect_timeout=10,
             keepalives=1,
@@ -54,8 +73,10 @@ def create_connection_pool():
             application_name='outfit_wizard',
             client_encoding='UTF8'
         )
+        logger.info("Successfully created new connection pool")
+        return pool
     except Exception as e:
-        logging.error(f"Error creating connection pool: {str(e)}")
+        logger.error(f"Failed to create connection pool: {str(e)}")
         raise
 
 def get_connection_pool():
@@ -67,51 +88,58 @@ def get_connection_pool():
     for attempt in range(max_retries):
         try:
             if not connection_pool:
+                logger.info(f"Initializing connection pool (attempt {attempt + 1}/{max_retries})")
                 connection_pool = create_connection_pool()
             return connection_pool
         except Exception as e:
             if attempt == max_retries - 1:
-                logging.error(f"Failed to create connection pool after {max_retries} attempts: {str(e)}")
+                logger.error(f"Failed to create connection pool after {max_retries} attempts: {str(e)}")
                 raise
+            logger.warning(f"Connection pool creation failed (attempt {attempt + 1}): {str(e)}")
             time.sleep(retry_delay * (2 ** attempt))
 
 @contextmanager
 def get_db_connection():
-    """Context manager for database connections with enhanced error handling"""
+    """Context manager for database connections with enhanced error handling and validation"""
     conn = None
     pool = None
     try:
         pool = get_connection_pool()
         conn = pool.getconn()
+        logger.debug("Retrieved connection from pool")
 
-        # Test the connection before using it
-        with conn.cursor() as cur:
-            cur.execute('SELECT 1')
+        # Validate connection before use
+        if not validate_connection(conn):
+            logger.error("Retrieved invalid connection from pool")
+            raise psycopg2.OperationalError("Invalid connection from pool")
+
         conn.set_session(autocommit=False)
         yield conn
     except psycopg2.OperationalError as e:
         if conn:
+            logger.error(f"Database operational error with connection: {str(e)}")
             conn.close()
         if "SSL connection has been closed unexpectedly" in str(e):
-            # Force recreation of pool on SSL errors
+            logger.warning("SSL connection error detected, recreating pool")
             global connection_pool
             connection_pool = None
-        logging.error(f"Database connection error: {str(e)}")
         raise
     except Exception as e:
-        logging.error(f"Unexpected database error: {str(e)}")
+        logger.error(f"Unexpected database error: {str(e)}")
         raise
     finally:
         if conn:
             try:
                 conn.rollback()
-            except Exception:
-                pass
+                logger.debug("Connection rollback completed")
+            except Exception as e:
+                logger.error(f"Error during connection rollback: {str(e)}")
             try:
                 if pool:
                     pool.putconn(conn)
+                    logger.debug("Connection returned to pool")
             except Exception as e:
-                logging.error(f"Error returning connection to pool: {str(e)}")
+                logger.error(f"Error returning connection to pool: {str(e)}")
                 conn.close()
 
 # Statement cache for prepared statements
@@ -210,23 +238,23 @@ def retry_on_error(max_retries=3, delay=1):
                 except psycopg2.OperationalError as e:
                     last_error = e
                     if "statement timeout" in str(e):
-                        logging.error(f"Statement timeout in {func.__name__}: {str(e)}")
+                        logger.error(f"Statement timeout in {func.__name__}: {str(e)}")
                         raise
                     if "SSL connection has been closed unexpectedly" in str(e):
-                        logging.error(f"SSL connection error in {func.__name__}: {str(e)}")
+                        logger.error(f"SSL connection error in {func.__name__}: {str(e)}")
                         # Force recreation of connection pool on SSL errors
                         global connection_pool
                         try:
                             connection_pool = create_connection_pool()
                         except Exception as pool_error:
-                            logging.error(f"Failed to recreate connection pool: {str(pool_error)}")
+                            logger.error(f"Failed to recreate connection pool: {str(pool_error)}")
                     if attempt < max_retries - 1:
                         sleep_time = delay * (2 ** attempt)  # Exponential backoff
                         jitter = random.uniform(0, 0.1 * sleep_time)  # Add jitter
                         time.sleep(sleep_time + jitter)
                 except (psycopg2.InterfaceError, psycopg2.InternalError) as e:
                     last_error = e
-                    logging.error(f"Database interface error in {func.__name__}: {str(e)}")
+                    logger.error(f"Database interface error in {func.__name__}: {str(e)}")
                     if attempt < max_retries - 1:
                         sleep_time = delay * (2 ** attempt)
                         time.sleep(sleep_time)
@@ -235,7 +263,7 @@ def retry_on_error(max_retries=3, delay=1):
                     if attempt < max_retries - 1:
                         sleep_time = delay * (2 ** attempt)
                         time.sleep(sleep_time)
-            logging.error(f"Operation failed after {max_retries} attempts: {str(last_error)}")
+            logger.error(f"Operation failed after {max_retries} attempts: {str(last_error)}")
             if last_error:
                 raise last_error
             raise Exception("Operation failed with unknown error")
@@ -514,7 +542,7 @@ def save_outfit(outfit):
                 cur.close()
                 
     except Exception as e:
-        logging.error(f"Error saving outfit: {str(e)}")
+        logger.error(f"Error saving outfit: {str(e)}")
         return None
 
 @retry_on_error()
@@ -760,7 +788,7 @@ def record_color_change(item_id, old_color, new_color):
             conn.commit()
             return True
         except Exception as e:
-            logging.error(f"Error recording color change: {str(e)}")
+            logger.error(f"Error recording color change: {str(e)}")
             return False
         finally:
             cur.close()
@@ -820,14 +848,14 @@ def update_item_image(item_id: int, new_image_path: str) -> Tuple[bool, str]:
                     try:
                         os.remove(old_image_path)
                     except Exception as e:
-                        logging.warning(f"Failed to delete old image {old_image_path}: {str(e)}")
+                        logger.warning(f"Failed to delete old image {old_image_path}: {str(e)}")
                 
                 # Delete the temporary uploaded image
                 if os.path.exists(new_image_path):
                     try:
                         os.remove(new_image_path)
                     except Exception as e:
-                        logging.warning(f"Failed to delete temporary image {new_image_path}: {str(e)}")
+                        logger.warning(f"Failed to delete temporary image {new_image_path}: {str(e)}")
                 
                 return True, "Image updated successfully"
                 
@@ -835,7 +863,7 @@ def update_item_image(item_id: int, new_image_path: str) -> Tuple[bool, str]:
                 cur.close()
                 
     except Exception as e:
-        logging.error(f"Error updating item image: {str(e)}")
+        logger.error(f"Error updating item image: {str(e)}")
         return False, f"Failed to update image: {str(e)}"
 
 @retry_on_error()
@@ -853,7 +881,7 @@ def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file,
     # Use item-specific color detection
     if item_type == 'pants':
         from color_utils import get_pants_colors
-        color = get_pants_colors(image_path)
+        color =get_pants_colors(image_path)
         if color is None:
             return False, "Failed to detect pants color"
     
@@ -1005,9 +1033,9 @@ def cleanup_orphaned_entries():
             
             if orphaned_items:
                 # Log orphaned items before processing
-                logging.warning(f"Found {len(orphaned_items)} orphaned entries in database")
+                logger.warning(f"Found {len(orphaned_items)} orphaned entries in database")
                 for item_id, item_type, path in orphaned_items:
-                    logging.info(f"Orphaned {item_type} (ID: {item_id}): {path}")
+                    logger.info(f"Orphaned {item_type} (ID: {item_id}): {path}")
                 
                 # Move orphaned entries to audit table for reference
                 cur.execute("""
@@ -1040,7 +1068,7 @@ def cleanup_orphaned_entries():
             
         except Exception as e:
             conn.rollback()
-            logging.error(f"Error during orphaned entries cleanup: {str(e)}")
+            logger.error(f"Error during orphaned entries cleanup: {str(e)}")
             return False, f"Cleanup failed: {str(e)}"
         finally:
             cur.close()
