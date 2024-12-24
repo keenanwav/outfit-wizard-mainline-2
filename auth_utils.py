@@ -15,6 +15,9 @@ MAX_CONNECTIONS = 10
 POOL_TIMEOUT = 30
 STATEMENT_TIMEOUT = 30000  # 30 seconds statement timeout
 
+# Global connection pool
+connection_pool = None
+
 def create_connection_pool():
     """Create and return a connection pool with optimized settings"""
     try:
@@ -39,7 +42,6 @@ def create_connection_pool():
         logging.error(f"Error creating auth connection pool: {str(e)}")
         raise
 
-# Create the connection pool with retry logic
 def get_connection_pool():
     """Get or create connection pool with retry logic"""
     global connection_pool
@@ -48,7 +50,7 @@ def get_connection_pool():
 
     for attempt in range(max_retries):
         try:
-            if connection_pool is None:
+            if not connection_pool:
                 connection_pool = create_connection_pool()
             return connection_pool
         except Exception as e:
@@ -57,9 +59,6 @@ def get_connection_pool():
                 raise
             time.sleep(retry_delay * (2 ** attempt))
 
-connection_pool = None
-connection_pool = get_connection_pool()
-
 @contextmanager
 def get_db_connection():
     """Context manager for database connections with enhanced error handling"""
@@ -67,21 +66,15 @@ def get_db_connection():
     try:
         pool = get_connection_pool()
         conn = pool.getconn()
-        if conn:
-            # Test the connection before using it
-            with conn.cursor() as cur:
-                cur.execute('SELECT 1')
-            conn.set_session(autocommit=False)
-            yield conn
+
+        # Test the connection before using it
+        with conn.cursor() as cur:
+            cur.execute('SELECT 1')
+        conn.set_session(autocommit=False)
+        yield conn
     except psycopg2.OperationalError as e:
         if conn:
-            conn.close()  # Explicitly close bad connections
-            if connection_pool:
-                connection_pool.putconn(conn, close=True)
-        if "SSL connection has been closed unexpectedly" in str(e):
-            # Force recreation of pool on SSL errors
-            global connection_pool
-            connection_pool = None
+            conn.close()
         logging.error(f"Database connection error in auth_utils: {str(e)}")
         raise
     except Exception as e:
@@ -90,18 +83,15 @@ def get_db_connection():
     finally:
         if conn:
             try:
-                conn.rollback()  # Ensure no hanging transactions
+                conn.rollback()
             except Exception:
                 pass
-            if connection_pool:
-                try:
-                    connection_pool.putconn(conn)
-                except Exception as e:
-                    logging.error(f"Error returning connection to pool in auth_utils: {str(e)}")
-                    try:
-                        conn.close()
-                    except Exception:
-                        pass
+            try:
+                if pool:
+                    pool.putconn(conn)
+            except Exception as e:
+                logging.error(f"Error returning connection to pool in auth_utils: {str(e)}")
+                conn.close()
 
 def init_auth_tables():
     """Initialize authentication tables with retry logic"""
@@ -125,19 +115,14 @@ def init_auth_tables():
                         )
                     """)
                     conn.commit()
-                    return
+                    return True
         except psycopg2.OperationalError as e:
-            if "SSL connection has been closed unexpectedly" in str(e):
-                global connection_pool
-                connection_pool = None
             if attempt == max_retries - 1:
                 logging.error(f"Failed to initialize auth tables after {max_retries} attempts: {str(e)}")
                 raise
             jitter = random.uniform(0, 0.1 * retry_delay)
             time.sleep((retry_delay * (2 ** attempt)) + jitter)
-        except Exception as e:
-            logging.error(f"Error initializing auth tables: {str(e)}")
-            raise
+    return False
 
 def hash_password(password: str) -> bytes:
     """Hash a password using bcrypt"""
@@ -149,66 +134,40 @@ def verify_password(password: str, password_hash: bytes) -> bool:
 
 def create_user(username: str, email: str, password: str, role: str = 'user') -> bool:
     """Create a new user with specified role and retry logic"""
-    max_retries = 3
-    retry_delay = 1
+    if role not in ('admin', 'user'):
+        raise ValueError("Invalid role specified")
 
-    for attempt in range(max_retries):
-        try:
-            if role not in ('admin', 'user'):
-                raise ValueError("Invalid role specified")
-
-            password_hash = hash_password(password)
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "INSERT INTO users (username, email, password_hash, role) VALUES (%s, %s, %s, %s)",
-                        (username, email, password_hash, role)
-                    )
-                    conn.commit()
-            return True
-        except psycopg2.OperationalError as e:
-            if "SSL connection has been closed unexpectedly" in str(e):
-                global connection_pool
-                connection_pool = None
-            if attempt == max_retries - 1:
-                st.error(f"Error creating user: {str(e)}")
-                return False
-            jitter = random.uniform(0, 0.1 * retry_delay)
-            time.sleep((retry_delay * (2 ** attempt)) + jitter)
-        except Exception as e:
-            st.error(f"Error creating user: {str(e)}")
-            return False
+    try:
+        password_hash = hash_password(password)
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO users (username, email, password_hash, role) VALUES (%s, %s, %s, %s)",
+                    (username, email, password_hash, role)
+                )
+                conn.commit()
+        return True
+    except Exception as e:
+        logging.error(f"Error creating user: {str(e)}")
+        return False
 
 def authenticate_user(email: str, password: str) -> tuple[bool, dict]:
     """Authenticate a user with retry logic"""
-    max_retries = 3
-    retry_delay = 1
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, username, password_hash, role FROM users WHERE email = %s",
+                    (email,)
+                )
+                result = cur.fetchone()
 
-    for attempt in range(max_retries):
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "SELECT id, username, password_hash, role FROM users WHERE email = %s",
-                        (email,)
-                    )
-                    result = cur.fetchone()
-
-                    if result and verify_password(password, result[2]):
-                        return True, {"id": result[0], "username": result[1], "role": result[3]}
-                    return False, {}
-        except psycopg2.OperationalError as e:
-            if "SSL connection has been closed unexpectedly" in str(e):
-                global connection_pool
-                connection_pool = None
-            if attempt == max_retries - 1:
-                st.error(f"Error authenticating user: {str(e)}")
+                if result and verify_password(password, result[2]):
+                    return True, {"id": result[0], "username": result[1], "role": result[3]}
                 return False, {}
-            jitter = random.uniform(0, 0.1 * retry_delay)
-            time.sleep((retry_delay * (2 ** attempt)) + jitter)
-        except Exception as e:
-            st.error(f"Error authenticating user: {str(e)}")
-            return False, {}
+    except Exception as e:
+        logging.error(f"Error authenticating user: {str(e)}")
+        return False, {}
 
 def init_session_state():
     """Initialize session state variables for authentication"""

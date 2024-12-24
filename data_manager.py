@@ -1,3 +1,5 @@
+connection_pool = None
+
 try:
     import pandas as pd
     import numpy as np
@@ -78,7 +80,6 @@ def create_connection_pool():
         logging.error(f"Error creating connection pool: {str(e)}")
         raise
 
-# Create the connection pool with retry logic
 def get_connection_pool():
     """Get or create connection pool with retry logic"""
     global connection_pool
@@ -95,9 +96,6 @@ def get_connection_pool():
                 logging.error(f"Failed to create connection pool after {max_retries} attempts: {str(e)}")
                 raise
             time.sleep(retry_delay * (2 ** attempt))
-
-connection_pool = None
-connection_pool = get_connection_pool()
 
 @contextmanager
 def get_db_connection():
@@ -570,7 +568,6 @@ def delete_saved_outfit(outfit_id):
             cur.close()
 
 
-
 @retry_on_error()
 def get_cleanup_settings():
     """Get cleanup settings from database"""
@@ -687,7 +684,7 @@ def get_cleanup_statistics():
             
             if not settings:
                 return None
-                
+            
             # Get total files in merged_outfits
             total_files = 0
             if os.path.exists('merged_outfits'):
