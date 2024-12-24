@@ -1,24 +1,11 @@
+# Global connection pool
 connection_pool = None
-
-try:
-    import pandas as pd
-    import numpy as np
-    from sklearn.metrics.pairwise import cosine_similarity
-    from sklearn.preprocessing import MultiLabelBinarizer, StandardScaler
-    from sklearn.decomposition import TruncatedSVD
-    from scipy.sparse import csr_matrix
-    from sklearn.neighbors import NearestNeighbors
-except ImportError as e:
-    logging.error(f"Error importing scientific computing libraries: {str(e)}")
-    # Continue without these libraries, core functionality should still work
-    pass
 
 import logging
 import os
 from PIL import Image
 import uuid
 from datetime import datetime, timedelta
-import joblib
 import psycopg2
 from psycopg2.pool import SimpleConnectionPool
 from psycopg2.extras import execute_values, execute_batch
@@ -28,11 +15,104 @@ from functools import wraps
 from typing import Tuple, Optional, Dict, Any, List
 import random
 
-# Initialize connection pool
+try:
+    import pandas as pd
+    import numpy as np
+    from sklearn.metrics.pairwise import cosine_similarity
+    from sklearn.preprocessing import MultiLabelBinarizer, StandardScaler
+    from sklearn.decomposition import TruncatedSVD
+    from scipy.sparse import csr_matrix
+    from sklearn.neighbors import NearestNeighbors
+    import joblib
+except ImportError as e:
+    logging.error(f"Error importing scientific computing libraries: {str(e)}")
+    pass
+
+# Initialize connection pool settings
 MIN_CONNECTIONS = 1
-MAX_CONNECTIONS = 10  # Reduced from 20 to prevent too many connections
+MAX_CONNECTIONS = 10
 POOL_TIMEOUT = 30
 STATEMENT_TIMEOUT = 30000  # 30 seconds statement timeout
+
+def create_connection_pool():
+    """Create and return a connection pool with optimized settings"""
+    try:
+        return SimpleConnectionPool(
+            MIN_CONNECTIONS,
+            MAX_CONNECTIONS,
+            host=os.environ['PGHOST'],
+            database=os.environ['PGDATABASE'],
+            user=os.environ['PGUSER'],
+            password=os.environ['PGPASSWORD'],
+            sslmode='require',
+            connect_timeout=10,
+            keepalives=1,
+            keepalives_idle=30,
+            keepalives_interval=10,
+            keepalives_count=5,
+            options=f'-c statement_timeout={STATEMENT_TIMEOUT}',
+            application_name='outfit_wizard',
+            client_encoding='UTF8'
+        )
+    except Exception as e:
+        logging.error(f"Error creating connection pool: {str(e)}")
+        raise
+
+def get_connection_pool():
+    """Get or create connection pool with retry logic"""
+    global connection_pool
+    max_retries = 3
+    retry_delay = 1
+
+    for attempt in range(max_retries):
+        try:
+            if not connection_pool:
+                connection_pool = create_connection_pool()
+            return connection_pool
+        except Exception as e:
+            if attempt == max_retries - 1:
+                logging.error(f"Failed to create connection pool after {max_retries} attempts: {str(e)}")
+                raise
+            time.sleep(retry_delay * (2 ** attempt))
+
+@contextmanager
+def get_db_connection():
+    """Context manager for database connections with enhanced error handling"""
+    conn = None
+    pool = None
+    try:
+        pool = get_connection_pool()
+        conn = pool.getconn()
+
+        # Test the connection before using it
+        with conn.cursor() as cur:
+            cur.execute('SELECT 1')
+        conn.set_session(autocommit=False)
+        yield conn
+    except psycopg2.OperationalError as e:
+        if conn:
+            conn.close()
+        if "SSL connection has been closed unexpectedly" in str(e):
+            # Force recreation of pool on SSL errors
+            global connection_pool
+            connection_pool = None
+        logging.error(f"Database connection error: {str(e)}")
+        raise
+    except Exception as e:
+        logging.error(f"Unexpected database error: {str(e)}")
+        raise
+    finally:
+        if conn:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            try:
+                if pool:
+                    pool.putconn(conn)
+            except Exception as e:
+                logging.error(f"Error returning connection to pool: {str(e)}")
+                conn.close()
 
 # Statement cache for prepared statements
 PREPARED_STATEMENTS = {
@@ -55,90 +135,6 @@ PREPARED_STATEMENTS = {
         ORDER BY type, created_at DESC
     """
 }
-
-def create_connection_pool():
-    """Create and return a connection pool with optimized settings and enhanced SSL configuration"""
-    try:
-        return SimpleConnectionPool(
-            MIN_CONNECTIONS,
-            MAX_CONNECTIONS,
-            host=os.environ['PGHOST'],
-            database=os.environ['PGDATABASE'],
-            user=os.environ['PGUSER'],
-            password=os.environ['PGPASSWORD'],
-            sslmode='require',  # Changed from verify-full to require for better compatibility
-            connect_timeout=10,  # Reduced from 30 to fail faster
-            keepalives=1,
-            keepalives_idle=30,
-            keepalives_interval=10,
-            keepalives_count=5,
-            options=f'-c statement_timeout={STATEMENT_TIMEOUT}',
-            application_name='outfit_wizard',
-            client_encoding='UTF8'
-        )
-    except Exception as e:
-        logging.error(f"Error creating connection pool: {str(e)}")
-        raise
-
-def get_connection_pool():
-    """Get or create connection pool with retry logic"""
-    global connection_pool
-    max_retries = 3
-    retry_delay = 1
-
-    for attempt in range(max_retries):
-        try:
-            if connection_pool is None:
-                connection_pool = create_connection_pool()
-            return connection_pool
-        except Exception as e:
-            if attempt == max_retries - 1:
-                logging.error(f"Failed to create connection pool after {max_retries} attempts: {str(e)}")
-                raise
-            time.sleep(retry_delay * (2 ** attempt))
-
-@contextmanager
-def get_db_connection():
-    """Context manager for handling database connections from the pool with enhanced error handling"""
-    conn = None
-    try:
-        pool = get_connection_pool()
-        conn = pool.getconn()
-        if conn:
-            # Test the connection before using it
-            with conn.cursor() as cur:
-                cur.execute('SELECT 1')
-            conn.set_session(autocommit=False)
-            yield conn
-    except psycopg2.OperationalError as e:
-        if conn:
-            conn.close()  # Explicitly close bad connections
-            if connection_pool:
-                connection_pool.putconn(conn, close=True)  # Return to pool as closed
-        if "SSL connection has been closed unexpectedly" in str(e):
-            # Force recreation of pool on SSL errors
-            global connection_pool
-            connection_pool = None
-        logging.error(f"Database connection error: {str(e)}")
-        raise
-    except Exception as e:
-        logging.error(f"Unexpected database error: {str(e)}")
-        raise
-    finally:
-        if conn:
-            try:
-                conn.rollback()  # Ensure no hanging transactions
-            except Exception:
-                pass
-            if connection_pool:  # Check if pool still exists
-                try:
-                    connection_pool.putconn(conn)
-                except Exception as e:
-                    logging.error(f"Error returning connection to pool: {str(e)}")
-                    try:
-                        conn.close()
-                    except Exception:
-                        pass
 
 def create_user_items_table():
     """Create necessary database tables with indexes"""
@@ -895,7 +891,7 @@ def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file,
 def get_price_history(item_id):
     """Get price history for an item"""
     with get_db_connection() as conn:
-        cur = conn.cursor()
+        cur =conn.cursor()
         try:
             cur.execute("""
                 SELECT price, created_at

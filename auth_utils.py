@@ -1,3 +1,6 @@
+# Global connection pool
+connection_pool = None
+
 import os
 import bcrypt
 import streamlit as st
@@ -15,9 +18,6 @@ MAX_CONNECTIONS = 10
 POOL_TIMEOUT = 30
 STATEMENT_TIMEOUT = 30000  # 30 seconds statement timeout
 
-# Global connection pool
-connection_pool = None
-
 def create_connection_pool():
     """Create and return a connection pool with optimized settings"""
     try:
@@ -28,7 +28,7 @@ def create_connection_pool():
             database=os.environ['PGDATABASE'],
             user=os.environ['PGUSER'],
             password=os.environ['PGPASSWORD'],
-            sslmode='require',  # Changed from verify-full to require
+            sslmode='require',
             connect_timeout=10,
             keepalives=1,
             keepalives_idle=30,
@@ -63,6 +63,7 @@ def get_connection_pool():
 def get_db_connection():
     """Context manager for database connections with enhanced error handling"""
     conn = None
+    pool = None
     try:
         pool = get_connection_pool()
         conn = pool.getconn()
@@ -75,6 +76,10 @@ def get_db_connection():
     except psycopg2.OperationalError as e:
         if conn:
             conn.close()
+        if "SSL connection has been closed unexpectedly" in str(e):
+            # Force recreation of pool on SSL errors
+            global connection_pool
+            connection_pool = None
         logging.error(f"Database connection error in auth_utils: {str(e)}")
         raise
     except Exception as e:
