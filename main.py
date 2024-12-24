@@ -1,48 +1,116 @@
-import streamlit as st
 import os
-from PIL import Image, ImageDraw, ImageFont
-import numpy as np
-import pandas as pd
-from collections import Counter
-from auth_utils import init_auth_tables, init_session_state, create_user, authenticate_user, logout_user
-from data_manager import (
-    load_clothing_items, save_outfit, load_saved_outfits,
-    edit_clothing_item, delete_clothing_item, create_user_items_table,
-    add_user_clothing_item, update_outfit_details,
-    get_outfit_details, update_item_details, delete_saved_outfit,
-    get_price_history, update_item_image
-)
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics.pairwise import cosine_similarity
 import logging
-from color_utils import get_color_palette, display_color_palette, rgb_to_hex, parse_color_string, get_color_name
-from outfit_generator import generate_outfit, bulk_delete_items, is_valid_image
 from datetime import datetime, timedelta
-from style_assistant import get_style_recommendation, format_clothing_items
 import time
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('app.log')
+    ]
+)
+
+# Initialize required libraries with error handling
+try:
+    import streamlit as st
+    import pandas as pd
+    import numpy as np
+    from PIL import Image, ImageDraw, ImageFont
+    from collections import Counter
+except ImportError as e:
+    logging.error(f"Failed to import core libraries: {e}")
+    raise
+
+# Initialize connection retries
+MAX_DB_RETRIES = 3
+RETRY_DELAY = 1
+
+# Function to safely import database-dependent modules
+def import_db_modules():
+    """Import database-dependent modules with retry logic"""
+    for attempt in range(MAX_DB_RETRIES):
+        try:
+            from auth_utils import init_auth_tables, init_session_state, create_user, authenticate_user, logout_user
+            from data_manager import (
+                load_clothing_items, save_outfit, load_saved_outfits,
+                edit_clothing_item, delete_clothing_item, create_user_items_table,
+                add_user_clothing_item, update_outfit_details,
+                get_outfit_details, update_item_details, delete_saved_outfit,
+                get_price_history, update_item_image
+            )
+            from color_utils import get_color_palette, display_color_palette, rgb_to_hex, parse_color_string, get_color_name
+            from outfit_generator import generate_outfit, bulk_delete_items, is_valid_image
+            from style_assistant import get_style_recommendation, format_clothing_items
+            return True
+        except Exception as e:
+            if attempt == MAX_DB_RETRIES - 1:
+                logging.error(f"Failed to initialize database connections: {str(e)}")
+                return False
+            logging.warning(f"Attempt {attempt + 1} failed, retrying in {RETRY_DELAY * (2 ** attempt)} seconds")
+            time.sleep(RETRY_DELAY * (2 ** attempt))
+
+# Configure Streamlit page
+try:
+    st.set_page_config(
+        page_title="Outfit Wizard",
+        page_icon="👕",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+except Exception as e:
+    logging.error(f"Failed to configure Streamlit page: {e}")
+    st.error("Application configuration error. Please try refreshing the page.")
+    st.stop()
+
+# Import database modules
+if not import_db_modules():
+    st.error("Failed to initialize database connections. Please try refreshing the page.")
+    st.warning("If the problem persists, contact support.")
+    st.stop()
+
+# Initialize database tables with retry logic
+try:
+    init_auth_tables()
+    create_user_items_table()
+except Exception as e:
+    st.error(f"Database initialization error: {str(e)}")
+    st.warning("Please try refreshing the page. If the problem persists, contact support.")
+    st.stop()
+
+# Initialize session state
+try:
+    init_session_state()
+except Exception as e:
+    st.error(f"Session initialization error: {str(e)}")
+    st.warning("Please try refreshing the page.")
+    st.stop()
+
 def create_mannequin_outfit_image(recommended_items, weather=None, template_size=(800, 1000)):
     """Create a visualization of the outfit using the mannequin template and clothing templates"""
     from clothing_templates import get_template_for_item, apply_color_to_template, get_item_position, parse_color_string
-    
+
     # Load the mannequin template
     template = Image.open('manikin temp.png')
-    
+
     # Resize the template while maintaining aspect ratio
     template.thumbnail(template_size, Image.Resampling.LANCZOS)
-    
+
     # Create a new image with white background
     final_image = Image.new('RGBA', template_size, 'white')
-    
+
     # Calculate position to center the template
     x_offset = (template_size[0] - template.width) // 2
     y_offset = (template_size[1] - template.height) // 2
-    
+
     # Paste the mannequin template
     final_image.paste(template, (x_offset, y_offset), template)
-    
+
     # Define layering order
     layer_order = ['pants', 'shirt', 'shoes']
-    
+
     # Layer clothing items in the correct order
     for layer_type in layer_order:
         for item in recommended_items:
@@ -53,21 +121,21 @@ def create_mannequin_outfit_image(recommended_items, weather=None, template_size
                     # Parse color and apply to template
                     color = parse_color_string(item['color'])
                     colored_item = apply_color_to_template(template_path, color)
-                    
+
                     # Get position for this item type
                     pos = get_item_position(item['type'], template_size)
-                    
+
                     # Resize colored item to match template proportions
                     colored_item.thumbnail((template_size[0] // 2, template_size[1] // 2), Image.Resampling.LANCZOS)
-                    
+
                     # Paste the colored item onto the final image
                     final_image.paste(colored_item, pos, colored_item)
-    
+
     # Save the visualization
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     output_path = f"style_recipes/mannequin_outfit_{timestamp}.png"
     os.makedirs("style_recipes", exist_ok=True)
-    
+
     final_image.save(output_path, 'PNG')
     return output_path
 
@@ -76,7 +144,7 @@ def create_style_recipe_image(recommendation, template_size=(1000, 1200)):
     # Create a new image with white background
     image = Image.new('RGB', template_size, 'white')
     draw = ImageDraw.Draw(image)
-    
+
     # Try to load a nice font, fallback to default if not available
     try:
         title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 48)
@@ -86,22 +154,22 @@ def create_style_recipe_image(recommendation, template_size=(1000, 1200)):
         title_font = ImageFont.load_default()
         heading_font = ImageFont.load_default()
         body_font = ImageFont.load_default()
-    
+
     # Add decorative header
     header_gradient = Image.new('RGB', (template_size[0], 100), '#ff6b6b')
     image.paste(header_gradient, (0, 0))
-    
+
     # Add title
     draw.text((template_size[0]//2, 60), "✨ Your Magical Style Recipe ✨", 
               font=title_font, fill='white', anchor="mm")
-    
+
     # Parse recommendation text into sections
     sections = {
         'Outfit': '',
         'Style Tips': '',
         'Accessories': ''
     }
-    
+
     current_section = None
     # Handle both string and list types for recommendation['text']
     text_lines = []
@@ -109,7 +177,7 @@ def create_style_recipe_image(recommendation, template_size=(1000, 1200)):
         text_lines = recommendation['text'].split('\n')
     elif isinstance(recommendation['text'], list):
         text_lines = recommendation['text']
-    
+
     for line in text_lines:
         line = str(line).strip()
         if line.startswith(('- Outfit:', '- Style Tips:', '- Accessories:')):
@@ -117,7 +185,7 @@ def create_style_recipe_image(recommendation, template_size=(1000, 1200)):
             sections[current_section] = line.split(':', 1)[1].strip()
         elif current_section and line:
             sections[current_section] += '\n' + line
-    
+
     # Layout sections
     y_offset = 150
     for section_title, content in sections.items():
@@ -126,13 +194,13 @@ def create_style_recipe_image(recommendation, template_size=(1000, 1200)):
                       fill='#4ecdc4')
         draw.text((75, y_offset+25), f"{section_title}", 
                  font=heading_font, fill='white', anchor="lm")
-        
+
         # Section content with wrapped text
         y_offset += 70
         words = content.split()
         lines = []
         current_line = []
-        
+
         for word in words:
             current_line.append(word)
             text_width = draw.textlength(" ".join(current_line), font=body_font)
@@ -140,51 +208,51 @@ def create_style_recipe_image(recommendation, template_size=(1000, 1200)):
                 current_line.pop()
                 lines.append(" ".join(current_line))
                 current_line = [word]
-        
+
         if current_line:
             lines.append(" ".join(current_line))
-        
+
         for line in lines:
             draw.text((75, y_offset), line, font=body_font, fill='black')
             y_offset += 35
-        
+
         y_offset += 50
-    
+
     # Add recommended items if available
     if recommendation['recommended_items']:
         draw.text((template_size[0]//2, y_offset), "Recommended Pieces", 
                  font=heading_font, fill='#4ecdc4', anchor="mm")
         y_offset += 50
-        
+
         # Calculate thumbnail size and positions
         thumb_size = 200
         spacing = (template_size[0] - (3 * thumb_size)) // 4
-        
+
         for idx, item in enumerate(recommendation['recommended_items'][:3]):
             if item.get('image_path') and os.path.exists(item['image_path']):
                 # Load and resize item image
                 item_img = Image.open(item['image_path'])
                 item_img.thumbnail((thumb_size, thumb_size))
-                
+
                 # Calculate position
                 x_pos = spacing + idx * (thumb_size + spacing)
                 image.paste(item_img, (x_pos, y_offset))
-                
+
                 # Add item details below thumbnail
                 details_y = y_offset + thumb_size + 10
                 draw.text((x_pos + thumb_size//2, details_y), 
                          f"{item['type'].capitalize()}", 
                          font=body_font, fill='#4ecdc4', anchor="mm")
-    
+
     # Add decorative footer
     footer_gradient = Image.new('RGB', (template_size[0], 50), '#4ecdc4')
     image.paste(footer_gradient, (0, template_size[1]-50))
-    
+
     # Generate unique filename
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     output_path = f"style_recipes/recipe_{timestamp}.png"
     os.makedirs("style_recipes", exist_ok=True)
-    
+
     # Save the image
     image.save(output_path)
     return output_path
@@ -462,8 +530,8 @@ def main_page():
                 if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
                     # Add custom filename input
                     custom_name = st.text_input("Enter a name for your outfit (optional)", 
-                                             placeholder="e.g., summer_casual_outfit",
-                                             key="outfit_name")
+                                                 placeholder="e.g., summer_casual_outfit",
+                                                 key="outfit_name")
                     
                     # Generate filename using custom name if provided, otherwise use timestamp
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -475,7 +543,7 @@ def main_page():
                         if item_type in outfit and isinstance(outfit[item_type], dict):
                             item_color = parse_color_string(outfit[item_type]['color'])
                             colors[item_type] = item_color
-
+                    
                     if colors:
                         # Open the original image
                         with Image.open(outfit['merged_image_path']) as img:
@@ -519,7 +587,7 @@ def main_page():
                                     font = ImageFont.load_default()
                             except:
                                 font = ImageFont.load_default()
-
+                            
                             # Add item types and color blocks
                             x_start = margin + spacing  # Starting position for first block
                             for idx, item_type in enumerate(['shirt', 'pants', 'shoes']):
@@ -536,7 +604,7 @@ def main_page():
                                     text_y = y2 + 5  # Minimal spacing after block
                                     hex_code = rgb_to_hex(colors[item_type]).lower()  # Convert to lowercase
                                     color_name = get_color_name(colors[item_type])
-                                    # Format: "shirt - Olive #d8a918"
+                                    # Format: "shirt - Olive #d8a18"
                                     combined_text = f"{item_type} - {color_name} {hex_code}"
                                     draw.text((x1, text_y), combined_text, fill='black', font=font)
                             
@@ -636,8 +704,8 @@ def main_page():
         
         with col2:
             preferences = st.text_area("🎯 Style preferences?",
-                                     placeholder="E.g., prefer dark colors, need to look professional",
-                                     height=122)
+                                   placeholder="E.g., prefer dark colors, need to look professional",
+                                   height=122)
         
         generate_col, _ = st.columns([2, 3])
         with generate_col:
@@ -664,7 +732,7 @@ def main_page():
                         "Enable Manual Selection",
                         help="Manually select clothing items for visualization"
                     )
-
+                
                 # Manual selection interface
                 if manual_selection:
                     st.markdown("### 👕 Manual Item Selection")
@@ -706,7 +774,7 @@ def main_page():
                                 'style': item['style']
                             })
                         recommendation = {'recommended_items': selected_items}
-
+                
                 # Display visualization
                 col1, col2 = st.columns(2)
                 
@@ -750,35 +818,35 @@ def main_page():
                     else:
                         st.error("Failed to generate style recipe image")
                     
-                # Keep the text version in an expander for accessibility
-                with st.expander("View Text Version"):
-                    st.markdown(recommendation['text'])
-                
-                # Display recommended items in an enhanced grid
-                if recommendation['recommended_items']:
-                    st.markdown("### 🎭 Recommended Pieces")
-                    st.markdown('<div class="item-grid">', unsafe_allow_html=True)
+                    # Keep the text version in an expander for accessibility
+                    with st.expander("View Text Version"):
+                        st.markdown(recommendation['text'])
                     
-                    # Create columns for the grid (3 items per row)
-                    cols = st.columns(3)
-                    for idx, item in enumerate(recommendation['recommended_items']):
-                        col = cols[idx % 3]
-                        with col:
-                            with st.container():
-                                if item.get('image_path') and os.path.exists(item['image_path']):
-                                    st.image(item['image_path'], use_column_width=True)
-                                    st.markdown(f"**{item['type'].capitalize()}** ✨")
-                                    st.markdown(f"Style: {item['style']} 🎯")
-                                    
-                                    # Display item color with enhanced visualization
-                                    color = parse_color_string(str(item['color']))
-                                    st.markdown("**Color Palette**")
-                                    display_color_palette([color])
-                                    
-                                    # Add a subtle separator
-                                    st.markdown("---")
-                    
-                    st.markdown('</div>', unsafe_allow_html=True)
+                    # Display recommended items in an enhanced grid
+                    if recommendation['recommended_items']:
+                        st.markdown("### 🎭 Recommended Pieces")
+                        st.markdown('<div class="item-grid">', unsafe_allow_html=True)
+                        
+                        # Create columns for the grid (3 items per row)
+                        cols = st.columns(3)
+                        for idx, item in enumerate(recommendation['recommended_items']):
+                            col = cols[idx % 3]
+                            with col:
+                                with st.container():
+                                    if item.get('image_path') and os.path.exists(item['image_path']):
+                                        st.image(item['image_path'], use_column_width=True)
+                                        st.markdown(f"**{item['type'].capitalize()}** ✨")
+                                        st.markdown(f"Style: {item['style']} 🎯")
+                                        
+                                        # Display item color with enhanced visualization
+                                        color = parse_color_string(str(item['color']))
+                                        st.markdown("**Color Palette**")
+                                        display_color_palette([color])
+                                        
+                                        # Add a subtle separator
+                                        st.markdown("---")
+                        
+                        st.markdown('</div>', unsafe_allow_html=True)
 
 def personal_wardrobe_page():
     # Initialize session state for editing
@@ -869,7 +937,7 @@ def personal_wardrobe_page():
             if not uploaded_file.name.lower().endswith('.png'):
                 st.error("Only PNG files are allowed. Please upload a PNG image.")
                 return
-
+            
             # Extract color after image upload
             temp_path = f"temp_{uploaded_file.name}"
             with open(temp_path, "wb") as f:
@@ -1050,18 +1118,18 @@ def personal_wardrobe_page():
                                     
                                     # Edit fields
                                     new_styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"], 
-                                                              default=current_styles)
+                                                               default=current_styles)
                                     new_sizes = st.multiselect("Size", ["S", "M", "L", "XL"], 
-                                                             default=current_sizes)
+                                                                default=current_sizes)
                                     new_genders = st.multiselect("Gender", ["Male", "Female", "Unisex"], 
-                                                               default=current_genders)
+                                                                default=current_genders)
                                     new_hyperlink = st.text_input("Shopping Link", 
-                                                                value=item['hyperlink'] if item['hyperlink'] else "")
+                                                                 value=item['hyperlink'] if item['hyperlink'] else "")
                                     new_price = st.number_input("Price ($)", 
-                                                              value=float(item['price']) if item['price'] else 0.0,
-                                                              min_value=0.0, 
-                                                              step=0.01, 
-                                                              format="%.2f")
+                                                               value=float(item['price']) if item['price'] else 0.0,
+                                                               min_value=0.0, 
+                                                               step=0.01, 
+                                                               format="%.2f")
                                     
                                     # Form validation
                                     is_valid = True
@@ -1321,7 +1389,7 @@ def bulk_delete_page():
             if not uploaded_file.name.lower().endswith('.png'):
                 st.error("Only PNG files are allowed. Please upload a PNG image.")
                 return
-
+            
             # Extract color after image upload
             temp_path = f"temp_{uploaded_file.name}"
             with open(temp_path, "wb") as f:
@@ -1503,18 +1571,18 @@ def bulk_delete_page():
                                     
                                     # Edit fields
                                     new_styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"], 
-                                                              default=current_styles)
+                                                               default=current_styles)
                                     new_sizes = st.multiselect("Size", ["S", "M", "L", "XL"], 
-                                                             default=current_sizes)
+                                                                default=current_sizes)
                                     new_genders = st.multiselect("Gender", ["Male", "Female", "Unisex"], 
-                                                               default=current_genders)
+                                                                default=current_genders)
                                     new_hyperlink = st.text_input("Shopping Link", 
-                                                                value=item['hyperlink'] if item['hyperlink'] else "")
+                                                                 value=item['hyperlink'] if item['hyperlink'] else "")
                                     new_price = st.number_input("Price ($)", 
-                                                              value=float(item['price']) if item['price'] else 0.0,
-                                                              min_value=0.0, 
-                                                              step=0.01, 
-                                                              format="%.2f")
+                                                               value=float(item['price']) if item['price'] else 0.0,
+                                                               min_value=0.0, 
+                                                               step=0.01, 
+                                                               format="%.2f")
                                     
                                     # Form validation
                                     is_valid = True
@@ -1559,83 +1627,12 @@ def bulk_delete_page():
                                             st.rerun()
                                         else:
                                             st.error(message)
-                            
-                            # Image editing interface
-                            if st.session_state.editing_image is not None and st.session_state.editing_image['id'] == item['id']:
-                                st.markdown("### Update Image")
-                                new_image = st.file_uploader("Choose new image", 
-                                                           type=['png', 'jpg', 'jpeg'],
-                                                           key=f"edit_image_{idx}")
-                                
-                                if new_image:
-                                    preview_col, button_col = st.columns([3, 1])
-                                    with preview_col:
-                                        st.image(new_image, width=200)
-                                    with button_col:
-                                        if st.button("Save New Image"):
-                                            # Save new image
-                                            temp_path = f"temp_edit_{new_image.name}"
-                                            with open(temp_path, "wb") as f:
-                                                f.write(new_image.getvalue())
                                             
-                                            success = update_item_image(item['id'], temp_path)
-                                            if success:
-                                                st.success("Image updated successfully!")
-                                                st.rerun()
-                                            else:
-                                                st.error("Failed to update image")
-                                            
-                                            os.remove(temp_path)
-                            
-                            # Color editing interface
-                            if st.session_state.editing_color is not None and st.session_state.editing_color['id'] == item['id']:
-                                st.markdown("### Edit Color")
-                                temp_path = item['image_path']
-                                colors = get_color_palette(temp_path)
-                                
-                                if colors is not None:
-                                    st.write("Available Colors:")
-                                    display_color_palette(colors)
-                                    
-                                    if st.button("Update Color"):
-                                        success, message = edit_clothing_item(
-                                            item['id'],
-                                            colors[0],
-                                            item['style'].split(','),
-                                            item['gender'].split(','),
-                                            item['size'].split(','),
-                                            item['hyperlink'],
-                                            float(item['price']) if item['price'] else None
-                                        )
-                                        if success:
-                                            st.success("Color updated successfully!")
-                                            st.rerun()
-                                        else:
-                                            st.error(message)
-                                    
-                                    # Add undo/redo buttons
-                                    undo_col, redo_col = st.columns(2)
-                                    with undo_col:
-                                        if st.button(f"↩ Undo {idx}"):
-                                            success, message = undo_edit(item.id)
-                                            if success:
-                                                st.success(message)
-                                                st.rerun()
-                                            else:
-                                                st.warning(message)
-                                    
-                                    with redo_col:
-                                        if st.button(f"↪ Redo {idx}"):
-                                            success, message = redo_edit(item.id)
-                                            if success:
-                                                st.success(message)
-                                                st.rerun()
-                                            else:
-                                                st.warning(message)
-
+                            # Add a separator between items
+                            st.markdown("---")
     else:
         st.info("Your wardrobe is empty. Start by adding some items!")
-
+    
 def saved_outfits_page():
     """Display saved outfits page"""
     st.title("Saved Outfits")
@@ -1704,6 +1701,7 @@ def saved_outfits_page():
                             st.rerun()
                         else:
                             st.error(message)
+            
 
 def cleanup_status_dashboard():
     """Display cleanup status dashboard"""
@@ -1827,54 +1825,6 @@ def redo_edit(item_id):
 
 # Update the main sidebar menu to include the bulk delete page
 def bulk_delete_page():
-    """Display the bulk delete interface for managing uploaded items"""
-    st.title("Bulk Delete Items")
-    
-    # Fetch all user items
-    from data_manager import get_db_connection
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT id, type, color, style, gender, size, hyperlink, price, image_path 
-            FROM user_clothing_items 
-            ORDER BY type, id
-        """)
-        items = cur.fetchall()
-        
-    if not items:
-        st.info("No items found in your wardrobe.")
-        return
-        
-    # Create a DataFrame for better display
-    df = pd.DataFrame(items, columns=[
-        'id', 'type', 'color', 'style', 'gender', 
-        'size', 'hyperlink', 'price', 'image_path'
-    ])
-    
-    # Group items by type for better organization
-    st.write("Select items to delete:")
-    selected_items = []
-    
-    for item_type in df['type'].unique():
-        with st.expander(f"{item_type.title()} Items"):
-            type_items = df[df['type'] == item_type]
-            for _, item in type_items.iterrows():
-                col1, col2 = st.columns([1, 4])
-                with col1:
-                    if st.checkbox("", key=f"delete_{item['id']}"):
-                        selected_items.append(item['id'])
-                with col2:
-                    st.write(f"Color: {item['color']}, Style: {item['style']}, Size: {item['size']}")
-    
-    if selected_items:
-        if st.button("Delete Selected Items", type="primary"):
-            success, message, stats = bulk_delete_items(selected_items)
-            if success:
-                st.success(message)
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error(f"{message}\nErrors: {', '.join(stats.get('errors', []))}")
     """Display the bulk delete interface for managing uploaded items"""
     st.title("Bulk Delete Items")
     
