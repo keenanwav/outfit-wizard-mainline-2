@@ -44,3 +44,5 @@
 2024-12-24 22:04:15,752 - WARNING - Attempt 2 failed, retrying in 2 seconds
 2024-12-24 22:04:15,850 - ERROR - Failed to initialize database connections: name 'connection_pool' is used prior to global declaration (data_manager.py, line 120)
 2024-12-24 22:04:17,756 - ERROR - Failed to initialize database connections: name 'connection_pool' is used prior to global declaration (data_manager.py, line 120)
+2024-12-24 22:46:29,689 - main - INFO - Successfully imported core libraries
+2024-12-24 22:46:30,226 - auth_utils - INFO - Successfully imported all required libraries
