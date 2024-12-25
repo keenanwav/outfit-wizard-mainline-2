@@ -1,184 +1,450 @@
 import os
-import logging
-import time
-import random
+import bcrypt
+import streamlit as st
 from datetime import datetime, timedelta
+import psycopg2
+from psycopg2.pool import SimpleConnectionPool
 from contextlib import contextmanager
+from typing import Optional, Dict, Tuple
+import pyotp
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+import random
+import string
 
-# Configure logging for auth module
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger('auth_utils')
-
-# Initialize connection pool settings
-MIN_CONNECTIONS = 1
-MAX_CONNECTIONS = 10
-POOL_TIMEOUT = 30
-STATEMENT_TIMEOUT = 30000  # 30 seconds statement timeout
-
-# Global connection pool
-connection_pool = None
-
-# Import database libraries
-try:
-    import psycopg2
-    from psycopg2.pool import SimpleConnectionPool
-    import bcrypt
-    import streamlit as st
-    logger.info("Successfully imported all required libraries")
-except ImportError as e:
-    logger.error(f"Failed to import required libraries: {e}")
-    raise
-
+# Initialize connection pool with better error handling
 def create_connection_pool():
-    """Create and return a connection pool with optimized settings"""
-    global connection_pool
     try:
-        if connection_pool is not None:
-            logger.info("Reusing existing connection pool")
-            return connection_pool
-
-        logger.info("Attempting to create database connection pool")
-
-        # Get database credentials from environment
-        db_params = {
-            'host': os.environ.get('PGHOST'),
-            'database': os.environ.get('PGDATABASE'),
-            'user': os.environ.get('PGUSER'),
-            'password': os.environ.get('PGPASSWORD'),
-            'sslmode': 'require'
-        }
-
-        # Validate database parameters
-        missing_params = [k for k, v in db_params.items() if not v]
-        if missing_params:
-            raise ValueError(f"Missing required database parameters: {', '.join(missing_params)}")
-
-        # Create connection pool with optimized settings
-        connection_pool = SimpleConnectionPool(
-            MIN_CONNECTIONS,
-            MAX_CONNECTIONS,
-            **db_params,
-            connect_timeout=10,
-            keepalives=1,
-            keepalives_idle=30,
-            keepalives_interval=10,
-            keepalives_count=5,
-            options=f'-c statement_timeout={STATEMENT_TIMEOUT}',
-            application_name='outfit_wizard_auth',
-            client_encoding='UTF8'
+        return SimpleConnectionPool(
+            minconn=1,
+            maxconn=10,
+            dsn=os.environ['DATABASE_URL'],
+            connect_timeout=30
         )
-
-        # Test the connection
-        with connection_pool.getconn() as conn:
-            with conn.cursor() as cur:
-                cur.execute('SELECT 1')
-                logger.info("Database connection test successful")
-            connection_pool.putconn(conn)
-
-        logger.info("Successfully created database connection pool")
-        return connection_pool
     except Exception as e:
-        logger.error(f"Failed to create database connection pool: {str(e)}")
+        st.error(f"Failed to create database pool: {str(e)}")
         raise
 
-def get_connection_pool():
-    """Get or create connection pool with retry logic"""
-    global connection_pool
-    max_retries = 3
-    retry_delay = 1
+# Initialize connection pool
+connection_pool = create_connection_pool()
 
-    for attempt in range(max_retries):
+def send_verification_email(email: str, code: str) -> bool:
+    """Send verification email with the provided code using SendGrid"""
+    try:
+        sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
+        sender_email = os.environ.get('EMAIL_SENDER')
+
+        if not sendgrid_api_key or not sender_email:
+            st.error("SendGrid configuration is missing. Please check SENDGRID_API_KEY and EMAIL_SENDER environment variables.")
+            return False
+
+        message = Mail(
+            from_email=sender_email,
+            to_emails=email,
+            subject='Digital Wardrobe - Email Verification',
+            plain_text_content=f"""
+Welcome to Digital Wardrobe!
+
+Your verification code is: {code}
+
+Please enter this code in the application to verify your email address.
+This code will expire in 10 minutes.
+
+If you didn't request this code, please ignore this email.
+            """
+        )
+
+        # Add debug logging
+        st.info(f"Attempting to send verification email to {email}")
+
         try:
-            if connection_pool is None:
-                connection_pool = create_connection_pool()
-            return connection_pool
+            sg = SendGridAPIClient(sendgrid_api_key)
+            response = sg.send(message)
+
+            if response.status_code in [200, 201, 202]:
+                st.success(f"Verification email sent successfully to {email}")
+                return True
+            else:
+                st.error(f"Failed to send email. Status code: {response.status_code}")
+                return False
+
         except Exception as e:
-            if attempt == max_retries - 1:
-                logger.error(f"Failed to get connection pool after {max_retries} attempts: {str(e)}")
-                raise
-            jitter = random.uniform(0, 0.1 * retry_delay)
-            time.sleep((retry_delay * (2 ** attempt)) + jitter)
-            logger.warning(f"Retrying connection pool creation (attempt {attempt + 1})")
+            st.error(f"SendGrid error: {str(e)}")
+            return False
+
+    except Exception as e:
+        st.error(f"Failed to send verification email: {str(e)}")
+        return False
+
+def generate_verification_code() -> str:
+    """Generate a 6-digit verification code"""
+    return ''.join(random.choices(string.digits, k=6))
+
+def store_verification_code(user_id: int, code: str) -> bool:
+    """Store verification code in database with expiration time"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                expiration = datetime.now() + timedelta(minutes=10)
+                cur.execute("""
+                    UPDATE users 
+                    SET verification_code = %s, verification_code_expires = %s
+                    WHERE id = %s
+                """, (code, expiration, user_id))
+                conn.commit()
+                return True
+            finally:
+                cur.close()
+    except Exception as e:
+        st.error(f"Error storing verification code: {str(e)}")
+        return False
+
+def verify_code(user_id: int, code: str) -> bool:
+    """Verify the provided code against stored code"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    SELECT verification_code, verification_code_expires
+                    FROM users
+                    WHERE id = %s
+                """, (user_id,))
+                result = cur.fetchone()
+
+                if not result:
+                    return False
+
+                stored_code, expiration = result
+
+                if (stored_code == code and 
+                    expiration and 
+                    expiration > datetime.now()):
+                    # Mark email as verified
+                    cur.execute("""
+                        UPDATE users
+                        SET email_verified = TRUE,
+                            verification_code = NULL,
+                            verification_code_expires = NULL
+                        WHERE id = %s
+                    """, (user_id,))
+                    conn.commit()
+                    return True
+                return False
+            finally:
+                cur.close()
+    except Exception as e:
+        st.error(f"Error verifying code: {str(e)}")
+        return False
+
+def setup_2fa(user_id: int) -> Tuple[bool, Optional[str]]:
+    """Set up 2FA for a user"""
+    try:
+        # Generate a random secret key
+        secret = pyotp.random_base32()
+
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    UPDATE users 
+                    SET two_factor_secret = %s, two_factor_enabled = TRUE
+                    WHERE id = %s
+                    RETURNING email
+                """, (secret, user_id))
+
+                result = cur.fetchone()
+                if result:
+                    conn.commit()
+                    return True, secret
+                return False, None
+            finally:
+                cur.close()
+    except Exception as e:
+        st.error(f"Error setting up 2FA: {str(e)}")
+        return False, None
+
+def verify_2fa(user_id: int, token: str) -> bool:
+    """Verify 2FA token"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    SELECT two_factor_secret
+                    FROM users
+                    WHERE id = %s AND two_factor_enabled = TRUE
+                """, (user_id,))
+
+                result = cur.fetchone()
+                if not result:
+                    return False
+
+                secret = result[0]
+                totp = pyotp.TOTP(secret)
+                return totp.verify(token)
+            finally:
+                cur.close()
+    except Exception as e:
+        st.error(f"Error verifying 2FA token: {str(e)}")
+        return False
+
+def disable_2fa(user_id: int) -> bool:
+    """Disable 2FA for a user"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    UPDATE users 
+                    SET two_factor_secret = NULL, two_factor_enabled = FALSE
+                    WHERE id = %s
+                    RETURNING id
+                """, (user_id,))
+
+                if cur.fetchone():
+                    conn.commit()
+                    return True
+                return False
+            finally:
+                cur.close()
+    except Exception as e:
+        st.error(f"Error disabling 2FA: {str(e)}")
+        return False
+
+# Keep existing functions but update authenticate_user to handle 2FA
+def authenticate_user(email: str, password: str) -> Tuple[bool, Dict]:
+    """Authenticate a user and handle 2FA if enabled"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute("""
+                    SELECT id, username, password_hash, role, two_factor_enabled, email_verified
+                    FROM users 
+                    WHERE email = %s
+                """, (email,))
+                result = cur.fetchone()
+
+                if not result:
+                    st.error("User not found")
+                    return False, {}
+
+                user_id, username, stored_hash, role, requires_2fa, email_verified = result
+
+                if not verify_password(password, stored_hash):
+                    st.error("Invalid password")
+                    return False, {}
+
+                if not email_verified:
+                    st.error("Email not verified. Please check your email for verification code.")
+                    return False, {}
+
+                # Update last login time
+                cur.execute(
+                    "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s",
+                    (user_id,)
+                )
+                conn.commit()
+
+                return True, {
+                    "id": user_id,
+                    "username": username,
+                    "role": role,
+                    "requires_2fa": requires_2fa
+                }
+            finally:
+                cur.close()
+    except Exception as e:
+        st.error(f"Authentication error: {str(e)}")
+        return False, {}
 
 @contextmanager
 def get_db_connection():
-    """Context manager for database connections with enhanced error handling"""
+    """Context manager for database connections with proper error handling"""
     conn = None
-    pool = None
     try:
-        pool = get_connection_pool()
-        conn = pool.getconn()
-        conn.set_session(autocommit=False)
+        conn = connection_pool.getconn()
         yield conn
-    except psycopg2.OperationalError as e:
-        if conn:
-            conn.close()
-        if "SSL connection has been closed unexpectedly" in str(e):
-            # Force recreation of pool on SSL errors
-            global connection_pool
-            connection_pool = None
-        logger.error(f"Database connection error: {str(e)}")
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected database error: {str(e)}")
-        raise
     finally:
         if conn:
-            try:
-                conn.rollback()
-            except Exception:
-                pass
-            if pool:
-                try:
-                    pool.putconn(conn)
-                except Exception as e:
-                    logger.error(f"Error returning connection to pool: {str(e)}")
-                    conn.close()
+            if not conn.closed:
+                conn.commit()
+            connection_pool.putconn(conn)
 
 def init_auth_tables():
-    """Initialize authentication tables with retry logic"""
-    logger.info("Starting authentication tables initialization")
-    max_retries = 3
-    retry_delay = 1
-
-    for attempt in range(max_retries):
+    """Initialize authentication and profile tables"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
         try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    # Create users table
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS users (
-                            id SERIAL PRIMARY KEY,
-                            username VARCHAR(64) UNIQUE NOT NULL,
-                            email VARCHAR(120) UNIQUE NOT NULL,
-                            password_hash BYTEA NOT NULL,
-                            role VARCHAR(10) NOT NULL DEFAULT 'user',
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            CHECK (role IN ('admin', 'user'))
-                        )
-                    """)
-                    conn.commit()
-                    logger.info("Successfully initialized auth tables")
-                    return True
-        except psycopg2.OperationalError as e:
-            if attempt == max_retries - 1:
-                logger.error(f"Failed to initialize auth tables after {max_retries} attempts: {str(e)}")
-                raise
-            jitter = random.uniform(0, 0.1 * retry_delay)
-            time.sleep((retry_delay * (2 ** attempt)) + jitter)
-            logger.warning(f"Retrying auth tables initialization (attempt {attempt + 1})")
-    return False
+            # Create users table with additional profile fields
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(64) UNIQUE NOT NULL,
+                    email VARCHAR(120) UNIQUE NOT NULL,
+                    password_hash BYTEA NOT NULL,
+                    role VARCHAR(10) NOT NULL DEFAULT 'user',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    full_name VARCHAR(100),
+                    bio TEXT,
+                    profile_picture_path VARCHAR(255),
+                    preferences JSONB DEFAULT '{}',
+                    last_login TIMESTAMP,
+                    verification_code VARCHAR(6),
+                    verification_code_expires TIMESTAMP,
+                    two_factor_secret VARCHAR(255),
+                    two_factor_enabled BOOLEAN DEFAULT FALSE,
+                    email_verified BOOLEAN DEFAULT FALSE,
+                    CHECK (role IN ('admin', 'user'))
+                )
+            """)
+            conn.commit()
+            st.success("Successfully initialized auth tables")
+        except Exception as e:
+            st.error(f"Failed to initialize auth tables: {str(e)}")
+            conn.rollback()
+            raise
+        finally:
+            cur.close()
 
 def hash_password(password: str) -> bytes:
-    """Hash a password using bcrypt"""
+    """Hash a password using bcrypt with proper encoding"""
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
 def verify_password(password: str, password_hash: bytes) -> bool:
-    """Verify a password against its hash"""
-    return bcrypt.checkpw(password.encode('utf-8'), password_hash)
+    """Verify a password against its hash with proper type handling and logging"""
+    try:
+        # Convert memoryview to bytes if necessary
+        if isinstance(password_hash, memoryview):
+            password_hash = password_hash.tobytes()
+        elif isinstance(password_hash, str):
+            # Handle case where hash might have been stored as string
+            password_hash = password_hash.encode('utf-8')
+
+        return bcrypt.checkpw(password.encode('utf-8'), password_hash)
+    except Exception as e:
+        st.error(f"Password verification error: {str(e)}")
+        return False
+
+def create_user(username: str, email: str, password: str, role: str = 'user') -> Tuple[bool, int]:
+    """Create a new user with specified role and return success status and user ID"""
+    try:
+        if role not in ('admin', 'user'):
+            raise ValueError("Invalid role specified")
+
+        password_hash = hash_password(password)
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                # Check if user already exists
+                cur.execute(
+                    "SELECT id FROM users WHERE email = %s OR username = %s",
+                    (email, username)
+                )
+                if cur.fetchone():
+                    st.error("Username or email already exists")
+                    return False, -1
+
+                # Insert new user
+                cur.execute(
+                    """
+                    INSERT INTO users (username, email, password_hash, role)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (username, email, password_hash, role)
+                )
+                user_id = cur.fetchone()[0]
+                conn.commit()
+
+                # Generate and store verification code
+                code = generate_verification_code()
+                if store_verification_code(user_id, code):
+                    # Send verification email
+                    if send_verification_email(email, code):
+                        st.success("Account created successfully. Please check your email for verification code.")
+                        return True, user_id
+                    else:
+                        st.error("Account created but failed to send verification email. Please contact support.")
+                        return False, -1
+                else:
+                    st.error("Failed to generate verification code")
+                    return False, -1
+            finally:
+                cur.close()
+    except Exception as e:
+        st.error(f"Error creating user: {str(e)}")
+        return False, -1
+
+def update_user_profile(user_id: int, data: Dict) -> bool:
+    """Update user profile information"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                # Build update query dynamically based on provided fields
+                update_fields = []
+                params = []
+                for key, value in data.items():
+                    if key in ['full_name', 'bio', 'profile_picture_path', 'preferences']:
+                        update_fields.append(f"{key} = %s")
+                        params.append(value)
+
+                if update_fields:
+                    params.append(user_id)
+                    query = f"""
+                        UPDATE users 
+                        SET {', '.join(update_fields)}
+                        WHERE id = %s
+                        RETURNING id
+                    """
+                    cur.execute(query, params)
+
+                    if cur.fetchone():
+                        conn.commit()
+                        return True
+                return False
+            finally:
+                cur.close()
+    except Exception as e:
+        st.error(f"Error updating profile: {str(e)}")
+        return False
+
+def get_user_profile(user_id: int) -> Optional[Dict]:
+    """Get user profile information"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    """
+                    SELECT username, email, full_name, bio, 
+                           profile_picture_path, preferences, last_login
+                    FROM users 
+                    WHERE id = %s
+                    """,
+                    (user_id,)
+                )
+                result = cur.fetchone()
+
+                if result:
+                    return {
+                        "username": result[0],
+                        "email": result[1],
+                        "full_name": result[2],
+                        "bio": result[3],
+                        "profile_picture_path": result[4],
+                        "preferences": result[5],
+                        "last_login": result[6]
+                    }
+                return None
+            finally:
+                cur.close()
+    except Exception as e:
+        st.error(f"Error fetching profile: {str(e)}")
+        return None
 
 def init_session_state():
     """Initialize session state variables for authentication"""
@@ -186,50 +452,37 @@ def init_session_state():
         st.session_state.user = None
     if 'auth_status' not in st.session_state:
         st.session_state.auth_status = None
-    logger.info("Session state initialized")
-
-def create_user(username: str, email: str, password: str, role: str = 'user') -> bool:
-    """Create a new user with specified role"""
-    if role not in ('admin', 'user'):
-        raise ValueError("Invalid role specified")
-
-    try:
-        password_hash = hash_password(password)
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO users (username, email, password_hash, role) VALUES (%s, %s, %s, %s)",
-                    (username, email, password_hash, role)
-                )
-                conn.commit()
-                logger.info(f"Successfully created user: {username}")
-        return True
-    except Exception as e:
-        logger.error(f"Error creating user: {str(e)}")
-        return False
-
-def authenticate_user(email: str, password: str) -> tuple[bool, dict]:
-    """Authenticate a user with retry logic"""
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT id, username, password_hash, role FROM users WHERE email = %s",
-                    (email,)
-                )
-                result = cur.fetchone()
-
-                if result and verify_password(password, result[2]):
-                    logger.info(f"Successfully authenticated user: {result[1]}")
-                    return True, {"id": result[0], "username": result[1], "role": result[3]}
-                logger.warning(f"Failed authentication attempt for email: {email}")
-                return False, {}
-    except Exception as e:
-        logger.error(f"Error authenticating user: {str(e)}")
-        return False, {}
 
 def logout_user():
     """Log out the current user"""
     st.session_state.user = None
     st.session_state.auth_status = None
-    logger.info("User logged out successfully")
+
+def test_email_configuration() -> bool:
+    """Test SendGrid email configuration"""
+    try:
+        sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
+        sender_email = os.environ.get('EMAIL_SENDER')
+
+        if not sendgrid_api_key or not sender_email:
+            st.error("SendGrid configuration is missing")
+            return False
+
+        # Try to initialize SendGrid client
+        try:
+            sg = SendGridAPIClient(sendgrid_api_key)
+            # Verify API key by making a simple request
+            response = sg.client.suppression.bounces.get()
+            if response.status_code == 200:
+                st.success("SendGrid configuration is valid")
+                return True
+            else:
+                st.error(f"SendGrid API test failed with status code: {response.status_code}")
+                return False
+        except Exception as e:
+            st.error(f"SendGrid configuration test failed: {str(e)}")
+            return False
+
+    except Exception as e:
+        st.error(f"Error testing email configuration: {str(e)}")
+        return False
