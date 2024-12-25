@@ -262,9 +262,8 @@ def main_page():
     if 'show_login' not in st.session_state:
         st.session_state.show_login = False
 
-    # Add login button in top left
-    col1, col2, col3 = st.columns([1, 4, 1])
-    with col1:
+    # Login button in sidebar
+    with st.sidebar:
         if st.button("🔐 Login/Signup", use_container_width=True):
             st.session_state.show_login = True
 
@@ -609,7 +608,7 @@ def main_page():
             occasion = st.text_input("✨ What's the occasion?", 
                                    placeholder="E.g., job interview, casual dinner, wedding")
             weather = st.text_input("🌤️ Weather conditions?", 
-                                  placeholder="E.g., sunny and warm, cold and rainy")
+                                 placeholder="E.g., sunny and warm, cold and rainy")
         
         with col2:
             preferences = st.text_area("🎯 Style preferences?",
