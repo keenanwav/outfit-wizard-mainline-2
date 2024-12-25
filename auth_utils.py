@@ -17,17 +17,12 @@ import json
 # Social Auth Configuration
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
-GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID')
-GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET')
 
 # OAuth endpoints
 GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo'
 
-GITHUB_AUTH_URL = 'https://github.com/login/oauth/authorize'
-GITHUB_TOKEN_URL = 'https://github.com/login/oauth/access_token'
-GITHUB_USERINFO_URL = 'https://api.github.com/user'
 
 # Initialize connection pool with better error handling
 def create_connection_pool():
@@ -525,21 +520,6 @@ def google_login():
     st.session_state.oauth_state = state
     return authorization_url
 
-def github_login():
-    """Initiate GitHub OAuth login flow"""
-    if not GITHUB_CLIENT_ID or not GITHUB_CLIENT_SECRET:
-        st.error("GitHub OAuth credentials not configured")
-        return None
-
-    github = OAuth2Session(
-        GITHUB_CLIENT_ID,
-        scope=['user:email'],
-        redirect_uri=os.environ.get('OAUTH_REDIRECT_URI')
-    )
-
-    authorization_url, state = github.authorization_url(GITHUB_AUTH_URL)
-    st.session_state.oauth_state = state
-    return authorization_url
 
 def handle_oauth_callback(provider: str, code: str, state: str) -> Tuple[bool, Optional[Dict]]:
     """Handle OAuth callback and user creation/login"""
@@ -562,58 +542,40 @@ def handle_oauth_callback(provider: str, code: str, state: str) -> Tuple[bool, O
             email = user_info.get('email')
             name = user_info.get('name', '').split()[0]  # Use first name as username
 
-        elif provider == 'github':
-            oauth_session = OAuth2Session(
-                GITHUB_CLIENT_ID,
-                state=st.session_state.oauth_state,
-                redirect_uri=os.environ.get('OAUTH_REDIRECT_URI')
-            )
-            token = oauth_session.fetch_token(
-                GITHUB_TOKEN_URL,
-                client_secret=GITHUB_CLIENT_SECRET,
-                code=code
-            )
-            resp = oauth_session.get(GITHUB_USERINFO_URL)
-            user_info = resp.json()
-
-            email = user_info.get('email')
-            name = user_info.get('login')  # Use GitHub username
-
-        else:
-            return False, None
-
-        # Create or get user
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            try:
-                # Check if user exists
-                cur.execute(
-                    "SELECT id, username FROM users WHERE email = %s",
-                    (email,)
-                )
-                user = cur.fetchone()
-
-                if not user:
-                    # Create new user
+            # Create or get user
+            with get_db_connection() as conn:
+                cur = conn.cursor()
+                try:
+                    # Check if user exists
                     cur.execute(
-                        """
-                        INSERT INTO users (username, email, password_hash, email_verified)
-                        VALUES (%s, %s, %s, TRUE)
-                        RETURNING id, username
-                        """,
-                        (name, email, bcrypt.hashpw(os.urandom(32), bcrypt.gensalt()))
+                        "SELECT id, username FROM users WHERE email = %s",
+                        (email,)
                     )
                     user = cur.fetchone()
-                    conn.commit()
 
-                return True, {
-                    "id": user[0],
-                    "username": user[1],
-                    "email": email,
-                    "provider": provider
-                }
-            finally:
-                cur.close()
+                    if not user:
+                        # Create new user
+                        cur.execute(
+                            """
+                            INSERT INTO users (username, email, password_hash, email_verified)
+                            VALUES (%s, %s, %s, TRUE)
+                            RETURNING id, username
+                            """,
+                            (name, email, bcrypt.hashpw(os.urandom(32), bcrypt.gensalt()))
+                        )
+                        user = cur.fetchone()
+                        conn.commit()
+
+                    return True, {
+                        "id": user[0],
+                        "username": user[1],
+                        "email": email,
+                        "provider": provider
+                    }
+                finally:
+                    cur.close()
+
+        return False, None
 
     except Exception as e:
         st.error(f"OAuth error: {str(e)}")

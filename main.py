@@ -263,12 +263,12 @@ def main_page():
         st.session_state.show_login = False
 
     # Initialize social auth settings
-    from auth_utils import init_social_auth, google_login, github_login
+    from auth_utils import init_social_auth, google_login
     init_social_auth()
 
     # Login/Signup section in sidebar
     with st.sidebar:
-        col1, col2, col3 = st.columns([1, 1, 1])
+        col1, col2 = st.columns([1, 1])
 
         with col1:
             if st.button("🔐 Login/Signup", use_container_width=True):
@@ -277,12 +277,6 @@ def main_page():
         with col2:
             if st.button("🔵 Google", use_container_width=True):
                 auth_url = google_login()
-                if auth_url:
-                    st.markdown(f'<meta http-equiv="refresh" content="0;url={auth_url}">', unsafe_allow_html=True)
-
-        with col3:
-            if st.button("⚫ GitHub", use_container_width=True):
-                auth_url = github_login()
                 if auth_url:
                     st.markdown(f'<meta http-equiv="refresh" content="0;url={auth_url}">', unsafe_allow_html=True)
 
@@ -304,18 +298,10 @@ def main_page():
             st.markdown("---")
             st.markdown("### Or continue with")
 
-            social_col1, social_col2 = st.columns(2)
-            with social_col1:
-                if st.button("🔵 Google", key="google_oauth"):
-                    auth_url = google_login()
-                    if auth_url:
-                        st.markdown(f'<meta http-equiv="refresh" content="0;url={auth_url}">', unsafe_allow_html=True)
-
-            with social_col2:
-                if st.button("⚫ GitHub", key="github_oauth"):
-                    auth_url = github_login()
-                    if auth_url:
-                        st.markdown(f'<meta http-equiv="refresh" content="0;url={auth_url}">', unsafe_allow_html=True)
+            if st.button("🔵 Google", key="google_oauth"):
+                auth_url = google_login()
+                if auth_url:
+                    st.markdown(f'<meta http-equiv="refresh" content="0;url={auth_url}">', unsafe_allow_html=True)
 
             if submit:
                 if is_signup:
@@ -712,32 +698,32 @@ def main_page():
                     else:
                         st.error("Failed to generate style recipe image")
                     
-                # Keep the text version in an expander for accessibility
-                with st.expander("View Text Version"):
-                    st.markdown(recommendation['text'])
-                
-                # Display recommended items in an enhanced grid
-                if recommendation['recommended_items']:
-                    st.markdown("### 🎭 Recommended Pieces")
-                    st.markdown('<div class="item-grid">', unsafe_allow_html=True)
+                    # Keep the text version in an expander for accessibility
+                    with st.expander("View Text Version"):
+                        st.markdown(recommendation['text'])
                     
-                    # Create columns for the grid (3 items per row)
-                    cols = st.columns(3)
-                    for idx, item in enumerate(recommendation['recommended_items']):
-                        with cols[idx % 3]:
-                            if item.get('image_path') and os.path.exists(item['image_path']):
-                                st.image(item['image_path'], use_column_width=True)
-                            st.markdown(f"**{item['type'].capitalize()}**")
-                            if item.get('color'):
-                                color = parse_color_string(item['color'])
-                                display_color_palette([color])
-                    
-                    st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    # Display any additional style tips or recommendations
-                    if recommendation.get('style_tips'):
-                        st.markdown("### 💡 Style Tips")
-                        st.markdown(recommendation['style_tips'])
+                    # Display recommended items in an enhanced grid
+                    if recommendation['recommended_items']:
+                        st.markdown("### 🎭 Recommended Pieces")
+                        st.markdown('<div class="item-grid">', unsafe_allow_html=True)
+                        
+                        # Create columns for the grid (3 items per row)
+                        cols = st.columns(3)
+                        for idx, item in enumerate(recommendation['recommended_items']):
+                            with cols[idx % 3]:
+                                if item.get('image_path') and os.path.exists(item['image_path']):
+                                    st.image(item['image_path'], use_column_width=True)
+                                st.markdown(f"**{item['type'].capitalize()}**")
+                                if item.get('color'):
+                                    color = parse_color_string(item['color'])
+                                    display_color_palette([color])
+                        
+                        st.markdown('</div>', unsafe_allow_html=True)
+                        
+                        # Display any additional style tips or recommendations
+                        if recommendation.get('style_tips'):
+                            st.markdown("### 💡 Style Tips")
+                            st.markdown(recommendation['style_tips'])
 
 def personal_wardrobe_page():
     # Initialize session state for editing
@@ -2236,14 +2222,14 @@ def personal_wardrobe_page():
         def handle_oauth_callback():
             """Handle OAuth callback parameters"""
             from auth_utils import handle_oauth_callback as process_oauth
-
+            
             params = st.experimental_get_query_params()
             if 'code' in params and 'state' in params:
                 # Extract provider from URL parameters
                 provider = params.get('provider', [''])[0]
                 code = params['code'][0]
                 state = params['state'][0]
-
+                
                 success, user_data = process_oauth(provider, code, state)
                 if success:
                     st.session_state.user = user_data
@@ -2255,7 +2241,7 @@ def personal_wardrobe_page():
                 else:
                     st.error(f"Failed to authenticate with {provider}")
                     st.experimental_set_query_params()
-
+                    
         # Add callback handling to the main execution
         if __name__ == "__main__":
             handle_oauth_callback()
