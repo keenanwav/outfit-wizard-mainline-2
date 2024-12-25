@@ -396,8 +396,8 @@ def main_page():
                 if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
                     # Add custom filename input
                     custom_name = st.text_input("Enter a name for your outfit (optional)", 
-                                             placeholder="e.g., summer_casual_outfit",
-                                             key="outfit_name")
+                                                 placeholder="e.g., summer_casual_outfit",
+                                                 key="outfit_name")
                     
                     # Generate filename using custom name if provided, otherwise use timestamp
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -569,8 +569,8 @@ def main_page():
         
         with col2:
             preferences = st.text_area("🎯 Style preferences?",
-                                    placeholder="E.g., prefer dark colors, need to look professional",
-                                    height=122)
+                                   placeholder="E.g., prefer dark colors, need to look professional",
+                                   height=122)
         
         generate_col, _ = st.columns([2, 3])
         with generate_col:
@@ -763,7 +763,7 @@ def personal_wardrobe_page():
         else:
             st.info("Add some items to see statistics!")
     
-    with list_view:
+    with listview:
         # Upload new item form
         with st.expander("Upload New Item", expanded=False):
             col1, col2 = st.columns(2)
@@ -983,33 +983,33 @@ def personal_wardrobe_page():
                                     
                                     # Edit fields
                                     new_styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"], 
-                                                               default=current_styles)
+                                                                default=current_styles)
                                     new_sizes = st.multiselect("Size", ["S", "M", "L", "XL"], 
-                                                             default=current_sizes)
+                                                                default=current_sizes)
                                     new_genders = st.multiselect("Gender", ["Male", "Female", "Unisex"], 
-                                                                default=current_genders)
+                                                                 default=current_genders)
                                     new_hyperlink = st.text_input("Shopping Link", 
-                                                                 value=item['hyperlink'] if item['hyperlink'] else "")
+                                                                  value=item['hyperlink'] if item['hyperlink'] else "")
                                     new_price = st.number_input("Price ($)", 
-                                                               value=float(item['price']) if item['price'] else 0.0,
-                                                               min_value=0.0, 
-                                                               step=0.01, 
-                                                               format="%.2f")
+                                                                value=float(item['price']) if item['price'] else 0.0,
+                                                                min_value=0.0, 
+                                                                step=0.01, 
+                                                                format="%.2f")
                                     
                                     # Form validation
                                     is_valid = True
                                     if not new_styles:
                                         is_valid = False
                                         st.markdown('<p class="validation-error">Please select at least one style</p>', 
-                                                  unsafe_allow_html=True)
+                                                      unsafe_allow_html=True)
                                     if not new_sizes:
                                         is_valid = False
                                         st.markdown('<p class="validation-error">Please select at least one size</p>', 
-                                                  unsafe_allow_html=True)
+                                                      unsafe_allow_html=True)
                                     if not new_genders:
                                         is_valid = False
                                         st.markdown('<p class="validation-error">Please select at least one gender</p>', 
-                                                  unsafe_allow_html=True)
+                                                      unsafe_allow_html=True)
                                     
                                     submitted = st.form_submit_button("Save Changes")
                                     if submitted and is_valid:
@@ -1027,6 +1027,15 @@ def personal_wardrobe_page():
                                         if success:
                                             st.session_state.edit_success = True
                                             st.success(message)
+                                            # Add edit to history
+                                            add_to_edit_history(item['id'], {
+                                                'color': color,
+                                                'style': new_styles,
+                                                'gender': new_genders,
+                                                'size': new_sizes,
+                                                'hyperlink': new_hyperlink,
+                                                'price': new_price
+                                            })
                                             st.rerun()
                                         else:
                                             st.error(message)
@@ -1436,33 +1445,33 @@ def bulk_delete_page():
                                     
                                     # Edit fields
                                     new_styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"], 
-                                                               default=current_styles)
+                                                                default=current_styles)
                                     new_sizes = st.multiselect("Size", ["S", "M", "L", "XL"], 
-                                                             default=current_sizes)
+                                                                default=current_sizes)
                                     new_genders = st.multiselect("Gender", ["Male", "Female", "Unisex"], 
-                                                                default=current_genders)
+                                                                 default=current_genders)
                                     new_hyperlink = st.text_input("Shopping Link", 
-                                                                 value=item['hyperlink'] if item['hyperlink'] else "")
+                                                                  value=item['hyperlink'] if item['hyperlink'] else "")
                                     new_price = st.number_input("Price ($)", 
-                                                               value=float(item['price']) if item['price'] else 0.0,
-                                                               min_value=0.0, 
-                                                               step=0.01, 
-                                                               format="%.2f")
+                                                                value=float(item['price']) if item['price'] else 0.0,
+                                                                min_value=0.0, 
+                                                                step=0.01, 
+                                                                format="%.2f")
                                     
                                     # Form validation
                                     is_valid = True
                                     if not new_styles:
                                         is_valid = False
                                         st.markdown('<p class="validation-error">Please select at least one style</p>', 
-                                                  unsafe_allow_html=True)
+                                                      unsafe_allow_html=True)
                                     if not new_sizes:
                                         is_valid = False
                                         st.markdown('<p class="validation-error">Please select at least one size</p>', 
-                                                  unsafe_allow_html=True)
+                                                      unsafe_allow_html=True)
                                     if not new_genders:
                                         is_valid = False
                                         st.markdown('<p class="validation-error">Please select at least one gender</p>', 
-                                                  unsafe_allow_html=True)
+                                                      unsafe_allow_html=True)
                                     
                                     submitted = st.form_submit_button("Save Changes")
                                     if submitted and is_valid:
@@ -1497,8 +1506,8 @@ def bulk_delete_page():
                             if st.session_state.editing_image is not None and st.session_state.editing_image['id'] == item['id']:
                                 st.markdown("### Update Image")
                                 new_image = st.file_uploader("Choose new image", 
-                                                           type=['png', 'jpg', 'jpeg'],
-                                                           key=f"edit_image_{idx}")
+                                                               type=['png', 'jpg', 'jpeg'],
+                                                               key=f"edit_image_{idx}")
                                 
                                 if new_image:
                                     preview_col, button_col = st.columns([3, 1])
@@ -1569,7 +1578,6 @@ def bulk_delete_page():
     else:
         st.info("Your wardrobe is empty. Start by adding some items!")
     
-
 def saved_outfits_page():
     """Display saved outfits page"""
     st.title("Saved Outfits")
@@ -1639,7 +1647,6 @@ def saved_outfits_page():
                         else:
                             st.error(message)
             
-
 def cleanup_status_dashboard():
     """Display cleanup status dashboard"""
     st.title("Cleanup Status Dashboard")
@@ -1701,7 +1708,6 @@ def cleanup_status_dashboard():
             st.success(f"Cleanup completed. {cleaned_count} files removed.")
             st.rerun()
         
-
 def add_to_edit_history(item_id, new_values):
     """Adds a new edit to the edit history for the given item"""
     if item_id not in st.session_state.edit_history:
@@ -1709,7 +1715,6 @@ def add_to_edit_history(item_id, new_values):
     
     st.session_state.edit_history[item_id].append(new_values)
     
-
 def undo_edit(item_id):
     """Undoes the last edit for the given item"""
     if item_id in st.session_state.edit_history and st.session_state.edit_history[item_id]:
@@ -1736,7 +1741,6 @@ def undo_edit(item_id):
     else:
         return False, "No edits to undo"
     
-
 def redo_edit(item_id):
     """Redoes the last undone edit for the given item"""
     if item_id in st.session_state.redo_stack and st.session_state.redo_stack[item_id]:
@@ -1814,18 +1818,95 @@ def bulk_delete_page():
                 st.rerun()
             
 
+def auth_page():
+    """Display authentication page with login and register options"""
+    st.title("Welcome to Outfit Wizard 👔")
+
+    # Initialize session state for authentication
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+    if 'current_user' not in st.session_state:
+        st.session_state.current_user = None
+
+    # Create tabs for login and register
+    tab1, tab2 = st.tabs(["🔑 Login", "📝 Register"])
+
+    with tab1:
+        st.header("Login")
+        email = st.text_input("Email", key="login_email")
+        password = st.text_input("Password", type="password", key="login_password")
+
+        if st.button("Login"):
+            # Check if user exists
+            for user in totalUsers:
+                if user.email == email and validateUser(user, password):
+                    st.session_state.authenticated = True
+                    st.session_state.current_user = user
+                    st.success("Successfully logged in!")
+                    st.rerun()
+                    break
+            else:
+                st.error("Invalid email or password")
+
+    with tab2:
+        st.header("Register")
+        name = st.text_input("Name", key="reg_name")
+        surname = st.text_input("Surname", key="reg_surname")
+        email = st.text_input("Email", key="reg_email")
+        password = st.text_input("Password", type="password", key="reg_password")
+
+        if st.button("Register"):
+            if validateInputs(name, surname, email, password):
+                user = createUser(name, surname, email, password)
+                st.success("Registration successful! Please login.")
+                st.rerun()
+            else:
+                st.error("Invalid input. Please check your details.")
+                st.info("""
+                Requirements:
+                - All fields must be filled
+                - Email must be valid and not already registered
+                - Password must be at least 8 characters
+                """)
+
+# Modify the main function to include authentication check
+def main():
+    """Main function to run the Streamlit application"""
+    # Import LogAndReg module at the top level
+    from attached_assets.LogAndReg import (
+        totalUsers, validateInputs, validateUser, 
+        createUser, User
+    )
+
+    show_first_visit_tips()
+
+    # Check authentication
+    if not st.session_state.get('authenticated', False):
+        auth_page()
+        return
+
+    # Show sidebar navigation only when authenticated
+    st.sidebar.title("Navigation")
+    navigation = st.sidebar.radio("Go to", ["My Items", "Generate Outfit", "Saved Outfits", "Bulk Delete", "Cleanup Status"])
+
+    if navigation == "My Items":
+        personal_wardrobe_page()
+    elif navigation == "Generate Outfit":
+        main_page()
+    elif navigation == "Saved Outfits":
+        saved_outfits_page()
+    elif navigation == "Bulk Delete":
+        bulk_delete_page()
+    elif navigation == "Cleanup Status":
+        cleanup_status_dashboard()
+
+    # Add logout button in sidebar
+    if st.sidebar.button("Logout"):
+        st.session_state.authenticated = False
+        st.session_state.current_user = None
+        st.rerun()
+
+# Update the entry point
 if __name__ == "__main__":
     create_user_items_table()
-    show_first_visit_tips()
-    
-    st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", ["Home", "My Items", "Saved Outfits", "Bulk Delete"])
-    
-    if page == "Home":
-        main_page()
-    elif page == "My Items":
-        personal_wardrobe_page()
-    elif page == "Saved Outfits":
-        saved_outfits_page()
-    elif page == "Bulk Delete":
-        bulk_delete_page()
+    main()

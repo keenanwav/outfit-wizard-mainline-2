@@ -10,6 +10,31 @@
 # Defines an Array that Contains Every Instantiated User Class added
 totalUsers = []
 
+# Add validation function
+def validateInputs(name, surname, email, password):
+    """
+    Validates user input data before creating a new user
+    Returns True if all inputs are valid, False otherwise
+    """
+    # Check if any field is empty
+    if not all([name, surname, email, password]):
+        return False
+
+    # Basic email validation
+    if '@' not in email or '.' not in email:
+        return False
+
+    # Basic password validation (at least 8 characters)
+    if len(password) < 8:
+        return False
+
+    # Check if email is already in use
+    for user in totalUsers:
+        if user.email == email:
+            return False
+
+    return True
+
 # User Class that Provides the Structure for a User Object
 # This class is what is created on invoking the createUser() function
 class User:
@@ -45,6 +70,7 @@ class User:
     # Returns the Password of a Certain User
     def getPassword(self):
         return self.password
+
 
 # Returns a new instantiation of the User Class for storage in a variable
 # Instantiations can be accessed later by accessing the __totalUsers array
