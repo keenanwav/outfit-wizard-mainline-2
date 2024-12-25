@@ -4,6 +4,7 @@ import time
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Tuple, Dict, Optional
+from functools import wraps
 import psycopg2
 import pandas as pd
 import numpy as np
@@ -17,12 +18,14 @@ import joblib
 from psycopg2.pool import SimpleConnectionPool
 from psycopg2.extras import execute_values, execute_batch
 import os
+from PIL import Image
+import uuid
 from outfit_generator import is_valid_image
 
-# Configure logging
+# Configure logging with more detailed format
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
