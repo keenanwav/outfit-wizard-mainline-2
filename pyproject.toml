@@ -21,11 +21,6 @@ psycopg2-pool = "^1.2"
 selenium = "^4.26.1"
 requests = "^2.32.3"
 python-dotenv = "^1.0.1"
-pyotp = "^2.9.0"
-secure-smtplib = "^0.1.1"
-sendgrid = "^6.11.0"
-authlib = "^1.4.0"
-requests-oauthlib = "^2.0.0"
 
 
 [build-system]
