@@ -1,8 +1,11 @@
-from outfit_generator import is_valid_image
+import random
+from datetime import datetime, timedelta
+import time
+from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List, Tuple, Dict, Optional
+import psycopg2
 import pandas as pd
-import os
-from PIL import Image
-import uuid
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MultiLabelBinarizer, StandardScaler
@@ -10,17 +13,20 @@ from sklearn.decomposition import TruncatedSVD
 from scipy.sparse import csr_matrix
 from sklearn.neighbors import NearestNeighbors
 import logging
-from datetime import datetime, timedelta
 import joblib
-import psycopg2
 from psycopg2.pool import SimpleConnectionPool
 from psycopg2.extras import execute_values, execute_batch
-from contextlib import contextmanager
-import time
-from functools import wraps
-from typing import Tuple
+import os
+from outfit_generator import is_valid_image
 
-# Initialize connection pool
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Initialize connection pool with improved error handling
 MIN_CONNECTIONS = 1
 MAX_CONNECTIONS = 20
 POOL_TIMEOUT = 30
@@ -378,10 +384,21 @@ def update_item_details(item_id, tags=None, season=None, notes=None):
 
 @retry_on_error()
 def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink, price=None):
-    """Edit clothing item with prepared statement and price history tracking"""
+    """Edit clothing item with prepared statement, price and color history tracking"""
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
+            # Get current color before update
+            cur.execute("SELECT color FROM user_clothing_items WHERE id = %s", (item_id,))
+            result = cur.fetchone()
+            if result:
+                old_color = result[0]
+                new_color = f"{color[0]},{color[1]},{color[2]}"
+                
+                # Record color change if different
+                if old_color != new_color:
+                    record_color_change(item_id, old_color, new_color)
+            
             # Record price change if price is provided and different
             if price is not None:
                 record_price_change(item_id, price)
@@ -472,30 +489,25 @@ def save_outfit(outfit):
 
 @retry_on_error()
 def load_saved_outfits():
-    """Load saved outfits with optimized query"""
+    """Load all saved outfits with their details"""
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
             cur.execute("""
-                SELECT outfit_id, image_path, tags, season, notes, created_at 
-                FROM saved_outfits 
+                SELECT outfit_id, image_path, tags, season, notes, created_at
+                FROM saved_outfits
                 ORDER BY created_at DESC
             """)
-            
             outfits = cur.fetchall()
-            if outfits:
-                return [
-                    {
-                        'outfit_id': outfit[0],
-                        'image_path': outfit[1],
-                        'tags': outfit[2] if outfit[2] else [],
-                        'season': outfit[3],
-                        'notes': outfit[4],
-                        'date': outfit[5].strftime("%Y-%m-%d %H:%M:%S")
-                    }
-                    for outfit in outfits
-                ]
-            return []
+            
+            return [{
+                'outfit_id': outfit[0],
+                'image_path': outfit[1],
+                'tags': outfit[2] if outfit[2] else [],
+                'season': outfit[3],
+                'notes': outfit[4],
+                'date': outfit[5].strftime("%Y-%m-%d %H:%M:%S") if outfit[5] else None
+            } for outfit in outfits]
         finally:
             cur.close()
 
@@ -524,26 +536,40 @@ def delete_saved_outfit(outfit_id):
 
 @retry_on_error()
 def get_cleanup_settings():
-    """Get cleanup configuration settings"""
+    """Get cleanup settings from database"""
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
-            cur.execute("""
-                SELECT max_age_hours, cleanup_interval_hours, batch_size, max_workers, last_cleanup
-                FROM cleanup_settings
-                ORDER BY created_at DESC
-                LIMIT 1
-            """)
+            cur.execute("SELECT * FROM cleanup_settings ORDER BY created_at DESC LIMIT 1")
             result = cur.fetchone()
+            
             if result:
                 return {
-                    'max_age_hours': result[0],
-                    'cleanup_interval_hours': result[1],
-                    'batch_size': result[2],
-                    'max_workers': result[3],
-                    'last_cleanup': result[4]
+                    'max_age_hours': result[1],
+                    'cleanup_interval_hours': result[2],
+                    'batch_size': result[3],
+                    'max_workers': result[4],
+                    'last_cleanup': result[5]
                 }
-            return None
+            else:
+                # Insert default settings if none exist
+                cur.execute("""
+                    INSERT INTO cleanup_settings 
+                    (max_age_hours, cleanup_interval_hours, batch_size, max_workers)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING *
+                """, (24, 12, 100, 4))
+                
+                result = cur.fetchone()
+                conn.commit()
+                
+                return {
+                    'max_age_hours': result[1],
+                    'cleanup_interval_hours': result[2],
+                    'batch_size': result[3],
+                    'max_workers': result[4],
+                    'last_cleanup': result[5]
+                }
         finally:
             cur.close()
 
@@ -601,13 +627,8 @@ def update_last_cleanup_time():
                 SET last_cleanup = CURRENT_TIMESTAMP,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = (SELECT id FROM cleanup_settings ORDER BY created_at DESC LIMIT 1)
-                RETURNING id
             """)
-            
-            if cur.fetchone():
-                conn.commit()
-                return True
-            return False
+            conn.commit()
         finally:
             cur.close()
 
@@ -629,7 +650,7 @@ def get_cleanup_statistics():
             
             if not settings:
                 return None
-                
+            
             # Get total files in merged_outfits
             total_files = 0
             if os.path.exists('merged_outfits'):
@@ -663,12 +684,14 @@ def get_price_history(item_id):
         cur = conn.cursor()
         try:
             cur.execute("""
-                SELECT price, changed_at 
-                FROM item_price_history 
-                WHERE item_id = %s 
-                ORDER BY changed_at DESC
+                SELECT price, created_at
+                FROM item_price_history
+                WHERE item_id = %s
+                ORDER BY created_at DESC
             """, (item_id,))
-            return cur.fetchall()
+            
+            history = cur.fetchall()
+            return [(float(price), date) for price, date in history] if history else []
         finally:
             cur.close()
 
@@ -727,96 +750,7 @@ def get_color_history(item_id):
             return cur.fetchall()
         finally:
             cur.close()
-# Update the edit_clothing_item function to include price history
-@retry_on_error()
-def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink, price=None):
-    """Edit clothing item with prepared statement, price and color history tracking"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            # Get current color before update
-            cur.execute("SELECT color FROM user_clothing_items WHERE id = %s", (item_id,))
-            result = cur.fetchone()
-            if result:
-                old_color = result[0]
-                new_color = f"{color[0]},{color[1]},{color[2]}"
-                
-                # Record color change if different
-                if old_color != new_color:
-                    record_color_change(item_id, old_color, new_color)
-            
-            # Record price change if price is provided and different
-            if price is not None:
-                record_price_change(item_id, price)
-            
-            cur.execute(PREPARED_STATEMENTS['update_item'], (
-                f"{color[0]},{color[1]},{color[2]}",
-                ','.join(styles),
-                ','.join(genders),
-                ','.join(sizes),
-                hyperlink,
-                price,
-                int(item_id) if hasattr(item_id, 'item') else item_id
-            ))
-            
-            if cur.fetchone():
-                conn.commit()
-                return True, f"Item with ID {item_id} updated successfully"
-            return False, f"Item with ID {item_id} not found"
-        finally:
-            cur.close()
 
-# Update add_user_clothing_item to include initial price history
-@retry_on_error()
-def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file, hyperlink="", price=None):
-    """Add clothing item with prepared statement and initial price history"""
-    if not os.path.exists("user_images"):
-        os.makedirs("user_images", exist_ok=True)
-    
-    image_filename = f"{item_type}_{uuid.uuid4()}.png"
-    image_path = os.path.join("user_images", image_filename)
-    
-    with Image.open(image_file) as img:
-        img.save(image_path)
-    
-    # Use item-specific color detection
-    if item_type == 'pants':
-        from color_utils import get_pants_colors
-        color = get_pants_colors(image_path)
-        if color is None:
-            return False, "Failed to detect pants color"
-    
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            cur.execute(PREPARED_STATEMENTS['insert_item'], (
-                item_type, 
-                f"{color[0]},{color[1]},{color[2]}", 
-                ','.join(styles),
-                ','.join(genders),
-                ','.join(sizes),
-                image_path,
-                hyperlink,
-                price
-            ))
-            new_id = cur.fetchone()[0]
-            
-            # Record initial price if provided
-            if price is not None:
-                cur.execute("""
-                    INSERT INTO item_price_history (item_id, price)
-                    VALUES (%s, %s)
-                """, (new_id, price))
-            
-            conn.commit()
-            return True, f"New {item_type} added successfully with ID: {new_id}"
-        except Exception as e:
-            conn.rollback()
-            return False, str(e)
-        finally:
-            cur.close()
-
-# Add the new function after line 382
 @retry_on_error()
 def update_item_image(item_id: int, new_image_path: str) -> Tuple[bool, str]:
     """Update the image of an existing clothing item"""
@@ -873,99 +807,6 @@ def update_item_image(item_id: int, new_image_path: str) -> Tuple[bool, str]:
     except Exception as e:
         logging.error(f"Error updating item image: {str(e)}")
         return False, f"Failed to update image: {str(e)}"
-
-def get_price_history(item_id):
-    """Get price history for an item"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            cur.execute("""
-                SELECT price, created_at
-                FROM item_price_history
-                WHERE item_id = %s
-                ORDER BY created_at DESC
-            """, (item_id,))
-            
-            history = cur.fetchall()
-            return [(float(price), date) for price, date in history] if history else []
-        finally:
-            cur.close()
-
-def get_cleanup_settings():
-    """Get cleanup settings from database"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            cur.execute("SELECT * FROM cleanup_settings ORDER BY created_at DESC LIMIT 1")
-            result = cur.fetchone()
-            
-            if result:
-                return {
-                    'max_age_hours': result[1],
-                    'cleanup_interval_hours': result[2],
-                    'batch_size': result[3],
-                    'max_workers': result[4],
-                    'last_cleanup': result[5]
-                }
-            else:
-                # Insert default settings if none exist
-                cur.execute("""
-                    INSERT INTO cleanup_settings 
-                    (max_age_hours, cleanup_interval_hours, batch_size, max_workers)
-                    VALUES (%s, %s, %s, %s)
-                    RETURNING *
-                """, (24, 12, 100, 4))
-                
-                result = cur.fetchone()
-                conn.commit()
-                
-                return {
-                    'max_age_hours': result[1],
-                    'cleanup_interval_hours': result[2],
-                    'batch_size': result[3],
-                    'max_workers': result[4],
-                    'last_cleanup': result[5]
-                }
-        finally:
-            cur.close()
-
-def update_last_cleanup_time():
-    """Update the last cleanup timestamp"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            cur.execute("""
-                UPDATE cleanup_settings 
-                SET last_cleanup = CURRENT_TIMESTAMP,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = (SELECT id FROM cleanup_settings ORDER BY created_at DESC LIMIT 1)
-            """)
-            conn.commit()
-        finally:
-            cur.close()
-@retry_on_error()
-def load_saved_outfits():
-    """Load all saved outfits with their details"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            cur.execute("""
-                SELECT outfit_id, image_path, tags, season, notes, created_at
-                FROM saved_outfits
-                ORDER BY created_at DESC
-            """)
-            outfits = cur.fetchall()
-            
-            return [{
-                'outfit_id': outfit[0],
-                'image_path': outfit[1],
-                'tags': outfit[2] if outfit[2] else [],
-                'season': outfit[3],
-                'notes': outfit[4],
-                'date': outfit[5].strftime("%Y-%m-%d %H:%M:%S") if outfit[5] else None
-            } for outfit in outfits]
-        finally:
-            cur.close()
 
 @retry_on_error()
 def cleanup_orphaned_entries():
