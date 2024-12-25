@@ -1,0 +1,30 @@
+{
+  "database": [
+    {
+      "filepath": "backups/database/db_20241225_175844.sql",
+      "timestamp": "2024-12-25T17:58:50.608837",
+      "checksum": "0f92a0d5e4474c0187e72576f7218a4b",
+      "type": "database"
+    },
+    {
+      "filepath": "backups/database/db_20241225_180453.sql",
+      "timestamp": "2024-12-25T18:05:00.621647",
+      "checksum": "0f92a0d5e4474c0187e72576f7218a4b",
+      "type": "database"
+    }
+  ],
+  "files": [
+    {
+      "filepath": "backups/files/files_20241225_175850.zip",
+      "timestamp": "2024-12-25T17:58:55.227620",
+      "checksum": "3c25f81c0a25784f55902beeece2e81d",
+      "type": "files"
+    },
+    {
+      "filepath": "backups/files/files_20241225_180500.zip",
+      "timestamp": "2024-12-25T18:05:05.213485",
+      "checksum": "3c25f81c0a25784f55902beeece2e81d",
+      "type": "files"
+    }
+  ]
+}

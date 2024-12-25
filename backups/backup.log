@@ -1,0 +1,4 @@
+2024-12-25 17:58:50,609 - INFO - Database backup created successfully: backups/database/db_20241225_175844.sql
+2024-12-25 17:58:55,227 - INFO - Files backup created successfully: backups/files/files_20241225_175850.zip
+2024-12-25 18:05:00,622 - INFO - Database backup created successfully: backups/database/db_20241225_180453.sql
+2024-12-25 18:05:05,213 - INFO - Files backup created successfully: backups/files/files_20241225_180500.zip
