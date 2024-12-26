@@ -372,7 +372,7 @@ def main_page():
     load_custom_css()
     st.title("Outfit Wizard")
 
-    # Initialize session state for current outfit
+    # Initialize session state for current outfit and missing items
     if 'current_outfit' not in st.session_state:
         st.session_state.current_outfit = None
     if 'missing_items' not in st.session_state:
@@ -427,21 +427,22 @@ def main_page():
         if st.button("🔄 Generate Outfit"):
             with st.spinner("🔮 Generating your perfect outfit..."):
                 # Generate the outfit
-                outfit, missing_items = generate_and_save_outfit(items_df, size, style, gender)
-                #st.session_state.current_outfit = outfit
-
+                outfit_result, missing_items_result = generate_outfit(items_df, size, style, gender)
+                st.session_state.current_outfit = outfit_result
+                st.session_state.missing_items = missing_items_result
 
         # Display current outfit details if available
         if st.session_state.current_outfit:
             outfit = st.session_state.current_outfit
+            missing_items = st.session_state.missing_items  # Access from session state
 
             # Display outfit image in the left column
             with outfit_col:
                 if 'merged_image_path' in outfit and outfit['merged_image_path'] and os.path.exists(outfit['merged_image_path']):
                     st.image(outfit['merged_image_path'], use_column_width=True)
 
-                if st.session_state.missing_items:
-                    st.warning(f"Missing items: {', '.join(st.session_state.missing_items)}")
+                if missing_items:  # Now using the local variable
+                    st.warning(f"Missing items: {', '.join(missing_items)}")
 
             # Display prices and colors in the right column with animation
             with price_col:
@@ -784,7 +785,7 @@ def main_page():
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    st.markdown("### 👔 Outfit Visualization")
+                    st.markdown("### 👔 OutfitVisualization")
                     # Generate mannequin-based visualization using initial weather input
                     mannequin_image_path = create_mannequin_outfit_image(
                         recommendation['recommended_items'],
