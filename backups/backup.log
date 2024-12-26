@@ -4,3 +4,5 @@
 2024-12-25 18:05:05,213 - INFO - Files backup created successfully: backups/files/files_20241225_180500.zip
 2024-12-26 08:48:40,123 - INFO - Database backup created successfully: backups/database/db_20241226_084832.sql
 2024-12-26 08:48:44,862 - INFO - Files backup created successfully: backups/files/files_20241226_084840.zip
+2024-12-26 09:05:36,243 - INFO - Database backup created successfully: backups/database/db_20241226_090528.sql
+2024-12-26 09:05:40,159 - INFO - Files backup created successfully: backups/files/files_20241226_090536.zip
