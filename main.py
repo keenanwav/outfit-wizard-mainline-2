@@ -25,7 +25,8 @@ except ImportError as e:
     raise
 
 # Import local modules
-from auth_utils import init_auth_tables, init_session_state, create_user, authenticate_user, logout_user
+from auth_utils import (init_auth_tables, init_session_state, create_user, 
+                       authenticate_user, logout_user, is_admin, require_admin)
 from data_manager import (
     load_clothing_items, save_outfit, load_saved_outfits,
     edit_clothing_item, delete_clothing_item, create_user_items_table,
@@ -383,9 +384,13 @@ def main_page():
         return
 
     # Add tabs for different features
-    tab1, tab2, tab3 = st.tabs(["📋 Generate Outfit", "🎯 Smart Style Assistant", "✨ Personalized Suggestions"])
+    available_tabs = ["📋 Generate Outfit", "🎯 Smart Style Assistant", "✨ Personalized Suggestions"]
+    if st.session_state.user and is_admin(st.session_state.user):
+        available_tabs.append("📦 My Items")
 
-    with tab1:
+    tabs = st.tabs(available_tabs)
+
+    with tabs[0]:  # Generate Outfit tab
         col1, col2, col3 = st.columns([2, 2, 1])
 
         with col1:
@@ -500,34 +505,36 @@ def main_page():
             with col1:
                 if st.button("💾 Save Outfit"):
                     if st.session_state.user:
-                        saved_path, message = save_outfit_with_validation(outfit, user_id=st.session_state.user['id'])
-                        if saved_path:
-                            st.success(message)
+                        try:
+                            saved_path, message = save_outfit(outfit, user_id=st.session_state.user['id'])
+                            if saved_path:
+                                st.success(message)
+                                # Enable sharing option after saving
+                                st.session_state.sharing_enabled = True
 
-                            # Enable sharing option after saving
-                            st.session_state.sharing_enabled = True
-
-                            # Show sharing options
-                            sharable_users = get_sharable_users(st.session_state.user['id'])
-                            if sharable_users:
-                                selected_user = st.selectbox(
-                                    "Share with:",
-                                    options=[(u['id'], u['name']) for u in sharable_users],
-                                    format_func=lambda x: x[1]
-                                )
-
-                                if st.button("Share Outfit"):
-                                    success, message = share_outfit(
-                                        outfit_id=saved_path,
-                                        shared_by_user_id=st.session_state.user['id'],
-                                        shared_with_user_id=selected_user[0]
+                                # Show sharing options
+                                sharable_users = get_sharable_users(st.session_state.user['id'])
+                                if sharable_users:
+                                    selected_user = st.selectbox(
+                                        "Share with:",
+                                        options=[(u['id'], u['name']) for u in sharable_users],
+                                        format_func=lambda x: x[1]
                                     )
-                                    if success:
-                                        st.success(message)
-                                    else:
-                                        st.error(message)
-                        else:
-                            st.error(message)
+
+                                    if st.button("Share Outfit"):
+                                        success, message = share_outfit(
+                                            outfit_id=saved_path,
+                                            shared_by_user_id=st.session_state.user['id'],
+                                            shared_with_user_id=selected_user[0]
+                                        )
+                                        if success:
+                                            st.success(message)
+                                        else:
+                                            st.error(message)
+                            else:
+                                st.error(message)
+                        except Exception as e:
+                            st.error(f"Error saving outfit: {str(e)}")
                     else:
                         st.warning("Please login to save outfits")
 
@@ -638,7 +645,7 @@ def main_page():
                                 mime="image/png"
                             )
 
-    with tab2:
+    with tabs[1]:
         # Add custom CSS for magic wand animation
         st.markdown("""
         <style>
@@ -964,7 +971,7 @@ def main_page():
                                     mime="image/png"
                                 )
 
-    with tab3:
+    with tabs[2]:
         st.markdown("""
         <div style="text-align: center; margin-bottom: 30px;">
             <h2>
@@ -1048,6 +1055,24 @@ def main_page():
                         if item.get('image_path') and os.path.exists(item['image_path']):
                             st.image(item['image_path'], caption=f"{item['type'].capitalize()}\n{item['style']}")
                             st.progress(float(item['similarity']))
+
+    if st.session_state.user and is_admin(st.session_state.user) and len(available_tabs) > 3:
+        with tabs[3]:  # My Items tab
+            st.title("My Items")
+
+            # Bulk delete section (admin only)
+            st.subheader("Bulk Operations")
+            items_to_delete = st.multiselect(
+                "Select items to delete",
+                options=items_df['id'].tolist(),
+                format_func=lambda x: f"Item #{x}"
+            )
+
+            if items_to_delete:
+                if st.button("🗑️ Delete Selected Items"):
+                    success = bulk_delete_clothing_items(items_to_delete)
+                    if success:
+                        st.experimental_rerun()
 
 def personal_wardrobe_page():
     # Initialize session state for editing
@@ -1542,7 +1567,7 @@ def bulk_delete_page():
             border-radius: 10px;
             margin: 15px 0;
             border: 1px solid #dee2e6;
-        }
+        }        }
         .validation-error {
             color: #dc3545;
             font-size: 0.875em;
