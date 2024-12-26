@@ -133,11 +133,13 @@ def create_user_items_table():
                 CREATE TABLE IF NOT EXISTS saved_outfits (
                     id SERIAL PRIMARY KEY,
                     outfit_id VARCHAR(50),
+                    user_id INTEGER,
                     image_path VARCHAR(255),
                     tags TEXT[],
                     season VARCHAR(10),
                     notes TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
                 )
             ''')
             
@@ -456,10 +458,10 @@ def save_outfit(outfit):
             cur = conn.cursor()
             try:
                 cur.execute("""
-                    INSERT INTO saved_outfits (outfit_id, image_path)
-                    VALUES (%s, %s)
+                    INSERT INTO saved_outfits (outfit_id, user_id, image_path)
+                    VALUES (%s, %s, %s)
                     RETURNING outfit_id
-                """, (outfit_id, outfit_path))
+                """, (outfit_id, st.session_state.user['id'], outfit_path))
                 
                 conn.commit()
                 return outfit_path
@@ -479,8 +481,9 @@ def load_saved_outfits():
             cur.execute("""
                 SELECT outfit_id, image_path, tags, season, notes, created_at 
                 FROM saved_outfits 
+                WHERE user_id = %s
                 ORDER BY created_at DESC
-            """)
+            """, (st.session_state.user['id'],))
             
             outfits = cur.fetchall()
             if outfits:

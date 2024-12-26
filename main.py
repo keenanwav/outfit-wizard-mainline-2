@@ -1638,7 +1638,11 @@ def bulk_delete_page():
 
 def saved_outfits_page():
     """Display saved outfits page"""
-    st.title("Saved Outfits")
+    if not st.session_state.user:
+        st.warning("Please log in to view your saved outfits")
+        return
+        
+    st.title("My Saved Outfits")
     
     outfits = load_saved_outfits()
     
