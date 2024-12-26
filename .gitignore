@@ -1,0 +1,22 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment
+.env
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Database backups
+backups/
+
+# User uploads
+user_images/
+wardrobe/
+merged_outfits/
+
+# System files
+.DS_Store
