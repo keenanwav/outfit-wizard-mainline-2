@@ -1,12 +1,6 @@
 {
   "database": [
     {
-      "filepath": "backups/database/db_20241226_162817.sql",
-      "timestamp": "2024-12-26T16:28:24.242189",
-      "checksum": "251440f5336456b2966f244b4e338535",
-      "type": "database"
-    },
-    {
       "filepath": "backups/database/db_20241226_163616.sql",
       "timestamp": "2024-12-26T16:36:24.266255",
       "checksum": "251440f5336456b2966f244b4e338535",
@@ -27,6 +21,12 @@
     {
       "filepath": "backups/database/db_20241226_172211.sql",
       "timestamp": "2024-12-26T17:22:17.753094",
+      "checksum": "251440f5336456b2966f244b4e338535",
+      "type": "database"
+    },
+    {
+      "filepath": "backups/database/db_20241226_190819.sql",
+      "timestamp": "2024-12-26T19:08:26.894772",
       "checksum": "251440f5336456b2966f244b4e338535",
       "type": "database"
     }

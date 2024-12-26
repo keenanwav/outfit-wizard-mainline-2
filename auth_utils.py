@@ -217,6 +217,21 @@ def init_session_state():
     if 'auth_status' not in st.session_state:
         st.session_state.auth_status = None
 
+def is_admin(user_data: Optional[Dict]) -> bool:
+    """Check if the current user has admin role"""
+    if not user_data:
+        return False
+    return user_data.get('role') == 'admin'
+
+def require_admin(func):
+    """Decorator to require admin role for accessing certain features"""
+    def wrapper(*args, **kwargs):
+        if not st.session_state.user or not is_admin(st.session_state.user):
+            st.error("Access Denied: This feature requires admin privileges.")
+            return None
+        return func(*args, **kwargs)
+    return wrapper
+
 def logout_user():
     """Log out the current user"""
     st.session_state.user = None
