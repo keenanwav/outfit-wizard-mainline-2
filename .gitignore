@@ -6,17 +6,23 @@ __pycache__/
 
 # Environment
 .env
+.venv
+env/
+venv/
 
-# Streamlit
-.streamlit/secrets.toml
+# Database
+*.db
+*.sqlite3
 
-# Database backups
-backups/
-
-# User uploads
-user_images/
-wardrobe/
+# Generated files
 merged_outfits/
+style_recipes/
+user_images/
+temp_*
 
-# System files
-.DS_Store
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
