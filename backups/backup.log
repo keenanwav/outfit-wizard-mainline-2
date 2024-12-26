@@ -41,3 +41,5 @@
 2024-12-26 16:36:24,266 - INFO - Database backup created successfully: backups/database/db_20241226_163616.sql
 2024-12-26 16:36:28,422 - INFO - Files backup created successfully: backups/files/files_20241226_163624.zip
 2024-12-26 16:43:29,997 - INFO - Database backup created successfully: backups/database/db_20241226_164322.sql
+2024-12-26 16:43:34,425 - INFO - Files backup created successfully: backups/files/files_20241226_164329.zip
+2024-12-26 17:12:37,796 - INFO - Database backup created successfully: backups/database/db_20241226_171231.sql

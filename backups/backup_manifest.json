@@ -1,12 +1,6 @@
 {
   "database": [
     {
-      "filepath": "backups/database/db_20241226_161047.sql",
-      "timestamp": "2024-12-26T16:10:53.772883",
-      "checksum": "251440f5336456b2966f244b4e338535",
-      "type": "database"
-    },
-    {
       "filepath": "backups/database/db_20241226_162301.sql",
       "timestamp": "2024-12-26T16:23:08.950084",
       "checksum": "251440f5336456b2966f244b4e338535",
@@ -29,15 +23,15 @@
       "timestamp": "2024-12-26T16:43:29.997381",
       "checksum": "251440f5336456b2966f244b4e338535",
       "type": "database"
+    },
+    {
+      "filepath": "backups/database/db_20241226_171231.sql",
+      "timestamp": "2024-12-26T17:12:37.795534",
+      "checksum": "251440f5336456b2966f244b4e338535",
+      "type": "database"
     }
   ],
   "files": [
-    {
-      "filepath": "backups/files/files_20241226_160549.zip",
-      "timestamp": "2024-12-26T16:05:53.419812",
-      "checksum": "e02e9978e259f7f9a69ee70d2aeb32bd",
-      "type": "files"
-    },
     {
       "filepath": "backups/files/files_20241226_161053.zip",
       "timestamp": "2024-12-26T16:10:57.131196",
@@ -59,6 +53,12 @@
     {
       "filepath": "backups/files/files_20241226_163624.zip",
       "timestamp": "2024-12-26T16:36:28.421771",
+      "checksum": "e02e9978e259f7f9a69ee70d2aeb32bd",
+      "type": "files"
+    },
+    {
+      "filepath": "backups/files/files_20241226_164329.zip",
+      "timestamp": "2024-12-26T16:43:34.425351",
       "checksum": "e02e9978e259f7f9a69ee70d2aeb32bd",
       "type": "files"
     }

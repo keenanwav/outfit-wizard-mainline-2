@@ -784,7 +784,7 @@ def main_page():
 
                 with col1:
                     st.markdown("### 👔 OutfitVisualization")                    # Generate mannequin-based visualization using initial weather input
-                    mannequin_image_path = create_mannequin_outfit_image(
+                    mannequinimage_path = create_mannequin_outfit_image(
                         recommendation['recommended_items'],
                         weather=weather.lower() if weather and not manual_selection else None
                     )
@@ -1984,6 +1984,88 @@ def save_outfit(outfit, user_id):
         logger.error(f"Error saving outfit: {str(e)}")
         return None, str(e)
 
+def my_items_page():
+    """Display page for managing uploaded clothing items"""
+    st.title("My Items")
+
+    # Create tabs for different item types
+    tabs = ["All Items", "Shirts", "Pants", "Shoes"]
+    selected_tab = st.tabs(tabs)
+
+    # Load all clothing items
+    items_df = load_clothing_items()
+    if items_df.empty:
+        st.info("No items found. Start by adding some clothing items!")
+        return
+
+    # Display items based on selected tab
+    with selected_tab[0]:  # All Items
+        st.header("All Items")
+        display_items_grid(items_df)
+
+    with selected_tab[1]:  # Shirts
+        st.header("Shirts")
+        shirts_df = items_df[items_df['type'] == 'shirt']
+        if shirts_df.empty:
+            st.info("No shirts found.")
+        else:
+            display_items_grid(shirts_df)
+
+    with selected_tab[2]:  # Pants
+        st.header("Pants")
+        pants_df = items_df[items_df['type'] == 'pants']
+        if pants_df.empty:
+            st.info("No pants found.")
+        else:
+            display_items_grid(pants_df)
+
+    with selected_tab[3]:  # Shoes
+        st.header("Shoes")
+        shoes_df = items_df[items_df['type'] == 'shoes']
+        if shoes_df.empty:
+            st.info("No shoes found.")
+        else:
+            display_items_grid(shoes_df)
+
+def display_items_grid(items_df):
+    """Display clothing items in a grid layout"""
+    cols = st.columns(3)
+    for idx, (_, item) in enumerate(items_df.iterrows()):
+        col = cols[idx % 3]
+        with col:
+            if os.path.exists(item['image_path']):
+                st.image(item['image_path'], use_column_width=True)
+
+                # Item details
+                st.write(f"**Type:** {item['type'].capitalize()}")
+                st.write(f"**Style:** {item['style']}")
+                st.write(f"**Color:** {item['color']}")
+                if item.get('price'):
+                    st.write(f"**Price:** ${float(item['price']):.2f}")
+
+                # Edit and Delete buttons
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button(f"✏️ Edit ###{item['id']}", key=f"edit_{item['id']}"):
+                        st.session_state.editing_item = item['id']
+                        st.rerun()
+                with col2:
+                    if st.button(f"🗑️ Delete ###{item['id']}", key=f"delete_{item['id']}"):
+                        success, message = delete_clothing_item(item['id'])
+                        if success:
+                            st.success(message)
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error(message)
+
+if 'page' not in st.session_state:
+    st.session_state.page = 'home'
+
+def saved_outfits_page():
+    st.title("Saved Outfits")
+    # Add your saved outfits logic here
+
 if __name__ == "__main__":
     create_user_items_table()
     show_first_visit_tips()
@@ -1994,7 +2076,7 @@ if __name__ == "__main__":
     if page == "Home":
         main_page()
     elif page == "My Items":
-        personal_wardrobe_page()
+        my_items_page()
     elif page == "Saved Outfits":
         saved_outfits_page()
     elif page == "Bulk Delete":
