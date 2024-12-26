@@ -1647,7 +1647,13 @@ def saved_outfits_page():
     outfits = load_saved_outfits()
     
     if not outfits:
-        st.info("No saved outfits yet. Generate and save some outfits first!")
+        st.info("Welcome! Start by generating and saving some outfits from the Home page.")
+        st.markdown("""
+        Here's how to get started:
+        1. Go to the Home page
+        2. Generate outfits using your preferences
+        3. Click 'Save Outfit' to add them to your collection
+        """)
         return
     
     # Display outfits in grid layout
