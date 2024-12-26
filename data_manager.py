@@ -451,50 +451,126 @@ def get_user_wardrobe_path(user_id):
 
 @retry_on_error()
 def save_outfit(outfit):
-    """Save outfit with user-specific folder structure"""
+    """Save outfit with enhanced user validation and error handling"""
     try:
         if 'user' not in st.session_state:
             return None, "User not logged in"
-        
+
         user_id = st.session_state.user['id']
+
+        # Validate outfit data
+        if not outfit or not isinstance(outfit, dict):
+            return None, "Invalid outfit data"
+
+        # Create user-specific directory if it doesn't exist
         user_wardrobe = get_user_wardrobe_path(user_id)
-        
+
+        # Generate unique outfit ID
         outfit_id = str(uuid.uuid4())
         outfit_filename = f"outfit_{outfit_id}.png"
         outfit_path = os.path.join(user_wardrobe, outfit_filename)
-        
-        if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
-            Image.open(outfit['merged_image_path']).save(outfit_path)
-        else:
-            total_width = 600
-            height = 200
-            outfit_img = Image.new('RGB', (total_width, height), (255, 255, 255))
-            
-            for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
-                if item_type in outfit:
-                    item_img = Image.open(outfit[item_type]['image_path'])
-                    item_img = item_img.resize((200, 200))
-                    outfit_img.paste(item_img, (i * 200, 0))
-            
-            outfit_img.save(outfit_path)
-        
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            try:
-                cur.execute("""
-                    INSERT INTO saved_outfits (outfit_id, user_id, image_path)
-                    VALUES (%s, %s, %s)
-                    RETURNING outfit_id
-                """, (outfit_id, user_id, outfit_path))
-                
-                conn.commit()
-                return outfit_path, "Outfit saved successfully"
-            finally:
-                cur.close()
-        
+
+        try:
+            # Handle merged image if available
+            if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
+                with Image.open(outfit['merged_image_path']) as img:
+                    img.save(outfit_path)
+            else:
+                # Create composite image from individual items
+                total_width = 600
+                height = 200
+                outfit_img = Image.new('RGB', (total_width, height), (255, 255, 255))
+
+                for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
+                    if item_type in outfit and outfit[item_type] and 'image_path' in outfit[item_type]:
+                        item_path = outfit[item_type]['image_path']
+                        if os.path.exists(item_path):
+                            with Image.open(item_path) as item_img:
+                                item_img = item_img.resize((200, 200))
+                                outfit_img.paste(item_img, (i * 200, 0))
+
+                outfit_img.save(outfit_path)
+
+            # Save to database with proper user association
+            with get_db_connection() as conn:
+                cur = conn.cursor()
+                try:
+                    # Add outfit with user association
+                    cur.execute("""
+                        INSERT INTO saved_outfits 
+                        (outfit_id, user_id, image_path, created_at)
+                        VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+                        RETURNING outfit_id
+                    """, (outfit_id, user_id, outfit_path))
+
+                    # If outfit contains tags or season, update those as well
+                    if 'tags' in outfit:
+                        cur.execute("""
+                            UPDATE saved_outfits 
+                            SET tags = %s
+                            WHERE outfit_id = %s
+                        """, (outfit.get('tags', []), outfit_id))
+
+                    if 'season' in outfit:
+                        cur.execute("""
+                            UPDATE saved_outfits 
+                            SET season = %s
+                            WHERE outfit_id = %s
+                        """, (outfit.get('season'), outfit_id))
+
+                    conn.commit()
+                    return outfit_path, "Outfit saved successfully"
+                except Exception as e:
+                    conn.rollback()
+                    logging.error(f"Database error while saving outfit: {str(e)}")
+                    return None, f"Error saving outfit to database: {str(e)}"
+                finally:
+                    cur.close()
+        except Exception as e:
+            logging.error(f"Error processing outfit image: {str(e)}")
+            if os.path.exists(outfit_path):
+                os.remove(outfit_path)
+            return None, f"Error processing outfit image: {str(e)}"
+
     except Exception as e:
         logging.error(f"Error saving outfit: {str(e)}")
         return None, f"Error saving outfit: {str(e)}"
+
+@retry_on_error()
+def load_saved_outfits(user_id=None):
+    """Load saved outfits with enhanced user filtering and error handling"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                # Only load outfits for the specified user
+                if user_id:
+                    cur.execute("""
+                        SELECT outfit_id, image_path, tags, season, notes, created_at 
+                        FROM saved_outfits 
+                        WHERE user_id = %s
+                        ORDER BY created_at DESC
+                    """, (user_id,))
+                else:
+                    # If no user_id specified, return empty list instead of all outfits
+                    return []
+
+                outfits = cur.fetchall()
+                if outfits:
+                    return [{
+                        'outfit_id': outfit[0],
+                        'image_path': outfit[1],
+                        'tags': outfit[2] if outfit[2] else [],
+                        'season': outfit[3],
+                        'notes': outfit[4],
+                        'date': outfit[5].strftime("%Y-%m-%d %H:%M:%S") if outfit[5] else None
+                    } for outfit in outfits if outfit[1] and os.path.exists(outfit[1])]
+                return []
+            finally:
+                cur.close()
+    except Exception as e:
+        logging.error(f"Error loading saved outfits: {str(e)}")
+        return []
 
 @retry_on_error()
 def load_saved_outfits(user_id: int = None):
@@ -787,7 +863,7 @@ def cleanup_orphaned_entries():
             if orphaned_items:
                 # Log orphaned items before processing
                 logging.warning(f"Found {len(orphaned_items)} orphaned entries in database")
-                for item_id, item_type, path in orphaned_items:
+                for item_id, item_type, path in orphaneditems:
                     logging.info(f"Orphaned {item_type} (ID: {item_id}): {path}")
                 
                 # Move orphaned entries to audit table for reference
@@ -1278,10 +1354,10 @@ def cleanup_orphaned_entries():
 @retry_on_error()
 def bulk_delete_items(item_ids: List[int]) -> Tuple[bool, str, Dict]:
     """Delete multiple clothing items in bulk with their associated files
-
+    
     Args:
         item_ids: List of item IDs to delete
-
+    
     Returns:
         Tuple containing:
         - Success status (bool)
