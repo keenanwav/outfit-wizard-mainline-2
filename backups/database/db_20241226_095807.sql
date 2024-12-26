@@ -864,4 +864,665 @@ COPY public.orphaned_items_audit (id, original_id, type, image_path, removed_at)
 -- Data for Name: recycle_bin; Type: TABLE DATA; Schema: public; Owner: neondb_owner
 --
 
-COPY public.recycle_bin (id, original_id, type, color, style
+COPY public.recycle_bin (id, original_id, type, color, style, gender, size, image_path, hyperlink, tags, season, notes, price, deleted_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: saved_outfits; Type: TABLE DATA; Schema: public; Owner: neondb_owner
+--
+
+COPY public.saved_outfits (id, outfit_id, username, image_path, created_at, tags, season, notes, user_id) FROM stdin;
+2	caa863f0-4130-43da-b142-7e6c38d2151e	default_user	wardrobe/outfit_caa863f0-4130-43da-b142-7e6c38d2151e.png	2024-11-01 03:07:31.208476	\N	\N	\N	\N
+48	9c4ee6ef-b847-49f6-a2e6-bad4db17a3db	\N	wardrobe/outfit_9c4ee6ef-b847-49f6-a2e6-bad4db17a3db.png	2024-12-09 19:51:51.735068	{"Casual "}	Fall	Nice colors 😌😌😌😌	\N
+15	c462434b-6fca-48ae-aa57-cedcafb9fe51	\N	wardrobe/outfit_c462434b-6fca-48ae-aa57-cedcafb9fe51.png	2024-11-09 17:29:52.517542	\N	\N	\N	\N
+16	a425fe87-4267-4267-be58-8700213abdbb	\N	wardrobe/outfit_a425fe87-4267-4267-be58-8700213abdbb.png	2024-11-09 17:30:14.046658	\N	\N	\N	\N
+17	945674b2-aa9f-480c-9bdf-ee0a2a70327e	\N	wardrobe/outfit_945674b2-aa9f-480c-9bdf-ee0a2a70327e.png	2024-11-10 08:33:47.461506	\N	\N	\N	\N
+18	cdae4bec-300c-4124-8930-e13b4a6a414e	\N	wardrobe/outfit_cdae4bec-300c-4124-8930-e13b4a6a414e.png	2024-11-10 14:10:17.285158	\N	\N	\N	\N
+19	e212695d-72f4-4ea5-b193-0e612430ebde	\N	wardrobe/outfit_e212695d-72f4-4ea5-b193-0e612430ebde.png	2024-11-10 17:22:35.996994	\N	\N	\N	\N
+20	5ad7373c-cf75-4356-b444-3930352faf9f	\N	wardrobe/outfit_5ad7373c-cf75-4356-b444-3930352faf9f.png	2024-11-10 21:01:47.662061	\N	\N	\N	\N
+49	3f36e925-4811-4288-9259-4396f1135a04	\N	wardrobe/outfit_3f36e925-4811-4288-9259-4396f1135a04.png	2024-12-11 21:14:26.236605	\N	\N	\N	\N
+21	9133527e-c6e1-445b-ac56-6189662ef466	\N	wardrobe/outfit_9133527e-c6e1-445b-ac56-6189662ef466.png	2024-11-10 21:49:41.999886	\N	\N	None	\N
+22	6228db34-68b1-44ab-b9ae-0e1f688cfaf1	\N	wardrobe/outfit_6228db34-68b1-44ab-b9ae-0e1f688cfaf1.png	2024-11-14 16:53:47.262734	\N	\N	\N	\N
+23	265dffbe-1b6d-4484-9c74-0bd35476fc37	\N	wardrobe/outfit_265dffbe-1b6d-4484-9c74-0bd35476fc37.png	2024-11-14 20:01:27.558533	\N	\N	\N	\N
+25	9b072a08-3e47-4cd8-a99a-86737a85bf7b	\N	wardrobe/outfit_9b072a08-3e47-4cd8-a99a-86737a85bf7b.png	2024-11-16 01:25:19.322262	\N	\N	\N	\N
+26	5134ac92-ca11-4d37-9020-3ac2ddc41fb0	\N	wardrobe/outfit_5134ac92-ca11-4d37-9020-3ac2ddc41fb0.png	2024-11-17 18:53:33.111465	\N	\N	\N	\N
+27	3c48797b-53cb-4be9-9257-175054723797	\N	wardrobe/outfit_3c48797b-53cb-4be9-9257-175054723797.png	2024-11-19 01:14:44.749351	\N	\N	\N	\N
+28	9b6c07c3-dde7-45ad-830d-6b1e20e3197d	\N	wardrobe/outfit_9b6c07c3-dde7-45ad-830d-6b1e20e3197d.png	2024-11-20 01:43:06.235052	\N	\N	\N	\N
+29	1a70a726-6dd4-4216-b42b-7a0aa1d0d5c2	\N	wardrobe/outfit_1a70a726-6dd4-4216-b42b-7a0aa1d0d5c2.png	2024-11-20 02:05:33.204453	\N	\N	\N	\N
+30	9c466e7c-5af6-42c1-90c6-4694768e6a98	\N	wardrobe/outfit_9c466e7c-5af6-42c1-90c6-4694768e6a98.png	2024-11-20 02:41:44.230543	\N	\N	\N	\N
+24	b181c92d-85ac-4668-a907-feb15c9806c4	\N	wardrobe/outfit_b181c92d-85ac-4668-a907-feb15c9806c4.png	2024-11-15 01:57:29.086473	\N	\N	None	\N
+31	794c20dc-3e8b-4161-8f69-e6229d23cac8	\N	wardrobe/outfit_794c20dc-3e8b-4161-8f69-e6229d23cac8.png	2024-11-20 16:54:41.790014	\N	\N	\N	\N
+32	79392f6b-fc89-4052-be82-26ce79277f6c	\N	wardrobe/outfit_79392f6b-fc89-4052-be82-26ce79277f6c.png	2024-11-20 16:57:08.544386	\N	\N	\N	\N
+33	6b13c2a8-d73f-4050-b4f2-ba95a84f958e	\N	wardrobe/outfit_6b13c2a8-d73f-4050-b4f2-ba95a84f958e.png	2024-11-21 09:39:57.391831	\N	\N	\N	\N
+34	0c3c985d-8695-4b89-91b0-f79f1426d675	\N	wardrobe/outfit_0c3c985d-8695-4b89-91b0-f79f1426d675.png	2024-11-24 18:35:37.980986	\N	\N	\N	\N
+35	10c37677-bb3b-453b-9bd7-dd8c21a73e09	\N	wardrobe/outfit_10c37677-bb3b-453b-9bd7-dd8c21a73e09.png	2024-11-24 23:31:15.008953	\N	\N	\N	\N
+36	215e045b-6d35-45dc-9e1d-a4557d04fa63	\N	wardrobe/outfit_215e045b-6d35-45dc-9e1d-a4557d04fa63.png	2024-11-25 14:41:35.603896	\N	\N	\N	\N
+39	f2641aa5-aba1-46b2-8a14-fe05c7407d1f	\N	wardrobe/outfit_f2641aa5-aba1-46b2-8a14-fe05c7407d1f.png	2024-11-25 15:33:34.029213	\N	\N	\N	\N
+41	4cf9825d-717d-47a0-8d12-f6a7c72430bd	\N	wardrobe/outfit_4cf9825d-717d-47a0-8d12-f6a7c72430bd.png	2024-11-26 13:44:08.728001	\N	\N	\N	\N
+42	bcdca021-9bb4-4be2-aa37-8a9f7f82a983	\N	wardrobe/outfit_bcdca021-9bb4-4be2-aa37-8a9f7f82a983.png	2024-11-27 12:07:35.512192	\N	\N	\N	\N
+43	5d2c4338-0e5f-4b48-ba71-0e72e676e53d	\N	wardrobe/outfit_5d2c4338-0e5f-4b48-ba71-0e72e676e53d.png	2024-11-28 20:40:17.420069	\N	\N	\N	\N
+50	b0538fba-3a7d-4643-b253-128f205cecc8	\N	wardrobe/outfit_b0538fba-3a7d-4643-b253-128f205cecc8.png	2024-12-11 21:15:11.802267	\N	\N	\N	\N
+45	b83d8629-1f7a-4f3f-9c32-af9049184426	\N	wardrobe/outfit_b83d8629-1f7a-4f3f-9c32-af9049184426.png	2024-12-02 02:51:16.441475	\N	\N	\N	\N
+46	bfab9722-0c0a-475e-aba7-f831658bb2b6	\N	wardrobe/outfit_bfab9722-0c0a-475e-aba7-f831658bb2b6.png	2024-12-09 08:43:48.273704	\N	\N	\N	\N
+47	fba1ba86-645e-4cd9-8cf3-b435c9ac97f4	\N	wardrobe/outfit_fba1ba86-645e-4cd9-8cf3-b435c9ac97f4.png	2024-12-09 08:44:28.964088	\N	\N	\N	\N
+51	5e7a0743-41a4-454f-bd26-e54f7f5837c0	\N	wardrobe/outfit_5e7a0743-41a4-454f-bd26-e54f7f5837c0.png	2024-12-11 21:15:24.861778	\N	\N	\N	\N
+52	399e59d7-92b7-49f4-978d-519394fed03b	\N	wardrobe/outfit_399e59d7-92b7-49f4-978d-519394fed03b.png	2024-12-11 21:16:22.858748	\N	\N	\N	\N
+54	ffecfa05-06e0-4394-9554-b2f5cf291f00	\N	wardrobe/outfit_ffecfa05-06e0-4394-9554-b2f5cf291f00.png	2024-12-16 13:43:03.777669	{"new outfits"}	Summer	take 1\n	\N
+53	4944a2ac-432a-4a66-9893-1f0a3e1e4223	\N	wardrobe/outfit_4944a2ac-432a-4a66-9893-1f0a3e1e4223.png	2024-12-16 13:41:57.376396	{#earthtones}	Spring	greens and brown go good together.	\N
+55	f0fe5608-6ab7-4f14-95e6-6c3117917f64	\N	wardrobe/outfit_f0fe5608-6ab7-4f14-95e6-6c3117917f64.png	2024-12-19 15:57:46.97338	\N	\N	\N	\N
+56	830cae20-f37e-42d3-93f7-e93086cb3220	\N	wardrobe/outfit_830cae20-f37e-42d3-93f7-e93086cb3220.png	2024-12-20 01:31:35.354365	\N	\N	\N	\N
+\.
+
+
+--
+-- Data for Name: shared_outfits; Type: TABLE DATA; Schema: public; Owner: neondb_owner
+--
+
+COPY public.shared_outfits (id, outfit_id, shared_by_user_id, shared_with_user_id, shared_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: user_clothing_items; Type: TABLE DATA; Schema: public; Owner: neondb_owner
+--
+
+COPY public.user_clothing_items (id, user_id, type, color, style, gender, size, image_path, hyperlink, created_at, tags, season, notes, price) FROM stdin;
+37	\N	pants	138,145,158	Casual	Male	S,M,L,XL	user_images/pants_19866edd-c42e-4aba-8338-ac8adef4cf39.png	https://www.jackjones.com/en-us/product/12268003_3561/slim-fit-jeans	2024-11-10 14:00:19.552124	\N	\N	\N	64.00
+38	\N	pants	67,101,141	Casual	Male	S,M,L,XL	user_images/pants_0c330e18-cd84-4d30-bda8-840fca9dcc3d.png	https://www.jackjones.com/en-us/product/12261946_3561/wide-leg-fit-jeans	2024-11-10 14:01:05.861081	\N	\N	\N	69.00
+5	\N	shirt	82,58,9	Casual	Male	XS,S,M,L,XL	user_images/shirt_b75e00d9-4f29-40ff-b040-cb0b57b35d66.png	https://www.youngandreckless.com/collections/mens-all/products/banner-tee-brown	2024-11-05 05:48:19.43671	\N	\N	\N	10.00
+17	\N	shoes	211,186,138	Formal,Casual	Male	S,M,L,XL	user_images/shoes_0c3efc99-0869-48a7-8a81-2c5b6be2113e.png	https://www.clarks.com/en-us/nomad-loafer/26178112-p	2024-11-10 08:13:44.270359	\N	\N	\N	190.00
+33	\N	shirt	234,235,239	Casual,Sport	Male	S,M,L,XL	user_images/shirt_82decbc7-8a4b-4d7d-9d4d-6e931a6523d3.png	https://www.jackjones.com/en-us/product/12263604_5_1135635/wide-fit-crew-neck-t-shirt	2024-11-10 13:57:22.446673	\N	\N	\N	10.00
+30	\N	shirt	28,28,31	Casual,Sport	Male	S,M,L,XL	user_images/shirt_9426e4e5-7c4f-4ccc-8eb0-b10ae18c3bcd.png	https://www.jackjones.com/en-us/product/12255085_2161_1182000/regular-fit-round-neck-t-shirt	2024-11-10 13:54:43.18382	\N	\N	\N	10.00
+86	\N	shirt	206,211,217	Casual	Female	S,M,L,XL	\N	https://www2.hm.com/en_us/productpage.1267555003.html	2024-11-26 23:50:24.243104	\N	\N	\N	24.99
+34	\N	shirt	29,29,32	Casual,Sport	Male	S,M,L,XL	user_images/shirt_8a82e599-8e0a-440c-90a9-1a0e5415cfb2.png	https://www.jackjones.com/en-us/product/12263604_2161/wide-fit-crew-neck-t-shirt	2024-11-10 13:57:57.800382	\N	\N	\N	10.00
+23	\N	shirt	181,181,181	Casual,Sport	Unisex,Male	S,M,L,XL	user_images/shirt_b02f6043-0727-40b8-9bc0-f9a1464ed201.png	https://www.thepopculture.co/products/the-college-dropout-bear-unisex-tee-old-kanye-west-inspired-tshirt	2024-11-10 13:43:22.847645	\N	\N	\N	10.00
+31	\N	shirt	92,82,75	Casual,Sport	Male	S,M,L,XL	user_images/shirt_95959371-e94c-4785-89a5-88ef18778a09.png	https://www.jackjones.com/en-us/product/12280884_274/relaxed-fit-crew-neck-t-shirt	2024-11-10 13:55:22.344472	\N	\N	\N	10.00
+87	\N	pants	23,22,23	Casual,Formal	Female	S,M,L,XL	\N	https://www2.hm.com/en_us/productpage.1260945001.html	2024-11-27 00:01:40.4087	\N	\N	\N	24.99
+29	\N	shirt	121,113,88	Casual,Sport	Male	S,M,L,XL	user_images/shirt_d4e0c46f-181a-41f5-8a5e-5ecf3347be9d.png	https://www.jackjones.com/en-us/product/12255085_4263_1182000/regular-fit-round-neck-t-shirt	2024-11-10 13:53:52.019631	\N	\N	\N	10.00
+27	\N	shirt	254,170,65	Casual,Sport	Male,Unisex	S,M,L,XL	user_images/shirt_1de23997-0440-464f-b12c-23d06cd89d08.png	https://www.hollisterco.com/shop/wd/p/relaxed-mclaren-graphic-hoodie-56197335?categoryId=166245&faceout=prod&seq=02	2024-11-10 13:51:00.563603	\N	\N	\N	10.00
+12	\N	shirt	0,131,255	Casual	Male	XS,S,M,L,XL	user_images/shirt_ab5b7a3b-ac67-4069-8e25-c2fcac340364.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/cracked-tee-royal-blue	2024-11-05 06:00:20.918218	\N	\N	\N	10.00
+13	\N	shirt	195,191,191	Casual	Male	XS,S,M,L,XL	user_images/shirt_4d133099-4396-40d1-930a-2f0bcf8a04c7.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/descent-tee-grey	2024-11-05 06:01:50.291653	\N	\N	\N	10.00
+15	\N	shoes	108,60,38	Formal	Male	S,M,L,XL	user_images/shoes_f5721652-f305-4efd-a17b-c22821d739ff.png	https://www.clarks.com/en-us/desert-trek-hiker/26178208-p	2024-11-10 08:12:03.055163	\N	\N	\N	160.00
+35	\N	shirt	23,36,49	Casual,Sport,Formal	Male	S,M,L,XL	user_images/shirt_e0f7ef39-9c7d-4b01-a093-cdd635092d89.png	https://www.jackjones.com/en-us/product/12136668_2078_624130/slim-fit-polo-polo-shirt	2024-11-10 13:58:41.478912	\N	\N	\N	40.00
+28	\N	pants	104,94,61	Casual,Sport	Male	S,M,L,XL	user_images/pants_5f6a323c-a5b9-445c-b912-2b4db3a7cadc.png	https://www.jackjones.com/en-us/product/12242264_1926/relaxed-fit-normal-rise-rib-hems-cargo-pants	2024-11-10 13:52:17.846364	\N	\N	\N	89.50
+11	\N	shirt	121,95,61	Casual	Male	XS,S,M,L,XL	user_images/shirt_2e72596a-448c-410f-8753-a72ee1ff0da6.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/internal-tee-dark-chocolate	2024-11-05 05:58:38.177397	\N	\N	\N	10.00
+89	\N	pants	73,73,74	Casual	Female	S,M,L,XL	\N	https://www2.hm.com/en_us/productpage.0768912001.html	2024-11-27 00:48:11.374308	\N	\N	\N	14.99
+8	\N	pants	99,113,74	Casual	Male	XS,S,M,L,XL	user_images/pants_4eaf78d2-434e-44bb-8fd1-53dd94d8678c.png	https://mnml.la/products/mnml-pants-bootcut-cargo-pants-m2020-p886-cam	2024-11-05 05:54:01.913763	\N	\N	\N	10.00
+18	\N	shoes	225,181,142	Formal	Male,Unisex	S,M,L,XL	user_images/shoes_d591b7b1-6b5a-4c9d-b41e-93c349d91b57.png	https://www.clarks.com/en-us/rossendale-desert/26178031-p	2024-11-10 08:15:31.457915	\N	\N	\N	190.00
+26	\N	pants	173,104,49	Casual,Formal,Sport	Male	S,M,L,XL	user_images/pants_8789580e-19fa-49fe-bc28-76511cd4eccb.png	https://www.jackjones.com/en-us/product/12150148_562/slim-fit-low-rise-chinos	2024-11-10 13:45:52.307386	\N	\N	\N	45.00
+22	\N	shoes	19,26,55	Formal,Casual	Male,Unisex	S,M,L,XL	user_images/shoes_14c41396-9a62-475f-b785-e5f659ea0346.png	https://www.clarks.com/en-us/wallabee/26178225-p	2024-11-10 08:23:02.394786	\N	\N	\N	160.00
+19	\N	shoes	14,13,11	Formal	Male	S,M,L,XL	user_images/shoes_70c3ce22-7a48-4d8e-a8d8-808b530d4ad7.png	https://www.clarks.com/en-us/wallabee/26155519-p	2024-11-10 08:16:49.896945	\N	\N	\N	10.00
+32	\N	shirt	154,179,199	Casual,Sport	Male	S,M,L,XL	user_images/shirt_af0723c3-a644-4da5-ad0a-96313b791aea.png	https://www.jackjones.com/en-us/product/12262491_8403/relaxed-fit-crew-neck-t-shirt	2024-11-10 13:56:42.140869	\N	\N	\N	10.00
+21	\N	shoes	145,126,93	Formal,Casual	Male	S,M,L,XL	user_images/shoes_569b78ba-738f-447b-b485-0db3a813d3b9.png	https://www.clarks.com/en-us/wallabee/26155515-p	2024-11-10 08:19:43.148881	\N	\N	\N	150.00
+20	\N	shoes	96,52,27	Formal	Male	S,M,L,XL	user_images/shoes_13467291-2d0a-44d0-a07b-b83a04d72020.png	https://www.clarks.com/en-us/wallabee/26155518-p	2024-11-10 08:18:08.058333	\N	\N	\N	150.00
+6	\N	shirt	190,177,158	Casual,Sporty	Male	XS,S,M,L,XL	user_images/shirt_b59f13c8-dc2e-4925-9056-b20bbd498f4a.png	https://www.youngandreckless.com/collections/mens-all/products/big-r-script-tee-sand	2024-11-05 05:49:57.169325	\N	\N	\N	10.00
+90	\N	pants	68,64,69	Casual	Female	S,M,L,XL	\N	https://www2.hm.com/en_us/productpage.1250617004.html	2024-11-27 03:32:37.567854	\N	\N	\N	19.00
+91	\N	pants	118,157,184	Casual	Female	S,M,L,XL	\N	https://www.levi.com/US/en_US/clothing/women/jeans/straight/wedgie-straight-fit-womens-jeans/p/349640198	2024-11-27 03:34:05.061463	\N	\N	\N	58.80
+39	\N	shoes	230,229,234	Casual,Sport	Male,Unisex	S,M,L,XL	user_images/shoes_74929657-e3ae-48b0-8d65-33cc32210d1a.png	https://www.converse.com/shop/p/chuck-taylor-all-star-canvas-unisex-high-top-shoe/M9006MP.html?pid=M9006MP&dwvar_M9006MP_color=optical%20white&dwvar_M9006MP_width=standard&styleNo=M7650&pdp=true	2024-11-13 23:48:22.281003	\N	\N	\N	65.00
+9	\N	shoes	72,22,26	Casual,Formal,Sporty	Male,Unisex	XS,S,M,L,XL	user_images/shoes_441f282d-21dc-4fc1-8f49-cb5a5b3ca853.png	https://www.converse.com/shop/p/chuck-taylor-all-star-canvas-unisex-high-top-shoe/M9006MP.html?pid=M9006MP&dwvar_M9006MP_color=maroon&dwvar_M9006MP_width=standard&styleNo=M9613&pdp=true	2024-11-05 05:56:08.151323	\N	\N	\N	10.00
+42	\N	pants	161,112,89	Casual,Sport	Male	S,M,L,XL	user_images/pants_fd0c41b0-3aef-4a62-95d4-0a373c11c6c6.png	https://killionest.com/collections/bottoms/products/cargo-twill-trekker-pant-rust	2024-11-15 01:19:30.198546	\N	\N	\N	64.00
+43	\N	pants	95,78,67	Casual	Male	S,M,L,XL	user_images/pants_b6208889-aa9c-4e86-8668-fa67a82ed54a.png	https://killionest.com/collections/bottoms/products/cargo-twill-trekker-pant-black	2024-11-15 01:20:29.616002	\N	\N	\N	64.00
+44	\N	pants	71,72,73	Casual	Male	S,M,L,XL	user_images/pants_f88d7d22-47de-41d7-be66-4b386534bc2b.png	https://killionest.com/collections/bottoms/products/cargo-twill-trekker-pant-black	2024-11-15 01:24:13.387239	\N	\N	\N	64.00
+46	\N	shirt	84,117,162	Casual	Male	S,M,L,XL	user_images/shirt_0dbd1814-1f0b-4dac-9a75-f008a9e5f62c.png	 https://killionest.com/collections/denim/products/classic-13oz-denim-jacket-medium-blue	2024-11-15 01:27:50.615438	\N	\N	\N	64.00
+49	\N	shirt	176,174,175	Casual,Sport	Male	S,M,L,XL	user_images/shirt_ce08caae-a050-4db5-853d-4766688af727.png	https://ethikworldwide.com/products/logistics-tee-1	2024-11-15 01:30:51.367421	\N	\N	\N	15.00
+51	\N	shoes	224,224,222	Casual,Sport	Male	S,M,L,XL	user_images/shoes_30deaaa6-d2f2-45b2-a5dc-9278b0d8f0ce.png	https://www.footlocker.com/product/nike-air-force-1-low-mens/J9179200.html	2024-11-15 01:33:41.180209	\N	\N	\N	115.00
+52	\N	shoes	169,123,79	Casual,Sport	Male	S,M,L,XL	user_images/shoes_43339fba-a2bd-49d0-bb7f-fb45d773b4c3.png	https://www.footlocker.com/product/~/J9179200.html	2024-11-15 01:35:36.211807	\N	\N	\N	135.00
+53	\N	pants	113,87,70	Casual,Sport	Male	S,M,L,XL	user_images/pants_2c53e6bf-c884-45b4-a30f-70f91cd3a16d.png	https://ethikworldwide.com/products/nylon-bungee-pants-3	2024-11-15 01:36:45.174576	\N	\N	\N	66.00
+54	\N	pants	134,124,86	Casual,Sport	Male	S,M,L,XL	user_images/pants_39b1da29-5ad3-44e6-b1ff-99a05ff55bfd.png	https://ethikworldwide.com/products/nylon-bungee-pants-1	2024-11-15 01:37:35.397672	\N	\N	\N	66.00
+55	\N	pants	37,29,28	Casual,Formal	Male	S,M,L,XL	user_images/pants_2e6a3166-4ef2-4acc-b179-3e447b45a582.png	https://www2.hm.com/en_us/productpage.1240972004.html	2024-11-15 01:39:12.073197	\N	\N	\N	24.99
+57	\N	shirt	68,62,62	Casual	Male	S,M,L,XL	user_images/shirt_f2b767b5-fa89-4d41-8458-7c602aa52280.png	https://ethikworldwide.com/products/sideline-jacket	2024-11-15 01:40:36.13986	\N	\N	\N	72.00
+58	\N	pants	68,70,71	Casual	Male	S,M,L,XL	user_images/pants_d935fcb8-dada-43d2-8852-f52967296685.png	https://killionest.com/collections/denim/products/ab-001-black-distressed-denim-jeans	2024-11-15 01:41:45.607035	\N	\N	\N	62.00
+60	\N	pants	71,70,74	Casual,Formal	Male	S,M,L,XL	user_images/pants_07b8ea5d-f7ab-4b03-ab64-d58be10e88cb.png	https://www2.hm.com/en_us/productpage.1074402002.html	2024-11-15 01:44:23.117417	\N	\N	\N	24.99
+61	\N	pants	75,75,75	Casual,Formal	Male	S,M,L,XL	user_images/pants_16627fdc-37f5-4dc0-8a68-4effe3e7543c.png	https://www2.hm.com/en_us/productpage.1219626003.html	2024-11-15 01:45:30.929718	\N	\N	\N	39.99
+62	\N	shirt	39,39,39	Casual	Male	S,M,L,XL	user_images/shirt_27d3781e-6843-4130-bc98-0848395834c8.png	https://ethikworldwide.com/products/strong-mint-tee-1	2024-11-15 01:46:38.810907	\N	\N	\N	25.00
+63	\N	shirt	36,59,41	Casual	Male	S,M,L,XL	user_images/shirt_78c5e4dc-abb0-44d2-b61f-bf75c2c163b9.png	https://www.ronindivision.com/collections/frontpage/products/warriors-tee-forest	2024-11-15 01:47:49.916951	\N	\N	\N	46.00
+67	\N	shirt	233,232,231	Casual,Sport,Beach	Male	S,M,L,XL	user_images/shirt_26120094-346e-484c-be6b-40fa017cb3c6.png	https://ethikworldwide.com/products/youre-always-on-your-phone-tee-1	2024-11-15 01:52:29.383951	\N	\N	\N	19.00
+68	\N	pants	147,126,126	Casual,Sport,Beach	Male	S,M,L,XL	user_images/pants_d2002997-3b4d-4df9-9a9b-9880b41f7731.png	https://www.ronindivision.com/collections/frontpage/products/wavy-water-shorts-taupe	2024-11-15 01:53:25.107853	\N	\N	\N	19.00
+47	\N	shoes	191,172,161	Sport	Male,Unisex,Female	S,M,L,XL	user_images/shoes_a1602b1b-9573-41ae-be4a-dc712eab45d9.png	https://www.crocs.com/p/classic-clog/10001.html?cgid=men-footwear&cid=6WC	2024-11-15 01:29:21.752232	\N	\N	\N	49.99
+59	\N	pants	168,166,166	Casual,Formal	Male	S,M,L,XL	user_images/pants_422a5b02-b75b-41fd-80da-800c22bb200c.png	https://www2.hm.com/en_us/productpage.1234995004.html	2024-11-15 01:43:17.377182	\N	\N	\N	24.99
+64	\N	shirt	210,210,210	Casual,Sport	Male	S,M,L,XL	user_images/shirt_a49030c9-ffcf-451e-8340-785802c7b62d.png	https://www.ronindivision.com/collections/frontpage/products/warriors-tee-heather-grey	2024-11-15 01:48:36.013664	\N	\N	\N	46.00
+50	\N	shirt	148,150,152	Casual	Male	S,M,L,XL	user_images/shirt_031c7f19-5024-431a-856f-e0124aae4934.png	https://ethikworldwide.com/products/new-jack-crewneck-1	2024-11-15 01:32:14.838268	\N	\N	\N	52.00
+48	\N	shoes	134,138,130	Sport	Male,Unisex	S,M,L,XL	user_images/shoes_b51e7556-e2de-45cb-8a09-d097830bfd53.png	https://www.crocs.com/p/classic-clog/10001.html?cgid=men-footwear&cid=6WC	2024-11-15 01:29:55.096743	\N	\N	\N	49.99
+69	\N	shirt	147,145,130	Formal	Male	S,M,L,XL	\N	https://www.jackjones.com/en-us/product/12263645_1714_1137226/comfort-fit-shirt-collar-shirt	2024-11-25 03:24:32.642693	\N	\N	\N	70.00
+70	\N	shirt	108,110,117	Casual,Sport	Male	S,M,L,XL	\N	https://www.jackjones.com/en-us/product/12285055_2042/relaxed-fit-crew-neck-t-shirt	2024-11-25 03:38:14.119171	\N	\N	\N	30.00
+66	\N	shirt	100,89,76	Casual,Sport,Beach	Male	S,M,L,XL	user_images/shirt_acca8ef7-eaa9-49ce-8145-bc92e2dfa291.png	https://ethikworldwide.com/products/wings-tee	2024-11-15 01:51:01.985913	\N	\N	\N	25.00
+71	\N	shirt	41,40,46	Casual	Male	S,M,L,XL	\N	https://www.jackjones.com/en-us/product/12285060_2161/relaxed-fit-crew-neck-t-shirt	2024-11-25 03:53:47.266362	\N	\N	\N	30.00
+72	\N	shirt	239,240,235	Casual	Male	S,M,L,XL	\N	https://www.jackjones.com/en-us/product/12278457_6/loose-fit-crew-neck-t-shirt	2024-11-25 04:11:07.497112	\N	\N	\N	35.00
+73	\N	shirt	240,238,244	Casual	Male	S,M,L,XL	\N	https://www.jackjones.com/en-us/product/12285057_5/relaxed-fit-crew-neck-t-shirt	2024-11-25 04:15:12.446728	\N	\N	\N	35.00
+74	\N	shirt	233,231,218	Casual	Male	S,M,L,XL	\N	https://www.jackjones.com/en-us/product/12262491_4162/relaxed-fit-crew-neck-t-shirt	2024-11-26 01:48:49.514188	\N	\N	\N	20.00
+75	\N	shirt	231,195,144	Casual,Beach	Male,Unisex	S,M,L,XL	\N	https://www.jackjones.com/en-us/product/12265826_19/wide-fit-crew-neck-t-shirt	2024-11-26 01:56:16.173063	\N	\N	\N	25.00
+76	\N	shirt	44,51,93	Casual	Male	S,M,L,XL	\N	https://www.jackjones.com/en-us/product/12265826_13046/wide-fit-crew-neck-t-shirt	2024-11-26 01:58:40.525081	\N	\N	\N	25.00
+77	\N	shirt	85,66,55	Casual	Male,Unisex	S,M,L,XL	\N	https://www.jackjones.com/en-us/product/12255167_273_1107495/standard-fit-round-neck-t-shirt	2024-11-26 02:03:18.61768	\N	\N	\N	15.00
+78	\N	shirt	102,98,92	Casual	Male,Unisex	S,M,L,XL	\N	https://www.jackjones.com/en-us/product/12256926_5/wide-fit-crew-neck-t-shirt	2024-11-26 02:09:03.336071	\N	\N	\N	20.00
+79	\N	pants	145,143,148	Casual	Male	S,M,L,XL	\N	https://killionest.com/collections/bottoms/products/cargo-twill-trekker-pant-slate	2024-11-26 02:16:23.336702	\N	\N	\N	25.00
+80	\N	shoes	180,181,172	Casual	Male	S,M,L,XL	\N	https://www.urbanoutfitters.com/shop/new-balance-530-sneaker2?category=mens-clothing&color=011&type=REGULAR&quantity=1	2024-11-26 10:57:52.607481	\N	\N	\N	100.00
+81	\N	shirt	38,25,26	Casual,Formal,Beach	Female	S,M,L,XL	\N	https://www2.hm.com/en_us/productpage.1199483009.html	2024-11-26 11:30:49.664429	\N	\N	\N	139.00
+83	\N	shirt	242,170,32	Casual	Male	S,M,L,XL	\N	https://anwarcarrots.com/collections/shop/products/hand-picked-tee-squash?variant=44882049630375	2024-11-26 11:41:20.29963	\N	\N	\N	26.00
+84	\N	shirt	216,169,24	Casual	Female	S,M,L,XL	\N	https://www2.hm.com/en_us/productpage.1238852010.html	2024-11-26 11:52:36.624985	\N	\N	\N	24.99
+85	\N	shirt	233,234,229	Casual	Female	S,M,L,XL	\N	https://www2.hm.com/en_us/productpage.1232418002.html	2024-11-26 11:58:24.754298	\N	\N	\N	14.99
+82	\N	shirt	28,17,49	Casual	Female	S,M,L,XL	\N	https://www.shein.com/	2024-11-26 11:35:05.566866	\N	\N	\N	5.95
+92	\N	pants	59,59,63	Casual	Female	S,M,L,XL	\N	https://www.prettylittlething.us/petite-black-micro-mini-pu-pleated-skirt.html	2024-11-27 11:41:27.422915	\N	\N	\N	60.00
+93	\N	pants	176,131,118	Casual	Female	S,M,L,XL	\N	https://www.prettylittlething.us/multi-scenic-collage-printed-mesh-frilly-low-waist-mini-skirt.html	2024-11-27 11:45:35.069652	\N	\N	\N	40.00
+94	\N	shoes	201,177,164	Casual	Female	S,M,L,XL	\N	https://www.prettylittlething.us/beige-faux-suede-buckled-mule-cloggs.html	2024-11-27 11:51:01.81794	\N	\N	\N	45.00
+95	\N	shoes	233,184,169	Casual	Female	S,M,L,XL	\N	https://www.prettylittlething.us/tan-pu-padded-cross-over-strap-flat-sandals.html	2024-11-27 12:06:54.339592	\N	\N	\N	10.50
+97	\N	shoes	201,177,164	Casual	Female	S,M,L,XL	\N	https://www.prettylittlething.us/beige-faux-suede-buckled-mule-cloggs.html	2024-11-30 03:27:44.826576	\N	\N	\N	18.00
+98	\N	shoes	209,205,202	Casual,Sport	Male	S,M,L,XL	user_images/shoes_2e3d9983-4371-4f30-97f7-929dcf1016ab.png	https://www.amazon.com/dp/B09YBGQBF4?ref=cm_sw_r_cp_ud_dp_NRNMK73M4TN4JS7ZF1F3_1&ref_=cm_sw_r_cp_ud_dp_NRNMK73M4TN4JS7ZF1F3_1&social_share=cm_sw_r_cp_ud_dp_NRNMK73M4TN4JS7ZF1F3_1&starsLeft=1&skipTwisterOG=1&th=1&psc=1	2024-12-02 02:47:14.403698	\N	\N	\N	64.99
+121	\N	pants	165,167,160	Casual	Male	S,M,L,XL	\N	https://mnml.la/products/mnml-denim-x511-denim-m2023-d884-blu	2024-12-09 08:20:11.902657	\N	\N	\N	76.00
+122	\N	pants	186,185,183	Casual	Male	S,M,L,XL	\N	https://mnml.la/products/mnml-bottoms-relaxed-every-day-sweatpants-m2022-w634-gry	2024-12-09 08:21:26.655016	\N	\N	\N	57.00
+99	\N	shirt	188,151,114	Casual	Male	S,M,L,XL	\N	https://www.jackjones.com/en-us/product/12263521_1957/oversized-fit-crew-neck-t-shirt	2024-12-09 07:55:55.586036	\N	\N	\N	25.00
+100	\N	shirt	197,204,196	Casual	Male	S,M,L,XL	\N	https://www.jackjones.com/en-us/product/12263521_3/oversized-fit-crew-neck-t-shirt	2024-12-09 07:56:45.507946	\N	\N	\N	25.00
+101	\N	shirt	236,228,214	Casual	Male	S,M,L,XL	\N	https://www.jackjones.com/en-us/pro duct/12282604_4162/relaxed-fit-crew-neck-t-shirt	2024-12-09 07:57:55.352047	\N	\N	\N	30.00
+102	\N	shirt	229,230,235	Casual	Male	S,M,L,XL	\N	https://www.jackjones.com/en-us/product/12262506_5/wide-fit-crew-neck-t-shirt	2024-12-09 07:58:58.549372	\N	\N	\N	25.00
+103	\N	shirt	39,38,43	Casual	Male	S,M,L,XL	\N	https://www.jackjones.com/en-us/product/12262506_2161/wide-fit-crew-neck-t-shirt	2024-12-09 07:59:38.950685	\N	\N	\N	25.00
+104	\N	shirt	24,24,24	Casual	Male	S,M,L,XL	\N	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/roses-tee-blac	2024-12-09 08:00:39.631233	\N	\N	\N	20.00
+105	\N	shirt	189,169,54	Casual	Male	S,M,L,XL	\N	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/test-your-luck-tee-natural	2024-12-09 08:01:41.769075	\N	\N	\N	27.99
+106	\N	shirt	63,53,41	Casual	Male	S,M,L,XL	\N	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/limited-edition-tee-dark-chocolate	2024-12-09 08:02:30.697161	\N	\N	\N	27.99
+107	\N	shirt	24,24,24	Casual	Male	S,M,L,XL	\N	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/marathon-tee-black	2024-12-09 08:03:09.718634	\N	\N	\N	27.99
+108	\N	shirt	226,224,231	Casual	Male	S,M,L,XL	\N	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/problem-child-tee-white	2024-12-09 08:04:19.224406	\N	\N	\N	27.99
+109	\N	shirt	24,24,24	Casual	Male	S,M,L,XL	\N	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/eye-of-the-storm-tee-natural	2024-12-09 08:05:01.124985	\N	\N	\N	27.99
+110	\N	shirt	151,146,140	Casual	Male	S,M,L,XL	\N	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/call-my-manager-tee-brown	2024-12-09 08:05:45.120196	\N	\N	\N	16.99
+111	\N	shirt	33,68,127	Casual	Male	S,M,L,XL	\N	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/better-as-one-tee-heather-grey	2024-12-09 08:06:36.392355	\N	\N	\N	20.00
+112	\N	shirt	203,222,217	Casual	Male	S,M,L,XL	\N	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/lifes-a-trip-tee-forest-green	2024-12-09 08:07:24.234708	\N	\N	\N	20.00
+113	\N	shirt	111,152,217	Casual	Male	S,M,L,XL	\N	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/explore-tee-white	2024-12-09 08:08:53.00458	\N	\N	\N	27.99
+114	\N	shirt	189,214,221	Casual	Male	S,M,L,XL	\N	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/world-tour-tee-light-blue	2024-12-09 08:09:31.032199	\N	\N	\N	27.99
+115	\N	shirt	225,225,223	Casual	Male	S,M,L,XL	\N	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/cracked-tee-white	2024-12-09 08:10:16.532631	\N	\N	\N	27.99
+116	\N	shirt	224,225,228	Casual	Male	S,M,L,XL	\N	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/flower-district-tee-white	2024-12-09 08:12:01.919826	\N	\N	\N	20.00
+117	\N	shirt	172,129,101	Casual	Male	S,M,L,XL	\N	https://marketstudios.com/products/dog-will-hunt-t-shirt-2	2024-12-09 08:13:00.251926	\N	\N	\N	38.00
+118	\N	shirt	193,64,51	Casual	Male	S,M,L,XL	\N	https://marketstudios.com/products/bullrider-t-shirt-2	2024-12-09 08:13:39.44088	\N	\N	\N	38.00
+119	\N	shirt	248,134,81	Casual	Male	S,M,L,XL	\N	https://marketstudios.com/products/bullrider-t-shirt-2	2024-12-09 08:14:14.912198	\N	\N	\N	38.00
+120	\N	pants	170,163,149	Casual	Male	S,M,L,XL	\N	https://mnml.la/products/mnml-denim-d152-cargo-denim-m2022-d617-bro	2024-12-09 08:19:09.449366	\N	\N	\N	81.00
+123	\N	pants	112,100,147	Casual	Male	S,M,L,XL	\N	https://mnml.la/products/mnml-bottoms-tie-dye-cargo-pants-m2023-p566-pup?refSrc=6623059902536&nosto=productpage-nosto-1-copy-1722864312997	2024-12-09 08:22:10.078528	\N	\N	\N	27.00
+124	\N	pants	120,112,124	Casual	Male	S,M,L	\N	https://reputation-studios.com/products/sakura-flare-denim-light-stone	2024-12-09 08:23:44.868539	\N	\N	\N	125.00
+125	\N	pants	133,116,100	Casual	Male	S,M,L,XL	\N	https://mnml.la/products/mnml-bottoms-bootcut-cargo-pants-m2020-p886-olv?nosto=frontpage-nosto-4-copy-1731688198721	2024-12-09 08:24:34.147821	\N	\N	\N	64.00
+126	\N	pants	160,163,165	Casual	Male	S,M,L,XL	\N	https://mnml.la/products/mnml-denim-v709-wide-bellow-cargo-denim-m2024-d897-blu	2024-12-09 08:25:17.820959	\N	\N	\N	93.00
+127	\N	shirt	168,179,197	Casual	Male	S,M,L,XL	\N	https://marketstudios.com/products/smiley-big-apple-crewneck	2024-12-09 08:26:28.960136	\N	\N	\N	113.00
+128	\N	shirt	189,114,83	Casual	Male	S,M,L,XL	\N	https://marketstudios.com/products/smiley-good-game-t-shirt	2024-12-09 08:27:32.67973	\N	\N	\N	54.00
+129	\N	shirt	202,145,148	Casual	Male	S,M,L,XL	\N	https://marketstudios.com/products/smiley-good-game-t-shirt	2024-12-09 08:28:20.004448	\N	\N	\N	54.00
+130	\N	shirt	70,81,103	Casual	Male	S,M,L,XL	\N	https://marketstudios.com/products/smiley-celebration-t-shirt	2024-12-09 08:29:24.011486	\N	\N	\N	54.00
+131	\N	shirt	34,30,36	Casual	Male	S,M,L,XL	\N	https://marketstudios.com/products/beware-sign-t-shirt	2024-12-09 08:29:59.07813	\N	\N	\N	54.00
+132	\N	pants	132,123,119	Casual	Male	S,M,L,XL	\N	https://mnml.la/products/mnml-bottoms-paneled-blanket-pants-m2022-p570-mul?srsltid=AfmBOop6OW50FnUbYz14Zit02GFwL1JozwewQDP472R3ibDin_cszWOZ	2024-12-09 08:34:42.69934	\N	\N	\N	105.00
+133	\N	shirt	188,151,114	Casual	Male	S,M,L,XL	user_images/shirt_04d0df51-1659-4414-a0c0-cfc7f6cc2224.png	https://www.jackjones.com/en-us/product/12263521_1957/oversized-fit-crew-neck-t-shirt	2024-12-11 05:01:35.846626	\N	\N	\N	25.00
+134	\N	shirt	197,204,196	Casual	Male	S,M,L,XL	user_images/shirt_58350e37-f35f-49b4-aba6-e96cc92e267b.png	https://www.jackjones.com/en-us/product/12263521_3/oversized-fit-crew-neck-t-shirt	2024-12-11 05:02:07.487382	\N	\N	\N	25.00
+135	\N	shirt	236,228,214	Casual	Male	S,M,L,XL	user_images/shirt_b28e213a-fa1a-4e7d-ac1b-33e452716339.png	https://www.jackjones.com/en-us/pro duct/12282604_4162/relaxed-fit-crew-neck-t-shirt	2024-12-11 05:02:55.658487	\N	\N	\N	30.00
+136	\N	shirt	229,230,235	Casual	Male	S,M,L,XL	user_images/shirt_81753ff5-1c22-43dc-b456-fe3ecda4fd2f.png	https://www.jackjones.com/en-us/product/12262506_5/wide-fit-crew-neck-t-shirt	2024-12-11 05:03:42.853103	\N	\N	\N	25.00
+137	\N	shirt	39,38,43	Casual	Male	S,M,L,XL	user_images/shirt_5bb23afe-fb29-4e54-a7ca-2d094a368124.png	https://www.jackjones.com/en-us/product/12262506_2161/wide-fit-crew-neck-t-shirt	2024-12-11 05:04:11.519772	\N	\N	\N	25.00
+138	\N	shirt	24,24,24	Casual	Male	S,M,L,XL	user_images/shirt_7a67182b-ebb6-4811-8ace-61889c835394.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/roses-tee-blac	2024-12-11 05:05:26.084879	\N	\N	\N	20.00
+139	\N	shirt	189,169,54	Casual	Male	S,M,L,XL	user_images/shirt_ec0fe765-6c13-4e4e-a364-afab8464e985.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/test-your-luck-tee-natural	2024-12-11 05:07:34.136239	\N	\N	\N	27.99
+140	\N	shirt	63,53,41	Casual	Male	S,M,L,XL	user_images/shirt_926a9474-8d9e-4329-a1bf-5b2842480536.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/limited-edition-tee-dark-chocolate	2024-12-11 05:08:01.112711	\N	\N	\N	27.99
+141	\N	shirt	24,24,24	Casual	Male	S,M,L,XL	user_images/shirt_9c07a264-cb1f-4226-95eb-2d0754982823.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/marathon-tee-black	2024-12-11 05:08:32.844516	\N	\N	\N	27.99
+142	\N	shirt	226,224,231	Casual	Male	S,M,L,XL	user_images/shirt_f619d3fb-7e0b-4856-984e-cd8cf388512f.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/problem-child-tee-white	2024-12-11 05:10:21.576884	\N	\N	\N	27.99
+143	\N	shirt	24,24,24	Casual	Male	S,M,L,XL	user_images/shirt_0dd5efdc-098f-461d-96b2-161e8c2e76cc.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/eye-of-the-storm-tee-natural	2024-12-11 05:10:52.610919	\N	\N	\N	27.99
+144	\N	shirt	151,146,140	Casual	Male	S,M,L,XL	user_images/shirt_455c4595-85e6-468a-b011-beba67d9138f.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/call-my-manager-tee-brown	2024-12-11 05:11:46.354238	\N	\N	\N	16.99
+145	\N	shirt	33,68,127	Casual	Male	S,M,L,XL	user_images/shirt_9a94ca1b-4297-4479-863c-e72e4f3a0497.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/better-as-one-tee-heather-grey	2024-12-11 05:12:28.916236	\N	\N	\N	20.00
+146	\N	shirt	203,222,217	Casual	Male	S,M,L	user_images/shirt_256fc997-f645-418b-99e5-54a3b1e9b8c8.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/lifes-a-trip-tee-forest-green	2024-12-11 05:23:16.201403	\N	\N	\N	20.00
+147	\N	shirt	189,214,221	Casual	Male	S,M,L	user_images/shirt_4434a5f7-7b46-4639-9320-341aa0240953.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/world-tour-tee-light-blue	2024-12-11 05:24:19.991872	\N	\N	\N	27.99
+148	\N	shirt	225,225,223	Casual	Male	S,M,L	user_images/shirt_c01286e0-4ede-4bf2-b6f5-73d9a448c1e0.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/cracked-tee-white	2024-12-11 05:25:05.370103	\N	\N	\N	27.99
+149	\N	shirt	188,151,114	Casual	Male	S,M,L,XL	user_images/shirt_8281f257-11d1-4af5-9218-3aafd2a139f0.png	https://www.jackjones.com/en-us/product/12263521_1957/oversized-fit-crew-neck-t-shirt	2024-12-14 18:32:58.31492	\N	\N	\N	25.00
+150	\N	shirt	197,204,196	Casual	Male	S,M,L,XL	user_images/shirt_d24bd054-a579-461d-b69e-0104b6ce8702.png	https://www.jackjones.com/en-us/product/12263521_3/oversized-fit-crew-neck-t-shirt	2024-12-14 18:34:37.844567	\N	\N	\N	30.00
+151	\N	shirt	236,228,214	Casual	Male	S,M,L,XL	user_images/shirt_0076e1d1-e2fd-4faf-8ada-d8db35bd65cd.png	https://www.jackjones.com/en-us/product/12262506_5/wide-fit-crew-neck-t-shirt	2024-12-17 02:23:54.823897	\N	\N	\N	25.00
+152	\N	shirt	229,230,235	Casual	Male	S,M,L,XL	user_images/shirt_d0b61f8f-32d8-4f28-8d7b-05ab9ceb736e.png	https://www.jackjones.com/en-us/product/12262506_2161/wide-fit-crew-neck-t-shirt	2024-12-17 02:26:35.229869	\N	\N	\N	25.00
+153	\N	shirt	39,38,43	Casual	Male	S,M,L,XL	user_images/shirt_70a2c32e-2287-479b-92bc-cc4f1025043a.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/roses-tee-blac	2024-12-17 02:27:39.308776	\N	\N	\N	20.00
+154	\N	shirt	24,24,24	Casual	Male	S,M,L,XL	user_images/shirt_ead27d24-360a-4e58-85a0-a1a1bc255f7e.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/roses-tee-blac	2024-12-17 02:28:54.225888	\N	\N	\N	20.00
+155	\N	shirt	189,169,54	Casual	Male	S,M,L,XL	user_images/shirt_3a1d8167-f0c1-40fd-b8bc-8a4f7158484d.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/test-your-luck-tee-natural	2024-12-17 02:29:39.105464	\N	\N	\N	27.99
+156	\N	shirt	63,53,41	Casual	Male	S,M,L,XL	user_images/shirt_918b7e2f-cab9-4e3a-9546-071e1140f60d.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/limited-edition-tee-dark-chocolate	2024-12-17 02:30:17.297989	\N	\N	\N	27.99
+157	\N	shirt	24,24,24	Casual	Male	S,M,L,XL	user_images/shirt_d32b6aef-d04e-4da0-9686-c21e9bc69efc.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/marathon-tee-black	2024-12-17 02:31:02.541807	\N	\N	\N	27.99
+158	\N	shirt	226,224,231	Casual	Male	S,M,L,XL	user_images/shirt_fdad92d8-ae79-48ed-96f8-7c034a7a945a.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/problem-child-tee-white	2024-12-17 02:31:37.226774	\N	\N	\N	27.99
+159	\N	shirt	24,24,24	Casual	Male	S,M,L,XL	user_images/shirt_f917cb54-0da9-48a3-88c5-19928cd2c7c5.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/eye-of-the-storm-tee-natural	2024-12-17 02:32:15.682249	\N	\N	\N	27.99
+160	\N	shirt	151,146,140	Casual	Male	S,M,L,XL	user_images/shirt_57901e93-d1c1-48c0-8c7a-d3dc8a141374.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/call-my-manager-tee-brown	2024-12-17 02:33:32.769174	\N	\N	\N	16.99
+161	\N	shirt	33,68,127	Casual	Male	S,M,L,XL	user_images/shirt_6d7a51b4-af52-4944-ac47-0fa608bdf504.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/better-as-one-tee-heather-grey	2024-12-17 02:34:22.264684	\N	\N	\N	20.00
+162	\N	shirt	203,222,217	Casual	Male	S,M,L,XL	user_images/shirt_87666d8e-6aaa-490e-a7c3-0d30e0c46efd.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/lifes-a-trip-tee-forest-green	2024-12-17 02:35:18.610068	\N	\N	\N	20.00
+163	\N	shirt	111,152,217	Casual	Male	S,M,L,XL	user_images/shirt_8e19fb6e-a102-4997-b82b-67a64981f5ee.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/explore-tee-white	2024-12-17 02:36:33.122413	\N	\N	\N	27.99
+164	\N	shirt	189,214,221	Casual	Male	S,M,L,XL	user_images/shirt_be6f68ed-a0cd-4659-9d87-9e938dccc9e0.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/world-tour-tee-light-blue	2024-12-17 02:37:06.64847	\N	\N	\N	27.99
+165	\N	shirt	225,225,223	Casual	Male	S,M,L,XL	user_images/shirt_40f8bebe-7f81-47f1-af99-689ae6caf653.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/cracked-tee-white	2024-12-17 02:37:45.136471	\N	\N	\N	27.99
+166	\N	shirt	224,225,228	Casual	Male	S,M,L,XL	user_images/shirt_3b96b24f-1d31-4208-a6f3-872387c053e0.png	https://www.youngandreckless.com/collections/mens-tops-graphic-tees/products/flower-district-tee-white	2024-12-17 02:38:29.642025	\N	\N	\N	20.00
+167	\N	shirt	172,129,101	Casual	Male	S,M,L,XL	user_images/shirt_5d0a3329-9b86-49ca-a366-22addfa9a394.png	https://marketstudios.com/products/dog-will-hunt-t-shirt-2	2024-12-18 01:07:08.662562	\N	\N	\N	38.00
+169	\N	shirt	248,134,81	Casual	Male	S,M,L,XL	user_images/shirt_c3eecb31-96ed-4c55-859c-68d1bd32a74d.png	https://marketstudios.com/products/bullrider-t-shirt-2	2024-12-18 01:08:34.524068	\N	\N	\N	38.00
+170	\N	pants	170,163,149	Casual	Male	S,M,L,XL	user_images/pants_60e12fc8-c622-4b4c-b7ca-cb5df8a6151e.png	https://mnml.la/products/mnml-denim-d152-cargo-denim-m2022-d617-bro	2024-12-18 01:09:19.276487	\N	\N	\N	81.00
+171	\N	pants	165,167,160	Casual	Male	S,M,L,XL	user_images/pants_058487c0-c9cb-480b-9061-f976c8793f52.png	https://mnml.la/products/mnml-denim-x511-denim-m2023-d884-blu	2024-12-18 01:10:04.205742	\N	\N	\N	76.00
+172	\N	pants	186,185,183	Casual	Male	S,M,L,XL	user_images/pants_3198c86b-1bae-409a-a905-0f5f04646542.png	https://mnml.la/products/mnml-bottoms-relaxed-every-day-sweatpants-m2022-w634-gry	2024-12-18 01:10:53.259917	\N	\N	\N	57.00
+168	\N	shirt	0,0,0	Casual	Male	S,M,L,XL	user_images/shirt_c4d4d609-8736-4a67-86e7-31d74a2c4a0f.png	https://marketstudios.com/products/bullrider-t-shirt-2	2024-12-18 01:07:50.855099	\N	\N	\N	38.00
+173	\N	pants	112,100,147	Casual	Male	S,M,L,XL	user_images/pants_4c352f53-095d-4e55-a858-761255491a0b.png	https://mnml.la/products/mnml-bottoms-tie-dye-cargo-pants-m2023-p566-pup?refSrc=6623059902536&nosto=productpage-nosto-1-copy-1722864312997	2024-12-18 01:11:42.444696	\N	\N	\N	27.00
+174	\N	pants	120,112,124	Casual	Male	S,M	user_images/pants_2fb1a6fc-0c50-412b-bb46-6d75c6a9a77f.png	https://reputation-studios.com/products/sakura-flare-denim-light-stone	2024-12-18 01:13:35.413336	\N	\N	\N	125.00
+175	\N	pants	133,116,100	Casual	Male	S,M,L,XL	user_images/pants_8db80d5f-d85f-4617-9506-4e4cef1e144a.png	https://mnml.la/products/mnml-bottoms-bootcut-cargo-pants-m2020-p886-olv?nosto=frontpage-nosto-4-copy-1731688198721	2024-12-18 01:14:25.70329	\N	\N	\N	64.00
+176	\N	pants	160,163,165	Casual	Male	S,M,L,XL	user_images/pants_219bf07d-d151-4829-b6c2-84708cf8d8c2.png	https://mnml.la/products/mnml-denim-v709-wide-bellow-cargo-denim-m2024-d897-blu	2024-12-18 01:15:14.597773	\N	\N	\N	93.00
+177	\N	shirt	168,179,197	Casual	Male	S,M,L,XL	user_images/shirt_3b21749b-cfe8-4b71-87a5-37519a3865d6.png	https://marketstudios.com/products/smiley-big-apple-crewneck	2024-12-18 01:16:16.81118	\N	\N	\N	113.00
+178	\N	shirt	189,114,83	Casual	Male	S,M,L,XL	user_images/shirt_084b5d25-4e80-4395-9108-b99fc5df0056.png	https://marketstudios.com/products/smiley-good-game-t-shirt	2024-12-18 01:16:55.353061	\N	\N	\N	54.00
+179	\N	shirt	202,145,148	Casual	Male	S,M,L,XL	user_images/shirt_1794e368-bcd2-4dc2-bf0c-7598bf135d80.png	https://marketstudios.com/products/smiley-good-game-t-shirt	2024-12-18 01:17:39.531685	\N	\N	\N	54.00
+180	\N	shirt	70,81,103	Casual	Male	S,M,L,XL	user_images/shirt_c55758fa-d7a4-4cec-adb3-427d5106314b.png	https://marketstudios.com/products/smiley-celebration-t-shirt	2024-12-18 01:18:13.905709	\N	\N	\N	54.00
+182	\N	pants	132,123,119	Casual	Male	S,M,L,XL	user_images/pants_4a3ebf0a-8db6-4d11-9e4f-b0a163ea1c17.png	https://mnml.la/products/mnml-bottoms-paneled-blanket-pants-m2022-p570-mul?srsltid=AfmBOop6OW50FnUbYz14Zit02GFwL1JozwewQDP472R3ibDin_cszWOZ	2024-12-18 01:19:28.874377	\N	\N	\N	105.00
+181	\N	shirt	236,236,236	Casual	Male	S,M,L,XL	user_images/shirt_c6f03b48-610f-440f-8678-44bfdac8aa45.png	https://marketstudios.com/products/beware-sign-t-shirt	2024-12-18 01:18:44.975983	\N	\N	\N	54.00
+\.
+
+
+--
+-- Data for Name: user_items; Type: TABLE DATA; Schema: public; Owner: neondb_owner
+--
+
+COPY public.user_items (id, type, color, style, gender, size, image_path, hyperlink, tags, season, notes, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: neondb_owner
+--
+
+COPY public.users (id, username, email, password_hash, role, created_at, full_name, bio, profile_picture_path, preferences, last_login, two_factor_secret, two_factor_enabled, email_verified, verification_code, verification_code_expires) FROM stdin;
+1	user1	neoniv3@gmail.com	\\x24326224313224613238785168304c7264646a41496238636a6b39364f4350636a344b51426132535a536d52393235484e39515562443630472e5a69	user	2024-12-15 00:38:59.454742	\N	\N	\N	{}	\N	\N	f	f	\N	\N
+4	neoniv3	keenanace3@gmail.com	\\x2432622431322450504a2e2f64734c75753345624a6e6e6272534157757a316d634c614b6657776b6a664b38525048537930674b37474f664d794b75	user	2024-12-21 02:32:12.804203	\N	\N	\N	{}	\N	\N	f	f	\N	\N
+8	kk	keenannewton242@gmail.com	\\x24326224313224774742734d4c67692f462f49454a756e48536972642e34564f6c6347477a5544784f6174444834556677777248487a36454e387861	user	2024-12-21 03:00:13.541267	\N	\N	\N	{}	\N	\N	f	f	\N	\N
+10	keenan	keenannace@gmail.com	\\x243262243132245155616a65595133427854306b35494d58375555752e4e7232644b3257566f636c654b2f4c2f676d74682e4c6d6c736579484b566d	admin	2024-12-22 01:44:45.977436	\N	\N	\N	{}	\N	\N	f	f	\N	\N
+5	keenanace1	keenanace@gmail.com	\\x24326224313224516752485931786651377279776a597a3053452e682e6b4568385863384d3744787876786a5a4a39724f53304a576d6e4432457961	admin	2024-12-21 02:48:50.642287	\N	\N	\N	{}	2024-12-22 01:46:55.091516	\N	f	f	\N	\N
+13	k2	sandyfingernails@gmaail.com	\\x24326224313224743432314253645376514871726e6348622f5437552e6a357a7879797459667259356f444a2e4e6151663970444e384a4a5558594b	admin	2024-12-22 14:45:03.917881	\N	\N	\N	{}	\N	\N	f	f	757262	2024-12-22 14:55:04.469931
+14	k3	sandyfingernails3@gmail.com	\\x2432622431322456564c3943726c7352352f6454546a383833494f73654542455a6451575263572e57356b49436a766d38766973345539356d746243	admin	2024-12-22 14:58:10.778839	\N	\N	\N	{}	\N	\N	f	f	790557	2024-12-22 15:08:11.373004
+15	test_user	test@example.com	\\x64756d6d795f68617368	user	2024-12-24 02:13:15.487308	\N	\N	\N	{}	\N	\N	f	f	\N	\N
+16	test1	test2@gmail.com	\\x243262243132245831425674532f636c6e7a464b454f766f4d534d4a65557676654677366b5571552e69622e67416c52725446475466667979645561	user	2024-12-25 20:12:19.981593	\N	\N	\N	{}	2024-12-26 09:31:22.319935	\N	f	f	\N	\N
+\.
+
+
+--
+-- Name: cleanup_settings_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
+--
+
+SELECT pg_catalog.setval('public.cleanup_settings_id_seq', 1, true);
+
+
+--
+-- Name: clothing_items_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
+--
+
+SELECT pg_catalog.setval('public.clothing_items_id_seq', 1, false);
+
+
+--
+-- Name: item_color_history_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
+--
+
+SELECT pg_catalog.setval('public.item_color_history_id_seq', 1, false);
+
+
+--
+-- Name: item_edit_history_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
+--
+
+SELECT pg_catalog.setval('public.item_edit_history_id_seq', 1, false);
+
+
+--
+-- Name: item_price_history_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
+--
+
+SELECT pg_catalog.setval('public.item_price_history_id_seq', 159, true);
+
+
+--
+-- Name: orphaned_items_audit_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
+--
+
+SELECT pg_catalog.setval('public.orphaned_items_audit_id_seq', 61, true);
+
+
+--
+-- Name: recycle_bin_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
+--
+
+SELECT pg_catalog.setval('public.recycle_bin_id_seq', 1, false);
+
+
+--
+-- Name: saved_outfits_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
+--
+
+SELECT pg_catalog.setval('public.saved_outfits_id_seq', 56, true);
+
+
+--
+-- Name: shared_outfits_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
+--
+
+SELECT pg_catalog.setval('public.shared_outfits_id_seq', 1, false);
+
+
+--
+-- Name: user_clothing_items_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
+--
+
+SELECT pg_catalog.setval('public.user_clothing_items_id_seq', 182, true);
+
+
+--
+-- Name: user_items_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
+--
+
+SELECT pg_catalog.setval('public.user_items_id_seq', 1, false);
+
+
+--
+-- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: neondb_owner
+--
+
+SELECT pg_catalog.setval('public.users_id_seq', 16, true);
+
+
+--
+-- Name: cleanup_settings cleanup_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.cleanup_settings
+    ADD CONSTRAINT cleanup_settings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: clothing_items clothing_items_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.clothing_items
+    ADD CONSTRAINT clothing_items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: item_color_history item_color_history_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.item_color_history
+    ADD CONSTRAINT item_color_history_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: item_edit_history item_edit_history_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.item_edit_history
+    ADD CONSTRAINT item_edit_history_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: item_price_history item_price_history_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.item_price_history
+    ADD CONSTRAINT item_price_history_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: orphaned_items_audit orphaned_items_audit_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.orphaned_items_audit
+    ADD CONSTRAINT orphaned_items_audit_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: recycle_bin recycle_bin_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.recycle_bin
+    ADD CONSTRAINT recycle_bin_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: saved_outfits saved_outfits_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.saved_outfits
+    ADD CONSTRAINT saved_outfits_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: shared_outfits shared_outfits_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.shared_outfits
+    ADD CONSTRAINT shared_outfits_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: item_price_history unique_price_change; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.item_price_history
+    ADD CONSTRAINT unique_price_change UNIQUE (item_id, changed_at);
+
+
+--
+-- Name: user_clothing_items user_clothing_items_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.user_clothing_items
+    ADD CONSTRAINT user_clothing_items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: user_items user_items_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.user_items
+    ADD CONSTRAINT user_items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_email_key UNIQUE (email);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_username_key; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_username_key UNIQUE (username);
+
+
+--
+-- Name: idx_deleted_at; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_deleted_at ON public.recycle_bin USING btree (deleted_at);
+
+
+--
+-- Name: idx_item_color_history_item_id; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_item_color_history_item_id ON public.item_color_history USING btree (item_id);
+
+
+--
+-- Name: idx_item_edit_history; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_item_edit_history ON public.item_edit_history USING btree (item_id, edited_at);
+
+
+--
+-- Name: idx_item_price_history_changed_at; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_item_price_history_changed_at ON public.item_price_history USING btree (changed_at);
+
+
+--
+-- Name: idx_item_price_history_item_id; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_item_price_history_item_id ON public.item_price_history USING btree (item_id);
+
+
+--
+-- Name: idx_outfit_id; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_outfit_id ON public.saved_outfits USING btree (outfit_id);
+
+
+--
+-- Name: idx_outfit_tags; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_outfit_tags ON public.saved_outfits USING gin (tags);
+
+
+--
+-- Name: idx_saved_outfits_user; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_saved_outfits_user ON public.saved_outfits USING btree (user_id);
+
+
+--
+-- Name: idx_saved_outfits_user_id; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_saved_outfits_user_id ON public.saved_outfits USING btree (user_id);
+
+
+--
+-- Name: idx_shared_outfits_by_user; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_shared_outfits_by_user ON public.shared_outfits USING btree (shared_by_user_id);
+
+
+--
+-- Name: idx_shared_outfits_outfit; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_shared_outfits_outfit ON public.shared_outfits USING btree (outfit_id);
+
+
+--
+-- Name: idx_shared_outfits_users; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_shared_outfits_users ON public.shared_outfits USING btree (shared_by_user_id, shared_with_user_id);
+
+
+--
+-- Name: idx_shared_outfits_with_user; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_shared_outfits_with_user ON public.shared_outfits USING btree (shared_with_user_id);
+
+
+--
+-- Name: idx_style; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_style ON public.user_clothing_items USING btree (style);
+
+
+--
+-- Name: idx_tags; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_tags ON public.user_clothing_items USING gin (tags);
+
+
+--
+-- Name: idx_type; Type: INDEX; Schema: public; Owner: neondb_owner
+--
+
+CREATE INDEX idx_type ON public.user_clothing_items USING btree (type);
+
+
+--
+-- Name: clothing_items clothing_items_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.clothing_items
+    ADD CONSTRAINT clothing_items_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: item_color_history item_color_history_item_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.item_color_history
+    ADD CONSTRAINT item_color_history_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.user_clothing_items(id);
+
+
+--
+-- Name: item_edit_history item_edit_history_item_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.item_edit_history
+    ADD CONSTRAINT item_edit_history_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.user_clothing_items(id);
+
+
+--
+-- Name: item_price_history item_price_history_item_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.item_price_history
+    ADD CONSTRAINT item_price_history_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.user_clothing_items(id) ON DELETE CASCADE;
+
+
+--
+-- Name: recycle_bin recycle_bin_original_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.recycle_bin
+    ADD CONSTRAINT recycle_bin_original_id_fkey FOREIGN KEY (original_id) REFERENCES public.user_clothing_items(id) ON DELETE SET NULL;
+
+
+--
+-- Name: saved_outfits saved_outfits_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.saved_outfits
+    ADD CONSTRAINT saved_outfits_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: shared_outfits shared_outfits_outfit_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.shared_outfits
+    ADD CONSTRAINT shared_outfits_outfit_id_fkey FOREIGN KEY (outfit_id) REFERENCES public.saved_outfits(id);
+
+
+--
+-- Name: shared_outfits shared_outfits_shared_by_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.shared_outfits
+    ADD CONSTRAINT shared_outfits_shared_by_user_id_fkey FOREIGN KEY (shared_by_user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: shared_outfits shared_outfits_shared_with_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.shared_outfits
+    ADD CONSTRAINT shared_outfits_shared_with_user_id_fkey FOREIGN KEY (shared_with_user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: DEFAULT PRIVILEGES FOR SEQUENCES; Type: DEFAULT ACL; Schema: public; Owner: cloud_admin
+--
+
+ALTER DEFAULT PRIVILEGES FOR ROLE cloud_admin IN SCHEMA public GRANT ALL ON SEQUENCES TO neon_superuser WITH GRANT OPTION;
+
+
+--
+-- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: public; Owner: cloud_admin
+--
+
+ALTER DEFAULT PRIVILEGES FOR ROLE cloud_admin IN SCHEMA public GRANT ALL ON TABLES TO neon_superuser WITH GRANT OPTION;
+
+
+--
+-- PostgreSQL database dump complete
+--
+

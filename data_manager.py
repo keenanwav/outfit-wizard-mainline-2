@@ -21,6 +21,7 @@ from contextlib import contextmanager
 import time
 from functools import wraps
 from typing import Tuple, List, Dict
+from concurrent.futures import ThreadPoolExecutor
 
 # Initialize connection pool
 MIN_CONNECTIONS = 1
@@ -454,29 +455,29 @@ def save_outfit(outfit):
     try:
         if 'user' not in st.session_state:
             return None, "User not logged in"
-
+        
         user_id = st.session_state.user['id']
         user_wardrobe = get_user_wardrobe_path(user_id)
-
+        
         outfit_id = str(uuid.uuid4())
         outfit_filename = f"outfit_{outfit_id}.png"
         outfit_path = os.path.join(user_wardrobe, outfit_filename)
-
+        
         if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
             Image.open(outfit['merged_image_path']).save(outfit_path)
         else:
             total_width = 600
             height = 200
             outfit_img = Image.new('RGB', (total_width, height), (255, 255, 255))
-
+            
             for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
                 if item_type in outfit:
                     item_img = Image.open(outfit[item_type]['image_path'])
                     item_img = item_img.resize((200, 200))
                     outfit_img.paste(item_img, (i * 200, 0))
-
+            
             outfit_img.save(outfit_path)
-
+        
         with get_db_connection() as conn:
             cur = conn.cursor()
             try:
@@ -485,12 +486,12 @@ def save_outfit(outfit):
                     VALUES (%s, %s, %s)
                     RETURNING outfit_id
                 """, (outfit_id, user_id, outfit_path))
-
+                
                 conn.commit()
                 return outfit_path, "Outfit saved successfully"
             finally:
                 cur.close()
-
+        
     except Exception as e:
         logging.error(f"Error saving outfit: {str(e)}")
         return None, f"Error saving outfit: {str(e)}"
@@ -514,7 +515,7 @@ def load_saved_outfits(user_id: int = None):
                     FROM saved_outfits 
                     ORDER BY created_at DESC
                 """)
-
+            
             outfits = cur.fetchall()
             if outfits:
                 return [{
@@ -535,26 +536,26 @@ def share_outfit(outfit_id: int, shared_by_user_id: int, shared_with_user_id: in
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
-
+            
             # Verify the outfit exists and belongs to the sharing user
             cur.execute("""
                 SELECT id FROM saved_outfits 
                 WHERE id = %s AND user_id = %s
             """, (outfit_id, shared_by_user_id))
-
+            
             if not cur.fetchone():
                 return False, "Outfit not found or you don't have permission to share it"
-
+            
             # Check if outfit is already shared with this user
             cur.execute("""
                 SELECT id FROM shared_outfits 
                 WHERE outfit_id = %s 
                 AND shared_with_user_id = %s
             """, (outfit_id, shared_with_user_id))
-
+            
             if cur.fetchone():
                 return False, "Outfit already shared with this user"
-
+            
             # Share the outfit
             cur.execute("""
                 INSERT INTO shared_outfits 
@@ -562,10 +563,10 @@ def share_outfit(outfit_id: int, shared_by_user_id: int, shared_with_user_id: in
                 VALUES (%s, %s, %s)
                 RETURNING id
             """, (outfit_id, shared_by_user_id, shared_with_user_id))
-
+            
             conn.commit()
             return True, "Outfit shared successfully"
-
+        
     except Exception as e:
         logging.error(f"Error sharing outfit: {str(e)}")
         return False, f"Error sharing outfit: {str(e)}"
@@ -576,7 +577,7 @@ def get_shared_outfits(user_id: int) -> List[Dict]:
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
-
+            
             cur.execute("""
                 SELECT 
                     so.outfit_id,
@@ -593,7 +594,7 @@ def get_shared_outfits(user_id: int) -> List[Dict]:
                 WHERE so.shared_with_user_id = %s
                 ORDER BY so.shared_at DESC
             """, (user_id,))
-
+            
             shared_outfits = cur.fetchall()
             if shared_outfits:
                 return [{
@@ -607,7 +608,7 @@ def get_shared_outfits(user_id: int) -> List[Dict]:
                     'notes': outfit[7]
                 } for outfit in shared_outfits]
             return []
-
+        
     except Exception as e:
         logging.error(f"Error getting shared outfits: {str(e)}")
         return []
@@ -618,7 +619,7 @@ def remove_shared_outfit(outfit_id: int, shared_by_user_id: int, shared_with_use
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
-
+            
             cur.execute("""
                 DELETE FROM shared_outfits 
                 WHERE outfit_id = %s 
@@ -626,12 +627,12 @@ def remove_shared_outfit(outfit_id: int, shared_by_user_id: int, shared_with_use
                 AND shared_with_user_id = %s
                 RETURNING id
             """, (outfit_id, shared_by_user_id, shared_with_user_id))
-
+            
             if cur.fetchone():
                 conn.commit()
                 return True, "Shared outfit removed successfully"
             return False, "Shared outfit not found"
-
+        
     except Exception as e:
         logging.error(f"Error removing shared outfit: {str(e)}")
         return False, f"Error removing shared outfit: {str(e)}"
@@ -642,21 +643,21 @@ def get_sharable_users(current_user_id: int) -> List[Dict]:
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
-
+            
             cur.execute("""
                 SELECT id, name, email 
                 FROM users 
                 WHERE id != %s
                 ORDER BY name
             """, (current_user_id,))
-
+            
             users = cur.fetchall()
             return [{
                 'id': user[0],
                 'name': user[1],
                 'email': user[2]
             } for user in users]
-
+        
     except Exception as e:
         logging.error(f"Error getting sharable users: {str(e)}")
         return []
@@ -1134,137 +1135,6 @@ def get_price_history(item_id):
             cur.close()
 
 @retry_on_error()
-def record_price_change(item_id, new_price):
-    """Record a price change in history"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            # Get the current price
-            cur.execute("SELECT price FROM user_clothing_items WHERE id = %s", (item_id,))
-            current_price = cur.fetchone()
-            
-            if current_price and current_price[0] != new_price:
-                # Record the new price in history
-                cur.execute("""
-                    INSERT INTO item_price_history (item_id, price)
-                    VALUES (%s, %s)
-                """, (item_id, new_price))
-                conn.commit()
-                return True
-            return False
-        finally:
-            cur.close()
-
-@retry_on_error()
-def record_color_change(item_id, old_color, new_color):
-    """Record a color change in history"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            cur.execute("""
-                INSERT INTO item_color_history (item_id, old_color, new_color)
-                VALUES (%s, %s, %s)
-            """, (item_id, old_color, new_color))
-            conn.commit()
-            return True
-        except Exception as e:
-            logging.error(f"Error recording color change: {str(e)}")
-            return False
-        finally:
-            cur.close()
-
-@retry_on_error()
-def get_color_history(item_id):
-    """Get color history for an item"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            cur.execute("""
-                SELECT old_color, new_color, changed_at
-                FROM item_color_history
-                WHERE item_id = %s
-                ORDER BY changed_at DESC
-            """, (item_id,))
-            return cur.fetchall()
-        finally:
-            cur.close()
-
-@retry_on_error()
-def update_item_image(item_id: int, new_image_path: str) -> Tuple[bool, str]:
-    """Update the image of an existing clothing item"""
-    try:
-        # Get the current image path first
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            try:
-                cur.execute(
-                    "SELECT image_path FROM user_clothing_items WHERE id = %s",
-                    (item_id,)
-                )
-                result = cur.fetchone()
-                if not result:
-                    return False, f"Item with ID {item_id} not found"
-                
-                old_image_path = result[0]
-                
-                # Generate new image path
-                new_filename = f"updated_{uuid.uuid4()}.png"
-                final_image_path = os.path.join("user_images", new_filename)
-                
-                # Save the new image
-                with Image.open(new_image_path) as img:
-                    img.save(final_image_path)
-                
-                # Update the database with new image path
-                cur.execute(
-                    "UPDATE user_clothing_items SET image_path = %s WHERE id = %s",
-                    (final_image_path, item_id)
-                )
-                
-                conn.commit()
-                
-                # Delete the old image if it exists
-                if old_image_path and os.path.exists(old_image_path):
-                    try:
-                        os.remove(old_image_path)
-                    except Exception as e:
-                        logging.warning(f"Failed to delete old image {old_image_path}: {str(e)}")
-                
-                # Delete the temporary uploaded image
-                if os.path.exists(new_image_path):
-                    try:
-                        os.remove(new_image_path)
-                    except Exception as e:
-                        logging.warning(f"Failed to delete temporary image {new_image_path}: {str(e)}")
-                
-                return True, "Image updated successfully"
-                
-            finally:
-                cur.close()
-                
-    except Exception as e:
-        logging.error(f"Error updating item image: {str(e)}")
-        return False, f"Failed to update image: {str(e)}"
-
-@retry_on_error()
-def get_price_history(item_id):
-    """Get price history for an item"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            cur.execute("""
-                SELECT price, created_at
-                FROM item_price_history
-                WHERE item_id = %s
-                ORDER BY created_at DESC
-            """, (item_id,))
-            
-            history = cur.fetchall()
-            return [(float(price), date) for price, date in history] if history else []
-        finally:
-            cur.close()
-
-@retry_on_error()
 def get_cleanup_settings():
     """Get cleanup settings from database"""
     with get_db_connection() as conn:
@@ -1404,3 +1274,92 @@ def cleanup_orphaned_entries():
             return False, f"Cleanup failed: {str(e)}"
         finally:
             cur.close()
+
+@retry_on_error()
+def bulk_delete_items(item_ids: List[int]) -> Tuple[bool, str, Dict]:
+    """Delete multiple clothing items in bulk with their associated files
+
+    Args:
+        item_ids: List of item IDs to delete
+
+    Returns:
+        Tuple containing:
+        - Success status (bool)
+        - Status message (str)
+        - Statistics dictionary with counts of successes and failures
+    """
+    if not item_ids:
+        return True, "No items to delete", {"deleted": 0, "failed": 0}
+
+    stats = {
+        "deleted": 0,
+        "failed": 0,
+        "errors": []
+    }
+
+    # Process deletions in batches using thread pool
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        # Split into reasonable batch sizes
+        batch_size = 10
+        batches = [item_ids[i:i + batch_size] for i in range(0, len(item_ids), batch_size)]
+
+        # Process each batch
+        for batch in batches:
+            try:
+                with get_db_connection() as conn:
+                    cur = conn.cursor()
+                    try:
+                        # Get image paths for the batch
+                        placeholders = ','.join(['%s'] * len(batch))
+                        cur.execute(f"""
+                            SELECT id, image_path 
+                            FROM user_clothing_items 
+                            WHERE id IN ({placeholders})
+                        """, tuple(batch))
+                        items = cur.fetchall()
+
+                        for item_id, image_path in items:
+                            try:
+                                # Delete the image file if it exists
+                                if image_path and os.path.exists(image_path):
+                                    os.remove(image_path)
+
+                                # Delete from database
+                                cur.execute("""
+                                    DELETE FROM user_clothing_items 
+                                    WHERE id = %s
+                                """, (item_id,))
+
+                                stats["deleted"] += 1
+                                logging.info(f"Successfully deleted item {item_id}")
+
+                            except Exception as e:
+                                stats["failed"] += 1
+                                error_msg = f"Failed to delete item {item_id}: {str(e)}"
+                                stats["errors"].append(error_msg)
+                                logging.error(error_msg)
+
+                        conn.commit()
+                    except Exception as e:
+                        conn.rollback()
+                        raise
+                    finally:
+                        cur.close()
+
+            except Exception as e:
+                batch_error = f"Batch processing error: {str(e)}"
+                stats["errors"].append(batch_error)
+                logging.error(batch_error)
+                stats["failed"] += len(batch)
+
+    # Prepare result message
+    message = f"Deleted {stats['deleted']} items"
+    if stats["failed"] > 0:
+        message += f", {stats['failed']} failed"
+
+    success = stats["failed"] == 0
+
+    if stats["errors"]:
+        logging.warning("Bulk delete errors:\n" + "\n".join(stats["errors"]))
+
+    return success, message, stats

@@ -1,9 +1,30 @@
-import streamlit as st
 import os
-from PIL import Image, ImageDraw, ImageFont
-import numpy as np
-import pandas as pd
-from collections import Counter
+import logging
+from datetime import datetime, timedelta
+import time
+from contextlib import contextmanager
+import uuid
+
+# Initialize logging first
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+# Try imports with error handling
+try:
+    import streamlit as st
+    import pandas as pd
+    import numpy as np
+    from PIL import Image, ImageDraw, ImageFont
+    from sklearn.preprocessing import LabelEncoder
+    from sklearn.metrics.pairwise import cosine_similarity
+except ImportError as e:
+    logger.error(f"Failed to import required packages: {str(e)}")
+    raise
+
+# Import local modules
 from auth_utils import init_auth_tables, init_session_state, create_user, authenticate_user, logout_user
 from data_manager import (
     load_clothing_items, save_outfit, load_saved_outfits,
@@ -11,18 +32,22 @@ from data_manager import (
     add_user_clothing_item, update_outfit_details,
     get_outfit_details, update_item_details, delete_saved_outfit,
     get_price_history, update_item_image, get_db_connection,
-    share_outfit, get_shared_outfits, remove_shared_outfit, get_sharable_users
+    share_outfit, get_shared_outfits, remove_shared_outfit, get_sharable_users,
+    bulk_delete_items, cleanup_merged_outfits, get_cleanup_statistics
 )
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics.pairwise import cosine_similarity
-import logging
 from color_utils import get_color_palette, display_color_palette, rgb_to_hex, parse_color_string, get_color_name
-from outfit_generator import generate_outfit, bulk_delete_items, is_valid_image
-from datetime import datetime, timedelta
+from outfit_generator import generate_outfit, is_valid_image
 from style_assistant import get_style_recommendation, format_clothing_items
-import time
-from recommendation_engine import PersonalizedRecommender # Added import
+from recommendation_engine import PersonalizedRecommender
 
+
+# Configure Streamlit page settings
+st.set_page_config(
+    page_title="Outfit Wizard",
+    page_icon="👕",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 def create_mannequin_outfit_image(recommended_items, weather=None, template_size=(800, 1000)):
     """Create a visualization of the outfit using the mannequin template and clothing templates"""
@@ -97,7 +122,7 @@ def create_style_recipe_image(recommendation, template_size=(1000, 1200)):
     image.paste(header_gradient, (0, 0))
 
     # Add title
-    draw.text((template_size[0]//2, 60), "✨ Your Magical Style Recipe ✨",
+    draw.text((template_size[0] // 2, 60), "✨ Your Magical Style Recipe ✨",
               font=title_font, fill='white', anchor="mm")
 
     # Parse recommendation text into sections
@@ -127,10 +152,10 @@ def create_style_recipe_image(recommendation, template_size=(1000, 1200)):
     y_offset = 150
     for section_title, content in sections.items():
         # Section header with gradient background
-        draw.rectangle([(50, y_offset), (template_size[0]-50, y_offset+50)],
-                      fill='#4ecdc4')
-        draw.text((75, y_offset+25), f"{section_title}",
-                 font=heading_font, fill='white', anchor="lm")
+        draw.rectangle([(50, y_offset), (template_size[0] - 50, y_offset + 50)],
+                       fill='#4ecdc4')
+        draw.text((75, y_offset + 25), f"{section_title}",
+                  font=heading_font, fill='white', anchor="lm")
 
         # Section content with wrapped text
         y_offset += 70
@@ -157,8 +182,8 @@ def create_style_recipe_image(recommendation, template_size=(1000, 1200)):
 
     # Add recommended items if available
     if recommendation['recommended_items']:
-        draw.text((template_size[0]//2, y_offset), "Recommended Pieces",
-                 font=heading_font, fill='#4ecdc4', anchor="mm")
+        draw.text((template_size[0] // 2, y_offset), "Recommended Pieces",
+                  font=heading_font, fill='#4ecdc4', anchor="mm")
         y_offset += 50
 
         # Calculate thumbnail size and positions
@@ -177,13 +202,13 @@ def create_style_recipe_image(recommendation, template_size=(1000, 1200)):
 
                 # Add item details below thumbnail
                 details_y = y_offset + thumb_size + 10
-                draw.text((x_pos + thumb_size//2, details_y),
-                         f"{item['type'].capitalize()}",
-                         font=body_font, fill='#4ecdc4', anchor="mm")
+                draw.text((x_pos + thumb_size // 2, details_y),
+                          f"{item['type'].capitalize()}",
+                          font=body_font, fill='#4ecdc4', anchor="mm")
 
     # Add decorative footer
     footer_gradient = Image.new('RGB', (template_size[0], 50), '#4ecdc4')
-    image.paste(footer_gradient, (0, template_size[1]-50))
+    image.paste(footer_gradient, (0, template_size[1] - 50))
 
     # Generate unique filename
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -298,9 +323,11 @@ def load_custom_css():
     with open("static/style.css") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
+
 # Initialize session state for price visibility
 if 'show_prices' not in st.session_state:
     st.session_state.show_prices = True
+
 
 def show_first_visit_tips():
     """Show first-visit tips in the sidebar"""
@@ -323,6 +350,7 @@ def show_first_visit_tips():
                 st.session_state.show_tips = False
                 st.rerun()
 
+
 def bulk_delete_clothing_items(item_ids):
     """Delete multiple clothing items in bulk"""
     try:
@@ -338,6 +366,7 @@ def bulk_delete_clothing_items(item_ids):
         st.error(f"Error during bulk delete: {str(e)}")
         return False
 
+
 def main_page():
     """Display main page with outfit generation"""
     load_custom_css()
@@ -346,6 +375,8 @@ def main_page():
     # Initialize session state for current outfit
     if 'current_outfit' not in st.session_state:
         st.session_state.current_outfit = None
+    if 'missing_items' not in st.session_state:
+        st.session_state.missing_items = []
 
     # Load clothing items
     items_df = load_clothing_items()
@@ -396,8 +427,9 @@ def main_page():
         if st.button("🔄 Generate Outfit"):
             with st.spinner("🔮 Generating your perfect outfit..."):
                 # Generate the outfit
-                outfit, missing_items = generate_outfit(items_df, size, style, gender)
-                st.session_state.current_outfit = outfit
+                outfit, missing_items = generate_and_save_outfit(items_df, size, style, gender)
+                #st.session_state.current_outfit = outfit
+
 
         # Display current outfit details if available
         if st.session_state.current_outfit:
@@ -405,11 +437,11 @@ def main_page():
 
             # Display outfit image in the left column
             with outfit_col:
-                if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
+                if 'merged_image_path' in outfit and outfit['merged_image_path'] and os.path.exists(outfit['merged_image_path']):
                     st.image(outfit['merged_image_path'], use_column_width=True)
 
-                if missing_items:
-                    st.warning(f"Missing items: {', '.join(missing_items)}")
+                if st.session_state.missing_items:
+                    st.warning(f"Missing items: {', '.join(st.session_state.missing_items)}")
 
             # Display prices and colors in the right column with animation
             with price_col:
@@ -444,7 +476,7 @@ def main_page():
                 for item_type, item in outfit.items():
                     if item_type not in ['merged_image_path', 'total_price'] and isinstance(item, dict):
                         st.markdown(f"**{item_type.capitalize()}**")
-                        color = parse_color_string(str(item['color']))
+                        color = parse_color_string(str(item.get('color', 'rgb(0,0,0)')))
                         display_color_palette([color])
 
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -468,7 +500,7 @@ def main_page():
             with col1:
                 if st.button("💾 Save Outfit"):
                     if st.session_state.user:
-                        saved_path, message = save_outfit(outfit, user_id=st.session_state.user['id'])
+                        saved_path, message = save_outfit_with_validation(outfit, user_id=st.session_state.user['id'])
                         if saved_path:
                             st.success(message)
 
@@ -780,14 +812,15 @@ def main_page():
                     if os.path.exists(recipe_image_path):
                         st.image(recipe_image_path, use_column_width=True)
 
-                                                # Add download button for the recipe image
+                        # Add download button for the recipe image
                         with open(recipe_image_path, 'rb') as file:
                             st.download_button(
                                 label="📥 Download Style Recipe",
                                 data=file,
-                                file_name=os.path.basename(recipe_image_path),
+                                file_name=f"style_recipe_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
                                 mime="image/png"
                             )
+
                     else:
                         st.error("Failed to generate style recipe image")
 
@@ -823,7 +856,7 @@ def main_page():
                     st.markdown('</div>', unsafe_allow_html=True)
                     with col1:
                         if st.button("💾 Save Outfit"):
-                            saved_path, message = save_outfit(outfit, st.session_state.user['id'])
+                            saved_path, message = save_outfit_with_validation(outfit, st.session_state.user['id'])
                             if saved_path:
                                 st.success(message)
                             else:
@@ -997,7 +1030,7 @@ def main_page():
 
                         # Add save button for the personalized outfit
                         if st.button("💾 Save This Outfit"):
-                            saved_path, message = save_outfit(outfit, st.session_state.user['id'])
+                            saved_path, message = save_outfit_with_validation(outfit, st.session_state.user['id'])
                             if saved_path:
                                 st.success(message)
                             else:
@@ -1017,7 +1050,7 @@ def main_page():
                 cols = st.columns(len(similar_items))
                 for col, item in zip(cols, similar_items):
                     with col:
-                        if os.path.exists(item['image_path']):
+                        if item.get('image_path') and os.path.exists(item['image_path']):
                             st.image(item['image_path'], caption=f"{item['type'].capitalize()}\n{item['style']}")
                             st.progress(float(item['similarity']))
 
@@ -1543,7 +1576,7 @@ def bulk_delete_page():
         col1, col2 = st.columns(2)
 
         with col1:
-            item_type = st.selectbox("Type", ["Shirt", "Pants", "Shoes"])
+            itemtype = st.selectbox("Type", ["Shirt", "Pants", "Shoes"])
             styles = st.multiselect("Style", ["Casual", "Formal", "Sport", "Beach"])
             sizes = st.multiselect("Size", ["S", "M", "L", "XL"])
             price = st.number_input("Price ($)", min_value=0.0, step=0.01, format="%.2f")
@@ -1559,7 +1592,7 @@ def bulk_delete_page():
         validation_messages = []
 
         if not styles:
-            is_valid= False
+            is_valid = False
             validation_messages.append("Please select at least one style")
         if not sizes:
             is_valid = False
@@ -1598,7 +1631,7 @@ def bulk_delete_page():
 
             if st.button("Add Item"):
                 success, message = add_user_clothing_item(
-                    item_type.lower(), colors[0], styles, genders, sizes,
+                    itemtype.lower(), colors[0], styles, genders, sizes,
                     temp_path, hyperlink, price if price > 0 else None
                 )
                 if success:
@@ -1891,7 +1924,7 @@ def save_outfit(outfit, user_id):
                 conn.commit()
                 return outfit['merged_image_path'], "Outfit saved successfully"
     except Exception as e:
-        logging.error(f"Error saving outfit: {str(e)}")
+        logger.error(f"Error saving outfit: {str(e)}")
         return None, str(e)
 
 def saved_outfits_page():
@@ -2142,6 +2175,65 @@ def bulk_delete_page():
                 time.sleep(1)
                 st.rerun()
 
+def save_outfit_with_validation(outfit, user_id):
+    """Save outfit with proper validation and error handling"""
+    try:
+        if not outfit:
+            logger.warning("Attempted to save empty outfit")
+            return None, "No outfit to save"
+
+        if not user_id:
+            logger.warning("Attempted to save outfit without user ID")
+            return None, "User not logged in"
+
+        # Verify all required paths exist
+        for item_type, item in outfit.items():
+            if isinstance(item, dict) and 'image_path' in item:
+                if not os.path.exists(item['image_path']):
+                    logger.error(f"Missing image file: {item['image_path']}")
+                    return None, f"Missing image file for {item_type}"
+
+        # Save the outfit
+        saved_path, message = save_outfit(outfit, user_id=user_id)
+        if saved_path:
+            logger.info(f"Successfully saved outfit for user {user_id}")
+        else:
+            logger.warning(f"Failed to save outfit: {message}")
+
+        return saved_path, message
+
+    except Exception as e:
+        logger.error(f"Error saving outfit: {str(e)}")
+        return None, f"Error saving outfit: {str(e)}"
+
+def generate_and_save_outfit(items_df, size, style, gender):
+    """Generate and optionally save an outfit with proper error handling"""
+    try:
+        logger.info("Generating new outfit")
+        outfit, missing_items = generate_outfit(items_df, size, style, gender)
+
+        # Update session state
+        st.session_state.current_outfit = outfit
+        st.session_state.missing_items = missing_items
+
+        if outfit:
+            logger.info("Successfully generated outfit")
+
+            # Verify image paths exist
+            for item_type, item in outfit.items():
+                if isinstance(item, dict) and 'image_path' in item:
+                    if not os.path.exists(item['image_path']):
+                        logger.warning(f"Image path not found for {item_type}: {item['image_path']}")
+
+            return outfit, missing_items
+        else:
+            logger.warning("No outfit generated")
+            return None, missing_items
+
+    except Exception as e:
+        logger.error(f"Error generating outfit: {str(e)}")
+        return None, ["Error generating outfit"]
+
 def save_outfit(outfit, user_id):
     """Save outfit with user_id for personalization"""
     try:
@@ -2161,7 +2253,7 @@ def save_outfit(outfit, user_id):
                 conn.commit()
                 return outfit['merged_image_path'], "Outfit saved successfully"
     except Exception as e:
-        logging.error(f"Error saving outfit: {str(e)}")
+        logger.error(f"Error saving outfit: {str(e)}")
         return None, str(e)
 
 if __name__ == "__main__":
