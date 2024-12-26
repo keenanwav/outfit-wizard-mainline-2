@@ -11,6 +11,12 @@
       "timestamp": "2024-12-25T18:05:00.621647",
       "checksum": "0f92a0d5e4474c0187e72576f7218a4b",
       "type": "database"
+    },
+    {
+      "filepath": "backups/database/db_20241226_084832.sql",
+      "timestamp": "2024-12-26T08:48:40.122936",
+      "checksum": "6f0972531ae68dbe2d6f5831b1d75e2c",
+      "type": "database"
     }
   ],
   "files": [
@@ -24,6 +30,12 @@
       "filepath": "backups/files/files_20241225_180500.zip",
       "timestamp": "2024-12-25T18:05:05.213485",
       "checksum": "3c25f81c0a25784f55902beeece2e81d",
+      "type": "files"
+    },
+    {
+      "filepath": "backups/files/files_20241226_084840.zip",
+      "timestamp": "2024-12-26T08:48:44.861618",
+      "checksum": "a304404a0438e3f840d6117e44fc2672",
       "type": "files"
     }
   ]
