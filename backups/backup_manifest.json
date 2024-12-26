@@ -33,12 +33,6 @@
   ],
   "files": [
     {
-      "filepath": "backups/files/files_20241226_163624.zip",
-      "timestamp": "2024-12-26T16:36:28.421771",
-      "checksum": "e02e9978e259f7f9a69ee70d2aeb32bd",
-      "type": "files"
-    },
-    {
       "filepath": "backups/files/files_20241226_164329.zip",
       "timestamp": "2024-12-26T16:43:34.425351",
       "checksum": "e02e9978e259f7f9a69ee70d2aeb32bd",
@@ -60,6 +54,12 @@
       "filepath": "backups/files/files_20241226_190826.zip",
       "timestamp": "2024-12-26T19:08:36.301620",
       "checksum": "e02e9978e259f7f9a69ee70d2aeb32bd",
+      "type": "files"
+    },
+    {
+      "filepath": "backups/files/files_20241226_193856.zip",
+      "timestamp": "2024-12-26T19:39:04.017381",
+      "checksum": "0888afef182f784527107c384dc0a717",
       "type": "files"
     }
   ]
