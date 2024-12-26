@@ -784,19 +784,16 @@ def main_page():
 
                 with col1:
                     st.markdown("### 👔 OutfitVisualization")                    # Generate mannequin-based visualization using initial weather input
-                    mannequinimage_path = create_mannequin_outfit_image(
-                        recommendation['recommended_items'],
-                        weather=weather.lower() if weather and not manual_selection else None
-                    )
-                    if os.path.exists(mannequin_image_path):
-                        st.image(mannequin_image_path, use_column_width=True)
+                    mannequinimage_path = create_mannequin_outfit_image(recommendation['recommended_items'],weather=weather.lower() if weather and not manual_selection else None)
+                    if os.path.exists(mannequinimage_path):
+                        st.image(mannequinimage_path, use_column_width=True)
 
                         # Add download button for the mannequin visualization
-                        with open(mannequin_image_path, 'rb') as file:
+                        with open(mannequinimage_path, 'rb') as file:
                             st.download_button(
                                 label="📥 Download Outfit Visualization",
                                 data=file,
-                                file_name=os.path.basename(mannequin_image_path),
+                                file_name=os.path.basename(mannequinimage_path),
                                 mime="image/png"
                             )
                     else:
@@ -1988,9 +1985,65 @@ def my_items_page():
     """Display page for managing uploaded clothing items"""
     st.title("My Items")
 
-    # Create tabs for different item types
-    tabs = ["All Items", "Shirts", "Pants", "Shoes"]
-    selected_tab = st.tabs(tabs)
+    # Add upload new item dropdown
+    with st.expander("➕ Upload New Item"):
+        upload_col1, upload_col2 = st.columns(2)
+
+        with upload_col1:
+            uploaded_file = st.file_uploader(
+                "Choose an image",
+                type=['png', 'jpg', 'jpeg'],
+                key="item_uploader"
+            )
+            item_type = st.selectbox(
+                "Type",
+                ["shirt", "pants", "shoes"],
+                key="item_type"
+            )
+            color = st.color_picker(
+                "Color",
+                "#000000",
+                key="item_color"
+            )
+
+        with upload_col2:
+            style = st.selectbox(
+                "Style",
+                ["Casual", "Formal", "Sport", "Beach"],
+                key="item_style"
+            )
+            gender = st.selectbox(
+                "Gender",
+                ["Male", "Female", "Unisex"],
+                key="item_gender"
+            )
+            size = st.selectbox(
+                "Size",
+                ["S", "M", "L", "XL"],
+                key="item_size"
+            )
+            price = st.number_input(
+                "Price ($)",
+                min_value=0.0,
+                format="%.2f",
+                key="item_price"
+            )
+
+        if uploaded_file and st.button("Upload Item"):
+            success, message = add_user_clothing_item(
+                uploaded_file,
+                item_type,
+                color,
+                style,
+                gender,
+                size,
+                price
+            )
+            if success:
+                st.success(message)
+                st.rerun()
+            else:
+                st.error(message)
 
     # Load all clothing items
     items_df = load_clothing_items()
@@ -1998,29 +2051,29 @@ def my_items_page():
         st.info("No items found. Start by adding some clothing items!")
         return
 
-    # Display items based on selected tab
-    with selected_tab[0]:  # All Items
-        st.header("All Items")
-        display_items_grid(items_df)
+    # Dropdown for filtering items
+    item_filter = st.selectbox(
+        "Filter Items",
+        ["All Items", "Shirts", "Pants", "Shoes"],
+        key="item_filter"
+    )
 
-    with selected_tab[1]:  # Shirts
-        st.header("Shirts")
+    # Filter and display items based on selection
+    if item_filter == "All Items":
+        display_items_grid(items_df)
+    elif item_filter == "Shirts":
         shirts_df = items_df[items_df['type'] == 'shirt']
         if shirts_df.empty:
             st.info("No shirts found.")
         else:
             display_items_grid(shirts_df)
-
-    with selected_tab[2]:  # Pants
-        st.header("Pants")
+    elif item_filter == "Pants":
         pants_df = items_df[items_df['type'] == 'pants']
         if pants_df.empty:
             st.info("No pants found.")
         else:
             display_items_grid(pants_df)
-
-    with selected_tab[3]:  # Shoes
-        st.header("Shoes")
+    else:  # Shoes
         shoes_df = items_df[items_df['type'] == 'shoes']
         if shoes_df.empty:
             st.info("No shoes found.")
