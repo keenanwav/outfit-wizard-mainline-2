@@ -33,7 +33,7 @@ from data_manager import (
     get_outfit_details, update_item_details, delete_saved_outfit,
     get_price_history, update_item_image, get_db_connection,
     share_outfit, get_shared_outfits, remove_shared_outfit, get_sharable_users,
-    bulk_delete_items, cleanup_merged_outfits, get_cleanup_statistics
+    bulk_delete_items
 )
 from color_utils import get_color_palette, display_color_palette, rgb_to_hex, parse_color_string, get_color_name
 from outfit_generator import generate_outfit, is_valid_image
@@ -225,13 +225,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-st.set_page_config(
-    page_title="Outfit Wizard",
-    page_icon="👕",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 # Initialize authentication
 init_auth_tables()
 init_session_state()
@@ -378,6 +371,10 @@ def main_page():
     if 'missing_items' not in st.session_state:
         st.session_state.missing_items = []
 
+    # Initialize local variables
+    missing_items = []
+    outfit = None
+
     # Load clothing items
     items_df = load_clothing_items()
 
@@ -430,18 +427,20 @@ def main_page():
                 outfit_result, missing_items_result = generate_outfit(items_df, size, style, gender)
                 st.session_state.current_outfit = outfit_result
                 st.session_state.missing_items = missing_items_result
+                outfit = outfit_result
+                missing_items = missing_items_result
 
         # Display current outfit details if available
         if st.session_state.current_outfit:
             outfit = st.session_state.current_outfit
-            missing_items = st.session_state.missing_items  # Access from session state
+            missing_items = st.session_state.missing_items
 
             # Display outfit image in the left column
             with outfit_col:
                 if 'merged_image_path' in outfit and outfit['merged_image_path'] and os.path.exists(outfit['merged_image_path']):
                     st.image(outfit['merged_image_path'], use_column_width=True)
 
-                if missing_items:  # Now using the local variable
+                if missing_items:
                     st.warning(f"Missing items: {', '.join(missing_items)}")
 
             # Display prices and colors in the right column with animation
@@ -777,16 +776,14 @@ def main_page():
                                 'type': item['type'],
                                 'image_path': item['image_path'],
                                 'color': item['color'],
-                                'style': item['style']
-                            })
+                                'style': item['style']                            })
                         recommendation = {'recommended_items': selected_items}
 
                 # Display visualization
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    st.markdown("### 👔 OutfitVisualization")
-                    # Generate mannequin-based visualization using initial weather input
+                    st.markdown("### 👔 OutfitVisualization")                    # Generate mannequin-based visualization using initial weather input
                     mannequin_image_path = create_mannequin_outfit_image(
                         recommendation['recommended_items'],
                         weather=weather.lower() if weather and not manual_selection else None
@@ -1858,276 +1855,6 @@ def bulk_delete_page():
     else:
         st.info("Your wardrobe is empty. Start by adding some items!")
 
-def bulk_delete_page():
-    """Display the bulk delete interface for managing uploaded items"""
-    st.title("Bulk Delete Items")
-
-    # Fetch all user items
-    from data_manager import get_db_connection
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT id, type, color, style, gender, size, hyperlink, price, image_path 
-            FROM user_clothing_items 
-            ORDER BY type, id
-        """)
-        items = cur.fetchall()
-
-    if not items:
-        st.info("No items found in your wardrobe.")
-        return
-
-    # Create a DataFrame for better display
-    df = pd.DataFrame(items, columns=[
-        'id', 'type', 'color', 'style', 'gender', 
-        'size', 'hyperlink', 'price', 'image_path'
-    ])
-
-    # Group items by type for better organization
-    st.write("Select items to delete:")
-    selected_items = []
-
-    for item_type in df['type'].unique():
-        with st.expander(f"{item_type.title()} Items"):
-            type_items = df[df['type'] == item_type]
-            for _, item in type_items.iterrows():
-                col1, col2 = st.columns([1, 4])
-                with col1:
-                    checkbox_key = f"delete_{item_type}_{item['id']}_{hash(str(item['image_path']))}"
-                    if st.checkbox(label=f"Select {item_type} item", key=checkbox_key):
-                        selected_items.append(item['id'])
-                with col2:
-                    st.write(f"Color: {item['color']}, Style: {item['style']}, Size: {item['size']}")
-
-    if selected_items:
-        if st.button("Delete Selected Items", type="primary"):
-            if bulk_delete_clothing_items(selected_items):
-                st.success("Selected items have been deleted.")
-                time.sleep(1)
-                st.rerun()
-
-def save_outfit(outfit, user_id):
-    """Save outfit with user_id for personalization"""
-    try:
-        if not user_id:
-            return None, "User not logged in"
-
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            # Save the outfit with user_id
-            if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
-                cur.execute("""
-                    INSERT INTO saved_outfits (image_path, created_at, user_id)
-                    VALUES (%s, %s, %s)
-                    RETURNING id
-                """, (outfit['merged_image_path'], datetime.now(), user_id))
-                outfit_id = cur.fetchone()[0]
-                conn.commit()
-                return outfit['merged_image_path'], "Outfit saved successfully"
-    except Exception as e:
-        logger.error(f"Error saving outfit: {str(e)}")
-        return None, str(e)
-
-def saved_outfits_page():
-    """Display saved outfits page"""
-    if not st.session_state.user:
-        st.warning("Please log in to view your saved outfits")
-        return
-
-    st.title("My Saved Outfits")
-
-    outfits = load_saved_outfits()
-
-    if not outfits:
-        st.info("Welcome! Start by generating and saving some outfits from the Home page.")
-        st.markdown("""
-        Here's how to get started:
-        1. Go to the Home page
-        2. Generate outfits using your preferences
-        3. Click 'Save Outfit' to add them to your collection
-        """)
-        return
-
-    # Display outfits in grid layout
-    cols = st.columns(3)
-    for idx, outfit in enumerate(outfits):
-        col = cols[int(idx) % 3]
-        with col:
-            image_path = str(outfit.get('image_path', ''))
-            if os.path.exists(image_path):
-                st.image(image_path, use_column_width=True)
-
-                # Organization features
-                tags = outfit.get('tags', [])
-                new_tags = st.text_input(
-                    f"Tags ###{idx}", 
-                    value=','.join(tags) if tags else "",
-                    help="Comma-separated tags"
-                )
-
-                current_season = str(outfit.get('season', ''))
-                season_options = ["", "Spring", "Summer", "Fall", "Winter"]
-                season_index = season_options.index(current_season) if current_season in season_options else 0
-
-                season = st.selectbox(
-                    f"Season ###{idx}",
-                    season_options,
-                    index=season_index
-                )
-
-                current_notes = str(outfit.get('notes', ''))
-                notes = st.text_area(
-                    f"Notes ###{idx}", 
-                    value=current_notes,
-                    help="Add notes about this outfit"
-                )
-
-                # Save and Delete buttons
-                save_col, del_col = st.columns([3, 1])
-                with save_col:
-                    if st.button(f"Save Details ###{idx}"):
-                        success, message = update_outfit_details(
-                            str(outfit['outfit_id']),
-                            tags=new_tags.split(',') if new_tags.strip() else None,
-                            season=season if season else None,
-                            notes=notes if notes.strip() else None
-                        )
-                        if success:
-                            st.success(message)
-                            st.rerun()
-                        else:
-                            st.error(message)
-
-                with del_col:
-                    if st.button(f"🗑️ ###{idx}"):
-                        success, message = delete_saved_outfit(str(outfit['outfit_id']))
-                        if success:
-                            st.success(message)
-                            st.rerun()
-                        else:
-                            st.error(message)
-
-def cleanup_status_dashboard():
-    """Display cleanup status dashboard"""
-    st.title("Cleanup Status Dashboard")
-
-    from data_manager import get_cleanup_statistics
-    stats = get_cleanup_statistics()
-
-    if not stats:
-        st.warning("No cleanup settings found. Please configure cleanup settings first.")
-        return
-
-    # Display current settings
-    st.header("📊 Cleanup Settings")
-    settings = stats['settings']
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Maximum File Age", f"{settings['max_age_hours']} hours")
-        st.metric("Cleanup Interval", f"{settings['cleanup_interval_hours']} hours")
-
-    with col2:
-        st.metric("Batch Size", str(settings['batch_size']))
-        st.metric("Max Workers", str(settings['max_workers']))
-
-    # Display last cleanup time
-    st.header("⏱️ Last Cleanup")
-    if settings['last_cleanup']:
-        last_cleanup = settings['last_cleanup']
-        time_since = datetime.now() - last_cleanup
-        hours_since = time_since.total_seconds() / 3600
-
-        status_color = "🟢" if hours_since < settings['cleanup_interval_hours'] else "🔴"
-        st.write(f"{status_color} Last cleanup: {last_cleanup.strftime('%Y-%m-%d %H:%M:%S')}")
-        st.write(f"Time since last cleanup: {int(hours_since)} hours")
-
-        # Next scheduled cleanup
-        next_cleanup = last_cleanup + timedelta(hours=settings['cleanup_interval_hours'])
-        st.write(f"Next scheduled cleanup: {next_cleanup.strftime('%Y-%m-%d %H:%M:%S')}")
-    else:
-        st.warning("No cleanup has been performed yet")
-
-    # Display file statistics
-    st.header("📁 File Statistics")
-    statistics = stats['statistics']
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total Files", statistics['total_files'])
-    with col2:
-        st.metric("Saved Outfits", statistics['saved_outfits'])
-    with col3:
-        st.metric("Temporary Files", statistics['temporary_files'])
-
-    # Add manual cleanup button
-    st.header("🧹 Manual Cleanup")
-    if st.button("Run Cleanup Now"):
-        with st.spinner("Running cleanup..."):
-            cleaned_count = cleanup_merged_outfits()
-            st.success(f"Cleanup completed. {cleaned_count} files removed.")
-            st.rerun()
-
-def add_to_edit_history(item_id, new_values):
-    """Adds a new edit to the edit history for the given item"""
-    if item_id not in st.session_state.edit_history:
-        st.session_state.edit_history[item_id] = []
-
-    st.session_state.edit_history[item_id].append(new_values)
-
-def undo_edit(item_id):
-    """Undoes the last edit for the given item"""
-    if item_id in st.session_state.edit_history and st.session_state.edit_history[item_id]:
-        # Pop the last edit from the history
-        last_edit = st.session_state.edit_history[item_id].pop()
-
-        # Push the last edit to the redo stack
-        if item_id not in st.session_state.redo_stack:
-            st.session_state.redo_stack[item_id] = []
-        st.session_state.redo_stack[item_id].append(last_edit)
-
-        # Update the item details
-        success, message = edit_clothing_item(
-            item_id,
-            last_edit['color'],
-            last_edit['style'],
-            last_edit['gender'],
-            last_edit['size'],
-            last_edit['hyperlink'],
-            last_edit['price']
-        )
-
-        return success, message
-    else:
-        return False, "No edits to undo"
-
-def redo_edit(item_id):
-    """Redoes the last undone edit for the given item"""
-    if item_id in st.session_state.redo_stack and st.session_state.redo_stack[item_id]:
-        # Pop the last undone edit from the redo stack
-        last_undone_edit = st.session_state.redo_stack[item_id].pop()
-
-        # Push the undone edit to the edit history
-        if item_id not in st.session_state.edit_history:
-            st.session_state.edit_history[item_id] = []
-        st.session_state.edit_history[item_id].append(last_undone_edit)
-
-        # Update the item details
-        success, message = edit_clothing_item(
-            item_id,
-            last_undone_edit['color'],
-            last_undone_edit['style'],
-            last_undone_edit['gender'],
-            last_undone_edit['size'],
-            last_undone_edit['hyperlink'],
-            last_undone_edit['price']
-        )
-
-        return success, message
-    else:
-        return False, "No edits to redo"
-
-# Update the main sidebar menu to include the bulk delete page
 def bulk_delete_page():
     """Display the bulk delete interface for managing uploaded items"""
     st.title("Bulk Delete Items")

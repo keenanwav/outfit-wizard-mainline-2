@@ -1,24 +1,6 @@
 {
   "database": [
     {
-      "filepath": "backups/database/db_20241226_153653.sql",
-      "timestamp": "2024-12-26T15:36:59.738319",
-      "checksum": "251440f5336456b2966f244b4e338535",
-      "type": "database"
-    },
-    {
-      "filepath": "backups/database/db_20241226_155037.sql",
-      "timestamp": "2024-12-26T15:50:45.032740",
-      "checksum": "251440f5336456b2966f244b4e338535",
-      "type": "database"
-    },
-    {
-      "filepath": "backups/database/db_20241226_160542.sql",
-      "timestamp": "2024-12-26T16:05:49.630093",
-      "checksum": "251440f5336456b2966f244b4e338535",
-      "type": "database"
-    },
-    {
       "filepath": "backups/database/db_20241226_161047.sql",
       "timestamp": "2024-12-26T16:10:53.772883",
       "checksum": "251440f5336456b2966f244b4e338535",
@@ -29,27 +11,27 @@
       "timestamp": "2024-12-26T16:23:08.950084",
       "checksum": "251440f5336456b2966f244b4e338535",
       "type": "database"
+    },
+    {
+      "filepath": "backups/database/db_20241226_162817.sql",
+      "timestamp": "2024-12-26T16:28:24.242189",
+      "checksum": "251440f5336456b2966f244b4e338535",
+      "type": "database"
+    },
+    {
+      "filepath": "backups/database/db_20241226_163616.sql",
+      "timestamp": "2024-12-26T16:36:24.266255",
+      "checksum": "251440f5336456b2966f244b4e338535",
+      "type": "database"
+    },
+    {
+      "filepath": "backups/database/db_20241226_164322.sql",
+      "timestamp": "2024-12-26T16:43:29.997381",
+      "checksum": "251440f5336456b2966f244b4e338535",
+      "type": "database"
     }
   ],
   "files": [
-    {
-      "filepath": "backups/files/files_20241226_153259.zip",
-      "timestamp": "2024-12-26T15:33:03.763481",
-      "checksum": "e02e9978e259f7f9a69ee70d2aeb32bd",
-      "type": "files"
-    },
-    {
-      "filepath": "backups/files/files_20241226_153659.zip",
-      "timestamp": "2024-12-26T15:37:05.000169",
-      "checksum": "e02e9978e259f7f9a69ee70d2aeb32bd",
-      "type": "files"
-    },
-    {
-      "filepath": "backups/files/files_20241226_155045.zip",
-      "timestamp": "2024-12-26T15:50:50.399081",
-      "checksum": "e02e9978e259f7f9a69ee70d2aeb32bd",
-      "type": "files"
-    },
     {
       "filepath": "backups/files/files_20241226_160549.zip",
       "timestamp": "2024-12-26T16:05:53.419812",
@@ -59,6 +41,24 @@
     {
       "filepath": "backups/files/files_20241226_161053.zip",
       "timestamp": "2024-12-26T16:10:57.131196",
+      "checksum": "e02e9978e259f7f9a69ee70d2aeb32bd",
+      "type": "files"
+    },
+    {
+      "filepath": "backups/files/files_20241226_162308.zip",
+      "timestamp": "2024-12-26T16:23:13.912075",
+      "checksum": "e02e9978e259f7f9a69ee70d2aeb32bd",
+      "type": "files"
+    },
+    {
+      "filepath": "backups/files/files_20241226_162824.zip",
+      "timestamp": "2024-12-26T16:28:29.493288",
+      "checksum": "e02e9978e259f7f9a69ee70d2aeb32bd",
+      "type": "files"
+    },
+    {
+      "filepath": "backups/files/files_20241226_163624.zip",
+      "timestamp": "2024-12-26T16:36:28.421771",
       "checksum": "e02e9978e259f7f9a69ee70d2aeb32bd",
       "type": "files"
     }
