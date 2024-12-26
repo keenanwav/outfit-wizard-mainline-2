@@ -20,7 +20,7 @@ from psycopg2.extras import execute_values, execute_batch
 from contextlib import contextmanager
 import time
 from functools import wraps
-from typing import Tuple
+from typing import Tuple, List, Dict
 
 # Initialize connection pool
 MIN_CONNECTIONS = 1
@@ -496,38 +496,170 @@ def save_outfit(outfit):
         return None, f"Error saving outfit: {str(e)}"
 
 @retry_on_error()
-def load_saved_outfits():
+def load_saved_outfits(user_id: int = None):
     """Load saved outfits with user-specific filtering"""
-    if 'user' not in st.session_state:
-        return []
-
-    user_id = st.session_state.user['id']
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
-            cur.execute("""
-                SELECT outfit_id, image_path, tags, season, notes, created_at 
-                FROM saved_outfits 
-                WHERE user_id = %s
-                ORDER BY created_at DESC
-            """, (user_id,))
+            if user_id:
+                cur.execute("""
+                    SELECT outfit_id, image_path, tags, season, notes, created_at 
+                    FROM saved_outfits 
+                    WHERE user_id = %s
+                    ORDER BY created_at DESC
+                """, (user_id,))
+            else:
+                cur.execute("""
+                    SELECT outfit_id, image_path, tags, season, notes, created_at 
+                    FROM saved_outfits 
+                    ORDER BY created_at DESC
+                """)
 
             outfits = cur.fetchall()
             if outfits:
-                return [
-                    {
-                        'outfit_id': outfit[0],
-                        'image_path': outfit[1],
-                        'tags': outfit[2] if outfit[2] else [],
-                        'season': outfit[3],
-                        'notes': outfit[4],
-                        'date': outfit[5].strftime("%Y-%m-%d %H:%M:%S")
-                    }
-                    for outfit in outfits
-                ]
+                return [{
+                    'outfit_id': outfit[0],
+                    'image_path': outfit[1],
+                    'tags': outfit[2] if outfit[2] else [],
+                    'season': outfit[3],
+                    'notes': outfit[4],
+                    'date': outfit[5].strftime("%Y-%m-%d %H:%M:%S")
+                } for outfit in outfits]
             return []
         finally:
             cur.close()
+
+@retry_on_error()
+def share_outfit(outfit_id: int, shared_by_user_id: int, shared_with_user_id: int) -> Tuple[bool, str]:
+    """Share an outfit with another user"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+
+            # Verify the outfit exists and belongs to the sharing user
+            cur.execute("""
+                SELECT id FROM saved_outfits 
+                WHERE id = %s AND user_id = %s
+            """, (outfit_id, shared_by_user_id))
+
+            if not cur.fetchone():
+                return False, "Outfit not found or you don't have permission to share it"
+
+            # Check if outfit is already shared with this user
+            cur.execute("""
+                SELECT id FROM shared_outfits 
+                WHERE outfit_id = %s 
+                AND shared_with_user_id = %s
+            """, (outfit_id, shared_with_user_id))
+
+            if cur.fetchone():
+                return False, "Outfit already shared with this user"
+
+            # Share the outfit
+            cur.execute("""
+                INSERT INTO shared_outfits 
+                (outfit_id, shared_by_user_id, shared_with_user_id)
+                VALUES (%s, %s, %s)
+                RETURNING id
+            """, (outfit_id, shared_by_user_id, shared_with_user_id))
+
+            conn.commit()
+            return True, "Outfit shared successfully"
+
+    except Exception as e:
+        logging.error(f"Error sharing outfit: {str(e)}")
+        return False, f"Error sharing outfit: {str(e)}"
+
+@retry_on_error()
+def get_shared_outfits(user_id: int) -> List[Dict]:
+    """Get outfits shared with the user"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+
+            cur.execute("""
+                SELECT 
+                    so.outfit_id,
+                    so.shared_by_user_id,
+                    u.name as shared_by_name,
+                    so.shared_at,
+                    s.image_path,
+                    s.tags,
+                    s.season,
+                    s.notes
+                FROM shared_outfits so
+                JOIN users u ON so.shared_by_user_id = u.id
+                JOIN saved_outfits s ON so.outfit_id = s.id
+                WHERE so.shared_with_user_id = %s
+                ORDER BY so.shared_at DESC
+            """, (user_id,))
+
+            shared_outfits = cur.fetchall()
+            if shared_outfits:
+                return [{
+                    'outfit_id': outfit[0],
+                    'shared_by_user_id': outfit[1],
+                    'shared_by_name': outfit[2],
+                    'shared_at': outfit[3].strftime("%Y-%m-%d %H:%M:%S"),
+                    'image_path': outfit[4],
+                    'tags': outfit[5] if outfit[5] else [],
+                    'season': outfit[6],
+                    'notes': outfit[7]
+                } for outfit in shared_outfits]
+            return []
+
+    except Exception as e:
+        logging.error(f"Error getting shared outfits: {str(e)}")
+        return []
+
+@retry_on_error()
+def remove_shared_outfit(outfit_id: int, shared_by_user_id: int, shared_with_user_id: int) -> Tuple[bool, str]:
+    """Remove a shared outfit"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+
+            cur.execute("""
+                DELETE FROM shared_outfits 
+                WHERE outfit_id = %s 
+                AND shared_by_user_id = %s 
+                AND shared_with_user_id = %s
+                RETURNING id
+            """, (outfit_id, shared_by_user_id, shared_with_user_id))
+
+            if cur.fetchone():
+                conn.commit()
+                return True, "Shared outfit removed successfully"
+            return False, "Shared outfit not found"
+
+    except Exception as e:
+        logging.error(f"Error removing shared outfit: {str(e)}")
+        return False, f"Error removing shared outfit: {str(e)}"
+
+@retry_on_error()
+def get_sharable_users(current_user_id: int) -> List[Dict]:
+    """Get list of users that outfits can be shared with"""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+
+            cur.execute("""
+                SELECT id, name, email 
+                FROM users 
+                WHERE id != %s
+                ORDER BY name
+            """, (current_user_id,))
+
+            users = cur.fetchall()
+            return [{
+                'id': user[0],
+                'name': user[1],
+                'email': user[2]
+            } for user in users]
+
+    except Exception as e:
+        logging.error(f"Error getting sharable users: {str(e)}")
+        return []
 
 @retry_on_error()
 def delete_saved_outfit(outfit_id):
@@ -554,69 +686,40 @@ def delete_saved_outfit(outfit_id):
 
 @retry_on_error()
 def get_cleanup_settings():
-    """Get cleanup configuration settings"""
+    """Get cleanup settings from database"""
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
-            cur.execute("""
-                SELECT max_age_hours, cleanup_interval_hours, batch_size, max_workers, last_cleanup
-                FROM cleanup_settings
-                ORDER BY created_at DESC
-                LIMIT 1
-            """)
+            cur.execute("SELECT * FROM cleanup_settings ORDER BY created_at DESC LIMIT 1")
             result = cur.fetchone()
+            
             if result:
                 return {
-                    'max_age_hours': result[0],
-                    'cleanup_interval_hours': result[1],
-                    'batch_size': result[2],
-                    'max_workers': result[3],
-                    'last_cleanup': result[4]
+                    'max_age_hours': result[1],
+                    'cleanup_interval_hours': result[2],
+                    'batch_size': result[3],
+                    'max_workers': result[4],
+                    'last_cleanup': result[5]
                 }
-            return None
-        finally:
-            cur.close()
-
-@retry_on_error()
-def update_cleanup_settings(max_age_hours=None, cleanup_interval_hours=None, 
-                          batch_size=None, max_workers=None):
-    """Update cleanup configuration settings"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            update_fields = []
-            params = []
-            
-            if max_age_hours is not None:
-                update_fields.append("max_age_hours = %s")
-                params.append(max_age_hours)
-            
-            if cleanup_interval_hours is not None:
-                update_fields.append("cleanup_interval_hours = %s")
-                params.append(cleanup_interval_hours)
-            
-            if batch_size is not None:
-                update_fields.append("batch_size = %s")
-                params.append(batch_size)
-            
-            if max_workers is not None:
-                update_fields.append("max_workers = %s")
-                params.append(max_workers)
-            
-            if update_fields:
-                update_fields.append("updated_at = CURRENT_TIMESTAMP")
-                query = f"""
-                    UPDATE cleanup_settings 
-                    SET {', '.join(update_fields)}
-                    WHERE id = (SELECT id FROM cleanup_settings ORDER BY created_at DESC LIMIT 1)
-                    RETURNING id
-                """
-                cur.execute(query, params)
+            else:
+                # Insert default settings if none exist
+                cur.execute("""
+                    INSERT INTO cleanup_settings 
+                    (max_age_hours, cleanup_interval_hours, batch_size, max_workers)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING *
+                """, (24, 12, 100, 4))
                 
-                if cur.fetchone():
-                    conn.commit()
-                    return True, "Cleanup settings updated successfully"
-                return False, "Failed to update cleanup settings"
+                result = cur.fetchone()
+                conn.commit()
+                
+                return {
+                    'max_age_hours': result[1],
+                    'cleanup_interval_hours': result[2],
+                    'batch_size': result[3],
+                    'max_workers': result[4],
+                    'last_cleanup': result[5]
+                }
         finally:
             cur.close()
 
@@ -631,10 +734,131 @@ def update_last_cleanup_time():
                 SET last_cleanup = CURRENT_TIMESTAMP,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = (SELECT id FROM cleanup_settings ORDER BY created_at DESC LIMIT 1)
-                RETURNING id
             """)
+            conn.commit()
+        finally:
+            cur.close()
+
+@retry_on_error()
+def load_saved_outfits():
+    """Load all saved outfits with their details"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT outfit_id, image_path, tags, season, notes, created_at
+                FROM saved_outfits
+                ORDER BY created_at DESC
+            """)
+            outfits = cur.fetchall()
             
-            if cur.fetchone():
+            return [{
+                'outfit_id': outfit[0],
+                'image_path': outfit[1],
+                'tags': outfit[2] if outfit[2] else [],
+                'season': outfit[3],
+                'notes': outfit[4],
+                'date': outfit[5].strftime("%Y-%m-%d %H:%M:%S") if outfit[5] else None
+            } for outfit in outfits]
+        finally:
+            cur.close()
+
+@retry_on_error()
+def cleanup_orphaned_entries():
+    """Clean up database entries that have missing or invalid image files"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            # Get all items with their image paths
+            cur.execute("""
+                SELECT id, type, image_path 
+                FROM user_clothing_items 
+                WHERE image_path IS NOT NULL
+            """)
+            items = cur.fetchall()
+            
+            orphaned_items = []
+            for item_id, item_type, image_path in items:
+                # Check if image file exists and is valid
+                if not os.path.exists(image_path) or not is_valid_image(image_path):
+                    orphaned_items.append((item_id, item_type, image_path))
+            
+            if orphaned_items:
+                # Log orphaned items before processing
+                logging.warning(f"Found {len(orphaned_items)} orphaned entries in database")
+                for item_id, item_type, path in orphaned_items:
+                    logging.info(f"Orphaned {item_type} (ID: {item_id}): {path}")
+                
+                # Move orphaned entries to audit table for reference
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS orphaned_items_audit (
+                        id SERIAL PRIMARY KEY,
+                        original_id INTEGER,
+                        type VARCHAR(50),
+                        image_path VARCHAR(255),
+                        removed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                
+                # Insert into audit table and mark as orphaned
+                execute_values(cur, """
+                    INSERT INTO orphaned_items_audit (original_id, type, image_path)
+                    VALUES %s
+                """, [(id, type, path) for id, type, path in orphaned_items])
+                
+                # Update main table to mark these items as orphaned
+                cur.execute("""
+                    UPDATE user_clothing_items 
+                    SET image_path = NULL 
+                    WHERE id = ANY(%s)
+                """, ([item[0] for item in orphaned_items],))
+                
+                conn.commit()
+                return True, f"Processed {len(orphaned_items)} orphaned entries"
+            
+            return True, "No orphaned entries found"
+            
+        except Exception as e:
+            conn.rollback()
+            logging.error(f"Error during orphaned entries cleanup: {str(e)}")
+            return False, f"Cleanup failed: {str(e)}"
+        finally:
+            cur.close()
+
+@retry_on_error()
+def get_price_history(item_id):
+    """Get price history for an item"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT price, created_at
+                FROM item_price_history
+                WHERE item_id = %s
+                ORDER BY created_at DESC
+            """, (item_id,))
+            
+            history = cur.fetchall()
+            return [(float(price), date) for price, date in history] if history else []
+        finally:
+            cur.close()
+
+@retry_on_error()
+def record_price_change(item_id, new_price):
+    """Record a price change in history"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            # Get the current price
+            cur.execute("SELECT price FROM user_clothing_items WHERE id = %s", (item_id,))
+            current_price = cur.fetchone()
+            
+            if current_price and current_price[0] != new_price:
+                # Record the new price in history
+                cur.execute("""
+                    INSERT INTO item_price_history (item_id, price)
+                    VALUES (%s, %s)
+                """, (item_id, new_price))
                 conn.commit()
                 return True
             return False
@@ -642,47 +866,252 @@ def update_last_cleanup_time():
             cur.close()
 
 @retry_on_error()
-def get_cleanup_statistics():
-    """Get cleanup statistics from the database"""
+def record_color_change(item_id, old_color, new_color):
+    """Record a color change in history"""
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
-            # Get cleanup settings
             cur.execute("""
-                SELECT max_age_hours, cleanup_interval_hours, batch_size, 
-                       max_workers, last_cleanup 
-                FROM cleanup_settings 
-                ORDER BY created_at DESC 
-                LIMIT 1
-            """)
-            settings = cur.fetchone()
-            
-            if not settings:
-                return None
+                INSERT INTO item_color_history (item_id, old_color, new_color)
+                VALUES (%s, %s, %s)
+            """, (item_id, old_color, new_color))
+            conn.commit()
+            return True
+        except Exception as e:
+            logging.error(f"Error recording color change: {str(e)}")
+            return False
+        finally:
+            cur.close()
+
+@retry_on_error()
+def get_color_history(item_id):
+    """Get color history for an item"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT old_color, new_color, changed_at
+                FROM item_color_history
+                WHERE item_id = %s
+                ORDER BY changed_at DESC
+            """, (item_id,))
+            return cur.fetchall()
+        finally:
+            cur.close()
+
+@retry_on_error()
+def update_item_image(item_id: int, new_image_path: str) -> Tuple[bool, str]:
+    """Update the image of an existing clothing item"""
+    try:
+        # Get the current image path first
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "SELECT image_path FROM user_clothing_items WHERE id = %s",
+                    (item_id,)
+                )
+                result = cur.fetchone()
+                if not result:
+                    return False, f"Item with ID {item_id} not found"
                 
-            # Get total files in merged_outfits
-            total_files = 0
-            if os.path.exists('merged_outfits'):
-                total_files = len(os.listdir('merged_outfits'))
+                old_image_path = result[0]
+                
+                # Generate new image path
+                new_filename = f"updated_{uuid.uuid4()}.png"
+                final_image_path = os.path.join("user_images", new_filename)
+                
+                # Save the new image
+                with Image.open(new_image_path) as img:
+                    img.save(final_image_path)
+                
+                # Update the database with new image path
+                cur.execute(
+                    "UPDATE user_clothing_items SET image_path = %s WHERE id = %s",
+                    (final_image_path, item_id)
+                )
+                
+                conn.commit()
+                
+                # Delete the old image if it exists
+                if old_image_path and os.path.exists(old_image_path):
+                    try:
+                        os.remove(old_image_path)
+                    except Exception as e:
+                        logging.warning(f"Failed to delete old image {old_image_path}: {str(e)}")
+                
+                # Delete the temporary uploaded image
+                if os.path.exists(new_image_path):
+                    try:
+                        os.remove(new_image_path)
+                    except Exception as e:
+                        logging.warning(f"Failed to delete temporary image {new_image_path}: {str(e)}")
+                
+                return True, "Image updated successfully"
+                
+            finally:
+                cur.close()
+                
+    except Exception as e:
+        logging.error(f"Error updating item image: {str(e)}")
+        return False, f"Failed to update image: {str(e)}"
+
+@retry_on_error()
+def get_price_history(item_id):
+    """Get price history for an item"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT price, created_at
+                FROM item_price_history
+                WHERE item_id = %s
+                ORDER BY created_at DESC
+            """, (item_id,))
             
-            # Get saved outfits count
-            cur.execute("SELECT COUNT(*) FROM saved_outfits")
-            saved_count = cur.fetchone()[0]
+            history = cur.fetchall()
+            return [(float(price), date) for price, date in history] if history else []
+        finally:
+            cur.close()
+
+@retry_on_error()
+def get_cleanup_settings():
+    """Get cleanup settings from database"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT * FROM cleanup_settings ORDER BY created_at DESC LIMIT 1")
+            result = cur.fetchone()
             
-            return {
-                'settings': {
-                    'max_age_hours': settings[0],
-                    'cleanup_interval_hours': settings[1],
-                    'batch_size': settings[2],
-                    'max_workers': settings[3],
-                    'last_cleanup': settings[4]
-                },
-                'statistics': {
-                    'total_files': total_files,
-                    'saved_outfits': saved_count,
-                    'temporary_files': max(0, total_files - saved_count)
+            if result:
+                return {
+                    'max_age_hours': result[1],
+                    'cleanup_interval_hours': result[2],
+                    'batch_size': result[3],
+                    'max_workers': result[4],
+                    'last_cleanup': result[5]
                 }
-            }
+            else:
+                # Insert default settings if none exist
+                cur.execute("""
+                    INSERT INTO cleanup_settings 
+                    (max_age_hours, cleanup_interval_hours, batch_size, max_workers)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING *
+                """, (24, 12, 100, 4))
+                
+                result = cur.fetchone()
+                conn.commit()
+                
+                return {
+                    'max_age_hours': result[1],
+                    'cleanup_interval_hours': result[2],
+                    'batch_size': result[3],
+                    'max_workers': result[4],
+                    'last_cleanup': result[5]
+                }
+        finally:
+            cur.close()
+
+@retry_on_error()
+def update_last_cleanup_time():
+    """Update the last cleanup timestamp"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                UPDATE cleanup_settings 
+                SET last_cleanup = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = (SELECT id FROM cleanup_settings ORDER BY created_at DESC LIMIT 1)
+            """)
+            conn.commit()
+        finally:
+            cur.close()
+
+@retry_on_error()
+def load_saved_outfits():
+    """Load all saved outfits with their details"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT outfit_id, image_path, tags, season, notes, created_at
+                FROM saved_outfits
+                ORDER BY created_at DESC
+            """)
+            outfits = cur.fetchall()
+            
+            return [{
+                'outfit_id': outfit[0],
+                'image_path': outfit[1],
+                'tags': outfit[2] if outfit[2] else [],
+                'season': outfit[3],
+                'notes': outfit[4],
+                'date': outfit[5].strftime("%Y-%m-%d %H:%M:%S") if outfit[5] else None
+            } for outfit in outfits]
+        finally:
+            cur.close()
+
+@retry_on_error()
+def cleanup_orphaned_entries():
+    """Clean up database entries that have missing or invalid image files"""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            # Get all items with their image paths
+            cur.execute("""
+                SELECT id, type, image_path 
+                FROM user_clothing_items 
+                WHERE image_path IS NOT NULL
+            """)
+            items = cur.fetchall()
+            
+            orphaned_items = []
+            for item_id, item_type, image_path in items:
+                # Check if image file exists and is valid
+                if not os.path.exists(image_path) or not is_valid_image(image_path):
+                    orphaned_items.append((item_id, item_type, image_path))
+            
+            if orphaned_items:
+                # Log orphaned items before processing
+                logging.warning(f"Found {len(orphaned_items)} orphaned entries in database")
+                for item_id, item_type, path in orphaned_items:
+                    logging.info(f"Orphaned {item_type} (ID: {item_id}): {path}")
+                
+                # Move orphaned entries to audit table for reference
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS orphaned_items_audit (
+                        id SERIAL PRIMARY KEY,
+                        original_id INTEGER,
+                        type VARCHAR(50),
+                        image_path VARCHAR(255),
+                        removed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                
+                # Insert into audit table and mark as orphaned
+                execute_values(cur, """
+                    INSERT INTO orphaned_items_audit (original_id, type, image_path)
+                    VALUES %s
+                """, [(id, type, path) for id, type, path in orphaned_items])
+                
+                # Update main table to mark these items as orphaned
+                cur.execute("""
+                    UPDATE user_clothing_items 
+                    SET image_path = NULL 
+                    WHERE id = ANY(%s)
+                """, ([item[0] for item in orphaned_items],))
+                
+                conn.commit()
+                return True, f"Processed {len(orphaned_items)} orphaned entries"
+            
+            return True, "No orphaned entries found"
+            
+        except Exception as e:
+            conn.rollback()
+            logging.error(f"Error during orphaned entries cleanup: {str(e)}")
+            return False, f"Cleanup failed: {str(e)}"
         finally:
             cur.close()
 
