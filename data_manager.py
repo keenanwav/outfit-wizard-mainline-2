@@ -1,3 +1,4 @@
+import streamlit as st
 from outfit_generator import is_valid_image
 import pandas as pd
 import os
@@ -10,6 +11,7 @@ from sklearn.decomposition import TruncatedSVD
 from scipy.sparse import csr_matrix
 from sklearn.neighbors import NearestNeighbors
 import logging
+import random
 from datetime import datetime, timedelta
 import joblib
 import psycopg2
@@ -384,6 +386,17 @@ def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink, price=
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
+            # Get current color before update
+            cur.execute("SELECT color FROM user_clothing_items WHERE id = %s", (item_id,))
+            result = cur.fetchone()
+            if result:
+                old_color = result[0]
+                new_color = f"{color[0]},{color[1]},{color[2]}"
+                
+                # Record color change if different
+                if old_color != new_color:
+                    record_color_change(item_id, old_color, new_color)
+            
             # Record price change if price is provided and different
             if price is not None:
                 record_price_change(item_id, price)
@@ -428,32 +441,42 @@ def delete_clothing_item(item_id):
         finally:
             cur.close()
 
+def get_user_wardrobe_path(user_id):
+    """Get the wardrobe path for a specific user"""
+    user_path = os.path.join('wardrobe', f'user_{user_id}')
+    if not os.path.exists(user_path):
+        os.makedirs(user_path, exist_ok=True)
+    return user_path
+
 @retry_on_error()
 def save_outfit(outfit):
-    """Save outfit with optimized file handling and database operations"""
+    """Save outfit with user-specific folder structure"""
     try:
-        if not os.path.exists('wardrobe'):
-            os.makedirs('wardrobe')
-        
+        if 'user' not in st.session_state:
+            return None, "User not logged in"
+
+        user_id = st.session_state.user['id']
+        user_wardrobe = get_user_wardrobe_path(user_id)
+
         outfit_id = str(uuid.uuid4())
         outfit_filename = f"outfit_{outfit_id}.png"
-        outfit_path = os.path.join('wardrobe', outfit_filename)
-        
+        outfit_path = os.path.join(user_wardrobe, outfit_filename)
+
         if 'merged_image_path' in outfit and os.path.exists(outfit['merged_image_path']):
             Image.open(outfit['merged_image_path']).save(outfit_path)
         else:
             total_width = 600
             height = 200
             outfit_img = Image.new('RGB', (total_width, height), (255, 255, 255))
-            
+
             for i, item_type in enumerate(['shirt', 'pants', 'shoes']):
                 if item_type in outfit:
                     item_img = Image.open(outfit[item_type]['image_path'])
                     item_img = item_img.resize((200, 200))
                     outfit_img.paste(item_img, (i * 200, 0))
-            
+
             outfit_img.save(outfit_path)
-        
+
         with get_db_connection() as conn:
             cur = conn.cursor()
             try:
@@ -461,20 +484,24 @@ def save_outfit(outfit):
                     INSERT INTO saved_outfits (outfit_id, user_id, image_path)
                     VALUES (%s, %s, %s)
                     RETURNING outfit_id
-                """, (outfit_id, st.session_state.user['id'], outfit_path))
-                
+                """, (outfit_id, user_id, outfit_path))
+
                 conn.commit()
-                return outfit_path
+                return outfit_path, "Outfit saved successfully"
             finally:
                 cur.close()
-                
+
     except Exception as e:
         logging.error(f"Error saving outfit: {str(e)}")
-        return None
+        return None, f"Error saving outfit: {str(e)}"
 
 @retry_on_error()
 def load_saved_outfits():
-    """Load saved outfits with optimized query"""
+    """Load saved outfits with user-specific filtering"""
+    if 'user' not in st.session_state:
+        return []
+
+    user_id = st.session_state.user['id']
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
@@ -483,8 +510,8 @@ def load_saved_outfits():
                 FROM saved_outfits 
                 WHERE user_id = %s
                 ORDER BY created_at DESC
-            """, (st.session_state.user['id'],))
-            
+            """, (user_id,))
+
             outfits = cur.fetchall()
             if outfits:
                 return [
@@ -666,12 +693,14 @@ def get_price_history(item_id):
         cur = conn.cursor()
         try:
             cur.execute("""
-                SELECT price, changed_at 
-                FROM item_price_history 
-                WHERE item_id = %s 
-                ORDER BY changed_at DESC
+                SELECT price, created_at
+                FROM item_price_history
+                WHERE item_id = %s
+                ORDER BY created_at DESC
             """, (item_id,))
-            return cur.fetchall()
+            
+            history = cur.fetchall()
+            return [(float(price), date) for price, date in history] if history else []
         finally:
             cur.close()
 
@@ -730,96 +759,7 @@ def get_color_history(item_id):
             return cur.fetchall()
         finally:
             cur.close()
-# Update the edit_clothing_item function to include price history
-@retry_on_error()
-def edit_clothing_item(item_id, color, styles, genders, sizes, hyperlink, price=None):
-    """Edit clothing item with prepared statement, price and color history tracking"""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            # Get current color before update
-            cur.execute("SELECT color FROM user_clothing_items WHERE id = %s", (item_id,))
-            result = cur.fetchone()
-            if result:
-                old_color = result[0]
-                new_color = f"{color[0]},{color[1]},{color[2]}"
-                
-                # Record color change if different
-                if old_color != new_color:
-                    record_color_change(item_id, old_color, new_color)
-            
-            # Record price change if price is provided and different
-            if price is not None:
-                record_price_change(item_id, price)
-            
-            cur.execute(PREPARED_STATEMENTS['update_item'], (
-                f"{color[0]},{color[1]},{color[2]}",
-                ','.join(styles),
-                ','.join(genders),
-                ','.join(sizes),
-                hyperlink,
-                price,
-                int(item_id) if hasattr(item_id, 'item') else item_id
-            ))
-            
-            if cur.fetchone():
-                conn.commit()
-                return True, f"Item with ID {item_id} updated successfully"
-            return False, f"Item with ID {item_id} not found"
-        finally:
-            cur.close()
 
-# Update add_user_clothing_item to include initial price history
-@retry_on_error()
-def add_user_clothing_item(item_type, color, styles, genders, sizes, image_file, hyperlink="", price=None):
-    """Add clothing item with prepared statement and initial price history"""
-    if not os.path.exists("user_images"):
-        os.makedirs("user_images", exist_ok=True)
-    
-    image_filename = f"{item_type}_{uuid.uuid4()}.png"
-    image_path = os.path.join("user_images", image_filename)
-    
-    with Image.open(image_file) as img:
-        img.save(image_path)
-    
-    # Use item-specific color detection
-    if item_type == 'pants':
-        from color_utils import get_pants_colors
-        color = get_pants_colors(image_path)
-        if color is None:
-            return False, "Failed to detect pants color"
-    
-    with get_db_connection() as conn:
-        cur = conn.cursor()
-        try:
-            cur.execute(PREPARED_STATEMENTS['insert_item'], (
-                item_type, 
-                f"{color[0]},{color[1]},{color[2]}", 
-                ','.join(styles),
-                ','.join(genders),
-                ','.join(sizes),
-                image_path,
-                hyperlink,
-                price
-            ))
-            new_id = cur.fetchone()[0]
-            
-            # Record initial price if provided
-            if price is not None:
-                cur.execute("""
-                    INSERT INTO item_price_history (item_id, price)
-                    VALUES (%s, %s)
-                """, (new_id, price))
-            
-            conn.commit()
-            return True, f"New {item_type} added successfully with ID: {new_id}"
-        except Exception as e:
-            conn.rollback()
-            return False, str(e)
-        finally:
-            cur.close()
-
-# Add the new function after line 382
 @retry_on_error()
 def update_item_image(item_id: int, new_image_path: str) -> Tuple[bool, str]:
     """Update the image of an existing clothing item"""
@@ -877,6 +817,7 @@ def update_item_image(item_id: int, new_image_path: str) -> Tuple[bool, str]:
         logging.error(f"Error updating item image: {str(e)}")
         return False, f"Failed to update image: {str(e)}"
 
+@retry_on_error()
 def get_price_history(item_id):
     """Get price history for an item"""
     with get_db_connection() as conn:
@@ -894,6 +835,7 @@ def get_price_history(item_id):
         finally:
             cur.close()
 
+@retry_on_error()
 def get_cleanup_settings():
     """Get cleanup settings from database"""
     with get_db_connection() as conn:
@@ -932,6 +874,7 @@ def get_cleanup_settings():
         finally:
             cur.close()
 
+@retry_on_error()
 def update_last_cleanup_time():
     """Update the last cleanup timestamp"""
     with get_db_connection() as conn:
@@ -946,6 +889,7 @@ def update_last_cleanup_time():
             conn.commit()
         finally:
             cur.close()
+
 @retry_on_error()
 def load_saved_outfits():
     """Load all saved outfits with their details"""
